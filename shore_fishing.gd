@@ -61,6 +61,11 @@ var _ripple_clock := 0.0
 
 var _rocks: Array[Dictionary] = []
 var _edge_pts := PackedVector2Array()
+var _crowd: Array[Dictionary] = []      # bridge: other anglers along the rail {x, len, phase}
+var _pebbles: Array[Vector3] = []       # beach: x, y, radius
+var _sparkles: Array[Vector3] = []      # sun glints on the water: x, y, phase
+var _kick := 0.0                        # camera punch when the hook is set
+var _fight_hint := ""
 
 var _water: WaterSurface
 var _cam: Camera2D
@@ -90,6 +95,10 @@ func _ready() -> void:
 	add_child(_cam)
 	_cam.make_current()
 
+	var tint := CanvasModulate.new()
+	tint.color = _region_tint()
+	add_child(tint)
+
 	_water = WaterSurface.new()
 	_water.camera = _cam
 	add_child(_water)
@@ -99,6 +108,7 @@ func _ready() -> void:
 	_fishing.name = "FishingController"
 	add_child(_fishing)
 	_fishing.apply_rig(BiomeDB.get_rig(RIG_ID))
+	_fishing.reel_speed_m_s = 3.2             # shore spinning reel: faster retrieve than the boat rig
 	_fishing.fish_caught.connect(_on_caught)
 	_fishing.line_snapped.connect(_on_snapped)
 	_fishing.fish_escaped.connect(_on_escaped)
@@ -138,13 +148,24 @@ func _build_land() -> void:
 				var a := TAU * float(i) / 9.0
 				pts.append(c + Vector2(cos(a) * r * rng.randf_range(0.75, 1.1), sin(a) * r * rng.randf_range(0.6, 0.95)))
 			var shade := rng.randf_range(0.85, 1.15)
-			_rocks.append({"pts": pts, "color": Color(base.r * shade, base.g * shade, base.b * shade)})
+			_rocks.append({"pts": pts, "color": Color(base.r * shade, base.g * shade, base.b * shade), "c": c, "r": r})
 			x += rng.randf_range(46.0, 80.0)
 	elif kind == "beach":
 		var x2 := -HALF_WIDTH
 		while x2 <= HALF_WIDTH:
 			_edge_pts.append(Vector2(x2, sin(x2 * 0.012 + 1.3) * 9.0 + sin(x2 * 0.031) * 4.0))
 			x2 += 40.0
+		for i in 140:
+			_pebbles.append(Vector3(rng.randf_range(-1400.0, 1400.0), rng.randf_range(30.0, 420.0), rng.randf_range(1.5, 4.0)))
+	elif kind == "bridge":
+		# The Galata survey counted about 200 anglers a day on the bridge: line the rail with them.
+		var cx := -1300.0
+		while cx < 1300.0:
+			if absf(cx) > 110.0:
+				_crowd.append({"x": cx, "len": rng.randf_range(90.0, 260.0), "phase": rng.randf() * TAU})
+			cx += rng.randf_range(60.0, 130.0)
+	for i in 46:
+		_sparkles.append(Vector3(rng.randf_range(-1300.0, 1300.0), rng.randf_range(-1100.0, -40.0), rng.randf() * TAU))
 
 
 func _build_hud() -> void:
@@ -266,6 +287,23 @@ func _fish_pos() -> Vector2:
 
 func _set_status(text: String) -> void:
 	_status.text = text
+
+
+## Short vibration on phones that support it (Android browsers). iOS Safari ignores it.
+func _buzz(ms: int) -> void:
+	Input.vibrate_handheld(ms)
+
+
+## Light colour grade per sea: grey-blue Black Sea, bright Aegean, warm Mediterranean.
+func _region_tint() -> Color:
+	var region: String = _spot["region"]
+	if region.contains("Black Sea"):
+		return Color(0.86, 0.90, 0.95)
+	if region.contains("Mediterranean"):
+		return Color(1.0, 0.97, 0.90)
+	if region.contains("Istanbul"):
+		return Color(0.95, 0.95, 1.0)
+	return Color(1.0, 1.0, 0.98)
 
 
 func _update_coins() -> void:
@@ -407,6 +445,7 @@ func _fish_event() -> void:
 	if _nib_left > 0:
 		_nib_left -= 1
 		_dip = 1.0
+		_buzz(35)
 		_add_ripple(_bobber_pos)
 		_set_status("Nibble!  Wait for the real bite")
 		var hz := maxf(float(_prof["noise_hz"]), 0.5)
@@ -415,6 +454,7 @@ func _fish_event() -> void:
 		_state = State.BITE
 		_bite_t = float(_prof["bite_window_s"])
 		_dip = 2.0
+		_buzz(90)
 		_add_ripple(_bobber_pos, true)
 		_set_status("BITE!  Press REEL now")
 
@@ -452,6 +492,10 @@ func _hook_fish() -> void:
 	_fishing.hook_fish(_fish_id, species, _weight_kg, _cast_dist_m)
 	_state = State.FIGHT
 	_dip = 0.0
+	_kick = 0.18
+	_fight_hint = ""
+	_buzz(120)
+	_splash(_bobber_pos)
 	_tension_bar.visible = true
 	_stamina_bar.visible = true
 	_tension_label.visible = true
@@ -488,6 +532,7 @@ func _on_caught(id: String, weight_kg: float) -> void:
 
 
 func _on_snapped(_id: String) -> void:
+	_buzz(300)
 	_result_label.text = "Line snapped!"
 	_set_status("Too much tension. Ease off the reel on the runs")
 	_end_fight()
@@ -502,6 +547,7 @@ func _on_escaped(_id: String) -> void:
 # ---------------------------------------------------------------- per-frame visuals
 func _process(delta: float) -> void:
 	_dip = maxf(0.0, _dip - delta * 2.5)
+	_kick = maxf(0.0, _kick - delta * 0.6)
 	if _state == State.WAIT or _state == State.BITE:
 		_rod_bend_target = _dip * 0.25
 	elif _state != State.FIGHT:
@@ -520,6 +566,7 @@ func _process(delta: float) -> void:
 	_power_bar.visible = _state == State.CHARGE
 	_power_bar.value = _power
 	if _state == State.FIGHT:
+		_fight_feedback(delta)
 		_tension_bar.value = clampf(_tension_ratio, 0.0, 1.0)
 		_stamina_bar.value = _fishing.stamina
 		_tension_fill.bg_color = Color(0.3, 0.85, 0.4).lerp(Color(1.0, 0.25, 0.2), clampf((_tension_ratio - 0.4) / 0.5, 0.0, 1.0))
@@ -527,6 +574,23 @@ func _process(delta: float) -> void:
 
 	_update_camera(delta)
 	queue_redraw()
+
+
+## Coaching line during the fight, plus splashes and a buzz when the fish makes a run.
+func _fight_feedback(delta: float) -> void:
+	var hint := "FISH ON!  Hold REEL.  Ease off when the line is tight"
+	if _tension_ratio > 0.85:
+		hint = "TOO TIGHT!  Let go of REEL or lower the clutch (DRAG-)"
+	elif _fishing.slack_time > 0.8:
+		hint = "Slack line!  Reel in or the hook falls out"
+	elif _fishing.stamina < 0.25:
+		hint = "The fish is tired.  Bring it in"
+	if hint != _fight_hint:
+		_fight_hint = hint
+		_set_status(hint)
+	if _fishing._burst_mult > 1.0 and _rng.randf() < delta * 2.5:
+		_splash(_fish_pos())
+		_buzz(25)
 
 
 func _update_camera(delta: float) -> void:
@@ -544,17 +608,54 @@ func _update_camera(delta: float) -> void:
 		State.RESULT:
 			target_zoom = 1.0
 	_cam.position = _cam.position.lerp(target_pos, 1.0 - exp(-3.0 * delta))
-	_cam.zoom = Vector2.ONE * lerpf(_cam.zoom.x, target_zoom, 1.0 - exp(-2.5 * delta))
+	_cam.zoom = Vector2.ONE * lerpf(_cam.zoom.x, target_zoom * (1.0 + _kick), 1.0 - exp(-2.5 * delta))
 	_cam.offset = Vector2(_rng.randf_range(-1.0, 1.0), _rng.randf_range(-1.0, 1.0)) * _shake * 6.0
 
 
 # ---------------------------------------------------------------- drawing
 func _draw() -> void:
+	_draw_sparkles()
 	_draw_shore()
 	_draw_fish_in_water()
 	_draw_ripples()
 	_draw_line_and_bobber()
 	_draw_angler()
+	_draw_gulls()
+
+
+func _draw_sparkles() -> void:
+	for s in _sparkles:
+		var tw := sin(_time * 2.6 + s.z)
+		if tw > 0.55:
+			var k := (tw - 0.55) / 0.45
+			var p := Vector2(s.x + sin(_time * 0.3 + s.z) * 20.0, s.y)
+			var c := Color(1.0, 1.0, 1.0, 0.8 * k)
+			draw_line(p - Vector2(6.0 * k, 0.0), p + Vector2(6.0 * k, 0.0), c, 2.0)
+			draw_line(p - Vector2(0.0, 6.0 * k), p + Vector2(0.0, 6.0 * k), c, 2.0)
+
+
+func _draw_gulls() -> void:
+	for i in 3:
+		var fi := float(i)
+		var x := fmod(_time * (60.0 + fi * 18.0) + fi * 900.0, 3200.0) - 1600.0
+		var p := Vector2(x, -520.0 + fi * 170.0 + sin(_time * 0.5 + fi) * 40.0)
+		var flap := sin(_time * 7.0 + fi * 2.0) * 7.0
+		var sh := p + Vector2(30.0, 60.0)
+		draw_polyline(PackedVector2Array([sh + Vector2(-14.0, -flap * 0.5), sh, sh + Vector2(14.0, -flap * 0.5)]), Color(0.0, 0.0, 0.0, 0.18), 3.0)
+		draw_polyline(PackedVector2Array([p + Vector2(-16.0, -flap), p + Vector2(0.0, 3.0), p + Vector2(16.0, -flap)]), Color(1.0, 1.0, 1.0, 0.95), 3.0)
+
+
+func _draw_crowd() -> void:
+	for a in _crowd:
+		var x := float(a["x"])
+		var ph := float(a["phase"])
+		var tip := Vector2(x + sin(ph) * 20.0, -30.0)
+		var end := Vector2(x + sin(_time * 0.4 + ph) * 14.0 + sin(ph) * 30.0, -float(a["len"]))
+		draw_line(Vector2(x, 20.0), tip, Color(0.2, 0.13, 0.08), 3.0)
+		draw_line(tip, end, Color(1.0, 1.0, 1.0, 0.35), 1.0)
+		draw_circle(end, 3.0, Color(0.95, 0.3, 0.2, 0.9))
+		draw_circle(Vector2(x, 26.0), 11.0, Color(0.25 + 0.3 * absf(sin(ph)), 0.25, 0.35))
+		draw_circle(Vector2(x, 24.0), 6.0, Color(0.9, 0.75, 0.6))
 
 
 func _draw_shore() -> void:
@@ -575,6 +676,7 @@ func _draw_shore() -> void:
 			draw_circle(Vector2(lx, 62.0), 80.0, Color(1.0, 0.85, 0.5, 0.10))
 			draw_circle(Vector2(lx, 62.0), 7.0, Color(1.0, 0.95, 0.7))
 			lx += 240.0
+		_draw_crowd()
 	elif kind == "harbor":
 		draw_rect(Rect2(-w, 0.0, w * 2.0, 150.0), base)
 		draw_rect(Rect2(-w, 0.0, w * 2.0, 8.0), base.darkened(0.4))
@@ -582,6 +684,11 @@ func _draw_shore() -> void:
 		while bx <= 1200.0:
 			draw_circle(Vector2(bx, 26.0), 9.0, base.darkened(0.5))
 			bx += 160.0
+		var hx := -1120.0
+		while hx <= 1120.0:
+			draw_circle(Vector2(hx, 110.0), 70.0, Color(1.0, 0.85, 0.5, 0.08))
+			draw_circle(Vector2(hx, 110.0), 6.0, Color(1.0, 0.95, 0.7))
+			hx += 320.0
 		for side in [-1.0, 1.0]:
 			_draw_moored_boat(Vector2(430.0 * side, -58.0))
 	elif kind == "beach":
@@ -593,6 +700,8 @@ func _draw_shore() -> void:
 		for p in _edge_pts:
 			wet.append(p + Vector2(0.0, 12.0))
 		draw_polyline(wet, base.darkened(0.14), 16.0)
+		for pb in _pebbles:
+			draw_circle(Vector2(pb.x, pb.y), pb.z, base.darkened(0.25))
 		_draw_foam()
 	else:
 		draw_rect(Rect2(-w, 40.0, w * 2.0, 900.0), base.darkened(0.2))
@@ -603,6 +712,11 @@ func _draw_shore() -> void:
 			var edge := pts.duplicate()
 			edge.append(pts[0])
 			draw_polyline(edge, col.lightened(0.18), 2.0)
+			var rc: Vector2 = rock["c"]
+			if rc.y < 25.0:
+				var rr: float = rock["r"]
+				var swell := sin(_time * 2.0 + rc.x * 0.05) * 3.0
+				draw_arc(rc, rr * 0.95 + 6.0 + swell, PI, TAU, 20, Color(1.0, 1.0, 1.0, 0.35), 2.5)
 		_draw_foam()
 
 

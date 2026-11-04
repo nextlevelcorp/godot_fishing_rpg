@@ -2,8 +2,8 @@
 ## Each button fires the same input action the keyboard uses (boat_forward, reel_in, ...),
 ## so no gameplay script needs to know whether the input came from a finger or a key.
 ## Multi-touch is handled: two fingers can hold throttle and steer at once.
-## Button positions are in the 1280x720 design space; they are mapped to the real screen
-## through the viewport transform, so they track the window size.
+## Button positions are in the 1280x720 design space. Godot maps touches into the same space,
+## so the buttons track the window size with no extra conversion.
 class_name TouchControls
 extends CanvasLayer
 
@@ -47,7 +47,7 @@ func _ready() -> void:
 func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		if event.pressed:
-			var idx := _button_at_screen(event.position)
+			var idx := _button_at(event.position)
 			if idx >= 0 and not _held.values().has(idx):
 				_held[event.index] = idx
 				_set_action(BUTTONS[idx][0], true)
@@ -78,17 +78,19 @@ func _is_enabled(action: StringName) -> bool:
 	return enabled_actions.is_empty() or enabled_actions.has(action)
 
 
-## Maps a screen position to a button index, or -1.
-func _button_at_screen(screen_pos: Vector2) -> int:
-	var xf := get_viewport().get_final_transform()
-	var scale_factor := xf.get_scale().x
+## Maps a touch position to a button index, or -1.
+## Godot already maps touches into the 1280x720 design space before _input (the window's stretch
+## transform is undone), so the table's coordinates compare directly. The second test, through the
+## inverse viewport transform, covers the case where a touch arrives in raw window pixels.
+func _button_at(pos: Vector2) -> int:
+	var alt := get_viewport().get_final_transform().affine_inverse() * pos
 	for i in BUTTONS.size():
 		var b: Array = BUTTONS[i]
 		if not _is_enabled(b[0]):
 			continue
-		var center := xf * Vector2(b[2], b[3])
-		var radius: float = b[4] * TOUCH_SCALE * scale_factor
-		if screen_pos.distance_to(center) <= radius * 1.2:
+		var center := Vector2(b[2], b[3])
+		var reach: float = b[4] * TOUCH_SCALE * 1.2
+		if pos.distance_to(center) <= reach or alt.distance_to(center) <= reach:
 			return i
 	return -1
 
