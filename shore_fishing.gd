@@ -15,7 +15,6 @@ extends Node2D
 enum State { AIM, CHARGE, FLY, WAIT, BITE, FIGHT, RESULT }
 
 const PX_PER_M := 10.0
-const RIG_ID := "shore_spinning_rig"
 const MIN_CAST_M := 8.0
 const MAX_CAST_M := 70.0
 const ROD_LEN := 90.0
@@ -85,6 +84,7 @@ var _tension_fill: StyleBoxFlat
 func _ready() -> void:
 	_rng.randomize()
 	InputDefaults.ensure_all()
+	GameSession.load_once()
 	if FishingSpots.get_spot(GameSession.spot_id).is_empty():
 		GameSession.spot_id = "galata_bridge"       # opened directly, not from the map
 	_spot = FishingSpots.get_spot(GameSession.spot_id)
@@ -107,7 +107,7 @@ func _ready() -> void:
 	_fishing = FishingController.new()
 	_fishing.name = "FishingController"
 	add_child(_fishing)
-	_fishing.apply_rig(BiomeDB.get_rig(RIG_ID))
+	_fishing.apply_rig(BiomeDB.get_rig(GameSession.rig_id))
 	_fishing.reel_speed_m_s = 3.2             # shore spinning reel: faster retrieve than the boat rig
 	_fishing.fish_caught.connect(_on_caught)
 	_fishing.line_snapped.connect(_on_snapped)
@@ -179,7 +179,7 @@ func _build_hud() -> void:
 
 	_spot_label = _make_label(ui, 22, Color.WHITE)
 	_spot_label.position = Vector2(20.0, 12.0)
-	_spot_label.text = "%s  -  %s" % [_spot["name"], _spot["region"]]
+	_spot_label.text = "%s  -  %s   |   %s" % [_spot["name"], _spot["region"], BiomeDB.get_rig(GameSession.rig_id).get("name", "")]
 
 	_status = _make_label(ui, 30, Color.WHITE)
 	_status.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
@@ -488,7 +488,7 @@ func _retrieve(message: String) -> void:
 func _hook_fish() -> void:
 	var species := BiomeDB.get_species(_fish_id)
 	_weight_kg = BiomeDB.roll_weight_kg(_fish_id, _rng)
-	_fishing.apply_rig(BiomeDB.get_rig(RIG_ID))
+	_fishing.apply_rig(BiomeDB.get_rig(GameSession.rig_id))
 	_fishing.hook_fish(_fish_id, species, _weight_kg, _cast_dist_m)
 	_state = State.FIGHT
 	_dip = 0.0
@@ -523,10 +523,12 @@ func _end_fight() -> void:
 func _on_caught(id: String, weight_kg: float) -> void:
 	var sp := BiomeDB.get_species(id)
 	var value := int(round(float(sp["base_price"]) * pow(maxf(weight_kg, 0.05), 0.8)))
-	GameSession.coins += value
-	GameSession.catches.append({"fish_id": id, "name": sp["name"], "weight_kg": weight_kg, "value": value, "spot_id": GameSession.spot_id})
+	var first := not GameSession.counts.has(id)
+	var record := not first and weight_kg > float(GameSession.best_kg.get(id, 0.0))
+	GameSession.record_catch(id, sp["name"], weight_kg, value)
 	_update_coins()
-	_result_label.text = "CAUGHT!\n%s  %.2f kg   +%d" % [sp["name"], weight_kg, value]
+	var badge := "NEW SPECIES!  " if first else ("NEW RECORD!  " if record else "")
+	_result_label.text = "%sCAUGHT!\n%s  %.2f kg   +%d" % [badge, sp["name"], weight_kg, value]
 	_set_status("Nice one")
 	_end_fight()
 

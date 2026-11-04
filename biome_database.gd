@@ -13,6 +13,8 @@ const RIGS := {
 	"heavy_saltwater_spinning": {"name": "Heavy Saltwater Spinning", "rod_stiffness": 210.0, "line_stiffness": 1900.0, "line_break_force_n": 125.0, "drag_max_n": 85.0, "spool_m": 200.0, "min_level": 20},
 	"titan_tackle_rig": {"name": "Titan Tackle Rig", "rod_stiffness": 230.0, "line_stiffness": 2100.0, "line_break_force_n": 240.0, "drag_max_n": 150.0, "spool_m": 300.0, "min_level": 30},
 	"shore_spinning_rig": {"name": "Shore Spinning Rig", "rod_stiffness": 100.0, "line_stiffness": 1000.0, "line_break_force_n": 55.0, "drag_max_n": 34.0, "spool_m": 140.0, "min_level": 1},
+	"shore_medium_rig": {"name": "Shore Medium Rig", "rod_stiffness": 140.0, "line_stiffness": 1300.0, "line_break_force_n": 85.0, "drag_max_n": 55.0, "spool_m": 180.0, "min_level": 1, "price": 400},
+	"shore_heavy_rig": {"name": "Shore Heavy Rig", "rod_stiffness": 190.0, "line_stiffness": 1700.0, "line_break_force_n": 140.0, "drag_max_n": 95.0, "spool_m": 220.0, "min_level": 1, "price": 1500},
 }
 
 # ---------------------------------------------------------------- BAITS

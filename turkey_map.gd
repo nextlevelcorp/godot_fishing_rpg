@@ -74,13 +74,19 @@ var _sub: Label
 var _fish_label: Label
 var _note_label: Label
 var _go_button: Button
+var _coins_label: Label
+var _overlay: PanelContainer
+var _overlay_title: Label
+var _overlay_list: VBoxContainer
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	GameSession.load_once()
 	_build_header()
 	_build_pins()
 	_build_panel()
+	_build_overlay()
 	resized.connect(_layout)
 	_layout()
 	if GameSession.spot_id != "" and _pins.has(GameSession.spot_id):
@@ -104,6 +110,23 @@ func _build_header() -> void:
 	header.add_theme_color_override("font_outline_color", Color(0, 0.1, 0.2, 0.9))
 	header.add_theme_constant_override("outline_size", 6)
 	add_child(header)
+
+	var bar := HBoxContainer.new()
+	bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	bar.offset_left = -560.0
+	bar.offset_right = -16.0
+	bar.offset_top = 6.0
+	bar.offset_bottom = 60.0
+	bar.alignment = BoxContainer.ALIGNMENT_END
+	bar.add_theme_constant_override("separation", 10)
+	add_child(bar)
+	_coins_label = _make_label(bar, 22, Color(1.0, 0.9, 0.5))
+	_coins_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_coins_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_coins_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bar.add_child(_make_button("TACKLE", 150.0, _open_tackle))
+	bar.add_child(_make_button("JOURNAL", 160.0, _open_journal))
+	_update_coins()
 
 
 func _build_pins() -> void:
@@ -260,10 +283,125 @@ func _select(id: String) -> void:
 	var names: Array[String] = []
 	for sid: String in s["species"]:
 		names.append(String(BiomeDB.get_species(sid).get("name", sid)))
-	_fish_label.text = "Fish here: " + ", ".join(names)
+	var ids: Array = s["species"]
+	_fish_label.text = "Fish here (%d/%d caught): %s" % [_caught_count(ids), ids.size(), ", ".join(names)]
 	_note_label.text = "Evidence: %s (%d sources). %s Pin is town-level, not the exact mark." % [s["evidence"], s["sources"].size(), s["species_note"]]
 	_go_button.disabled = false
 	queue_redraw()
+
+
+func _caught_count(ids: Array) -> int:
+	var n := 0
+	for fid: String in ids:
+		if GameSession.counts.has(fid):
+			n += 1
+	return n
+
+
+func _update_coins() -> void:
+	_coins_label.text = "Coins: %d" % GameSession.coins
+
+
+func _make_button(text: String, width: float, on_press: Callable) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.custom_minimum_size = Vector2(width, 54.0)
+	b.add_theme_font_size_override("font_size", 20)
+	b.focus_mode = Control.FOCUS_NONE
+	b.pressed.connect(on_press)
+	return b
+
+
+# ---------------------------------------------------------------- tackle shop and journal
+func _build_overlay() -> void:
+	_overlay = PanelContainer.new()
+	_overlay.name = "Overlay"
+	_overlay.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_overlay.offset_left = -420.0
+	_overlay.offset_right = 420.0
+	_overlay.offset_top = -300.0
+	_overlay.offset_bottom = 300.0
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.02, 0.10, 0.18, 0.96)
+	style.set_corner_radius_all(18)
+	style.set_content_margin_all(18)
+	style.set_border_width_all(2)
+	style.border_color = Color(1, 1, 1, 0.25)
+	_overlay.add_theme_stylebox_override("panel", style)
+	add_child(_overlay)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	_overlay.add_child(box)
+	var top := HBoxContainer.new()
+	box.add_child(top)
+	_overlay_title = _make_label(top, 28, Color.WHITE)
+	top.add_child(_make_button("CLOSE", 140.0, func() -> void: _overlay.visible = false))
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
+	_overlay_list = VBoxContainer.new()
+	_overlay_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_overlay_list.add_theme_constant_override("separation", 10)
+	scroll.add_child(_overlay_list)
+	_overlay.visible = false
+
+
+func _clear_list() -> void:
+	for c in _overlay_list.get_children():
+		c.queue_free()
+
+
+func _open_tackle() -> void:
+	_clear_list()
+	_overlay_title.text = "Tackle  -  Coins: %d" % GameSession.coins
+	for rid: String in GameSession.SHORE_RIGS:
+		var rig := BiomeDB.get_rig(rid)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		_overlay_list.add_child(row)
+		var info := _make_label(row, 18, Color.WHITE)
+		info.text = "%s\nLine breaks at %.0f N, clutch up to %.0f N, %.0f m of line" % [rig["name"], rig["line_break_force_n"], rig["drag_max_n"], rig["spool_m"]]
+		var price := int(rig.get("price", 0))
+		var b: Button
+		if GameSession.rig_id == rid:
+			b = _make_button("EQUIPPED", 190.0, func() -> void: pass)
+			b.disabled = true
+		elif GameSession.owned_rigs.has(rid):
+			b = _make_button("EQUIP", 190.0, func() -> void:
+				GameSession.equip(rid)
+				_open_tackle())
+		else:
+			b = _make_button("BUY  %d" % price, 190.0, func() -> void:
+				GameSession.buy_rig(rid, price)
+				_update_coins()
+				_open_tackle())
+			b.disabled = GameSession.coins < price
+		row.add_child(b)
+	var tip := _make_label(_overlay_list, 15, Color(0.7, 0.8, 0.9))
+	tip.text = "A stronger rig lets you hold big fish without snapping the line. The biggest fish here can still out-pull it: use the clutch."
+	_overlay.visible = true
+
+
+func _open_journal() -> void:
+	_clear_list()
+	_overlay_title.text = "Journal  -  %d species landed" % GameSession.counts.size()
+	for spot_key: String in FishingSpots.ids():
+		var s := FishingSpots.get_spot(spot_key)
+		var ids: Array = s["species"]
+		var head := _make_label(_overlay_list, 20, Color(1.0, 0.9, 0.6))
+		head.text = "%s  -  %d / %d species" % [s["name"], _caught_count(ids), ids.size()]
+		var lines: Array[String] = []
+		for fid: String in ids:
+			if GameSession.counts.has(fid):
+				lines.append("   %s: best %.2f kg, landed %d" % [BiomeDB.get_species(fid)["name"], float(GameSession.best_kg[fid]), int(GameSession.counts[fid])])
+			else:
+				lines.append("   ???  not caught yet")
+		var body := _make_label(_overlay_list, 16, Color(0.85, 0.9, 1.0))
+		body.text = "\n".join(lines)
+	_overlay.visible = true
 
 
 func _on_go_pressed() -> void:
