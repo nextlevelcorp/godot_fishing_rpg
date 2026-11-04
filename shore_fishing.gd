@@ -100,7 +100,14 @@ var _crowd: Array[Dictionary] = []
 var _pebbles: Array[Vector3] = []
 var _sparkles: Array[Vector3] = []
 
+# boats on a sea lane (path following) and the other anglers on the shore
+var _boats: Array = []
+var _boat_lane := PackedVector2Array()
+var _neighbor_clock := 8.0
+var _reel_click := 0.0
+
 # nodes
+var _amb: Ambience
 var _water: WaterSurface
 var _cam: Camera2D
 var _tint: CanvasModulate
@@ -162,6 +169,11 @@ func _ready() -> void:
 	_rope = Noc.Rope.new(ROPE_POINTS, HAND, HAND)
 	_build_land()
 	_spawn_shoals()
+	_spawn_boats()
+	_amb = Ambience.new()
+	_amb.surf_level = 0.75 if _spot["kind"] == "rocky" else 0.55
+	add_child(_amb)
+	_build_vignette()
 	_build_hud()
 	var touch := TouchControls.new()
 	touch.enabled_actions.assign([&"steer_left", &"steer_right", &"cast", &"reel_in", &"drag_up", &"drag_down"])
@@ -204,13 +216,15 @@ func _build_land() -> void:
 			x2 += 40.0
 		for i in 140:
 			_pebbles.append(Vector3(rng.randf_range(-1400.0, 1400.0), rng.randf_range(30.0, 230.0), rng.randf_range(1.5, 4.0)))
-	elif kind == "bridge":
-		# The Galata survey counted about 200 anglers a day on the bridge: line the rail with them.
-		var cx := -1300.0
-		while cx < 1300.0:
-			if absf(cx) > 110.0:
-				_crowd.append({"x": cx, "len": rng.randf_range(90.0, 260.0), "phase": rng.randf() * TAU})
-			cx += rng.randf_range(60.0, 130.0)
+	# Other anglers along the shore. The Galata survey counted about 200 a day on the bridge, so
+	# the rail is lined with them; elsewhere a few locals fish the same water.
+	var crowd_y: float = {"bridge": 20.0, "harbor": 20.0, "beach": 34.0}.get(kind, 12.0)
+	var gap := Vector2(60.0, 130.0) if kind == "bridge" else Vector2(260.0, 520.0)
+	var cx := -1300.0
+	while cx < 1300.0:
+		if absf(cx) > 140.0:
+			_crowd.append({"x": cx, "y": crowd_y, "len": rng.randf_range(90.0, 260.0), "phase": rng.randf() * TAU})
+		cx += rng.randf_range(gap.x, gap.y)
 	for i in 46:
 		_sparkles.append(Vector3(rng.randf_range(-1300.0, 1300.0), rng.randf_range(-1100.0, -40.0), rng.randf() * TAU))
 
@@ -227,6 +241,43 @@ func _spawn_shoals() -> void:
 		_shoals.append(group)
 
 
+## Fishing boats (and a ferry on the Istanbul spot) sailing a loop out at sea.
+func _spawn_boats() -> void:
+	_boat_lane = PackedVector2Array([Vector2(-2300.0, -760.0), Vector2(2300.0, -820.0), Vector2(2300.0, -1060.0), Vector2(-2300.0, -1000.0)])
+	var count := 3
+	for i in count:
+		var ferry: bool = _spot["region"].contains("Istanbul") and i == 0
+		var speed := 55.0 if ferry else _rng.randf_range(35.0, 60.0)
+		var b := Noc.Vehicle.new(_boat_lane[i % 4] + Vector2(float(i) * 500.0, 0.0), speed, 25.0)
+		b.data = {"ferry": ferry, "trail": 0.0, "color": [Color(0.85, 0.3, 0.25), Color(0.2, 0.5, 0.75), Color(0.95, 0.75, 0.25)][i % 3]}
+		_boats.append(b)
+
+
+## Soft dark corners: keeps the eye on the middle of the screen.
+func _build_vignette() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 4
+	add_child(layer)
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0.0, 0.0, 0.0, 0.0))
+	grad.set_color(1, Color(0.0, 0.02, 0.06, 0.5))
+	grad.add_point(0.62, Color(0.0, 0.0, 0.0, 0.0))
+	var tex := GradientTexture2D.new()
+	tex.gradient = grad
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(1.0, 1.0)
+	tex.width = 256
+	tex.height = 256
+	var rect := TextureRect.new()
+	rect.texture = tex
+	rect.stretch_mode = TextureRect.STRETCH_SCALE
+	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(rect)
+
+
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	layer.layer = 5
@@ -241,6 +292,9 @@ func _build_hud() -> void:
 	_spot_label.text = "%s  -  %s   |   %s" % [_spot["name"], _spot["region"], BiomeDB.get_rig(GameSession.rig_id).get("name", "")]
 	_clock_label = _make_label(ui, 18, Color(0.85, 0.92, 1.0))
 	_clock_label.position = Vector2(20.0, 40.0)
+	var build := _make_label(ui, 14, Color(1.0, 1.0, 1.0, 0.6))
+	build.position = Vector2(20.0, 694.0)
+	build.text = GameSession.BUILD
 
 	_status = _make_label(ui, 30, Color.WHITE)
 	_status.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
@@ -461,6 +515,8 @@ func _physics_process(delta: float) -> void:
 	_update_rope(delta)
 	_update_shoals(delta)
 	_update_particles(delta)
+	_update_boats(delta)
+	_update_neighbors(delta)
 
 
 ## A press counts once whether it came from a key (pressed now, not last frame) or a touch
@@ -508,6 +564,7 @@ func _tick_fly(delta: float) -> void:
 		return
 	_cast_dist_m = _rod_tip().distance_to(_bobber_pos) / PX_PER_M
 	_splash(_bobber_pos, 1.0)
+	_amb.play("splash", 0.8)
 	_float_x = 0.8
 	_float_v = 0.0
 	_float_pull = 0.0
@@ -570,6 +627,7 @@ func _fish_event() -> void:
 		_nib_left -= 1
 		_float_v += 6.0
 		_buzz(35)
+		_amb.play("plop", 0.35)
 		_add_ripple(_bobber_pos)
 		if _fish_agent != null:
 			_fish_agent.vel += (_bobber_pos - _fish_agent.pos).normalized() * 60.0
@@ -583,6 +641,7 @@ func _fish_event() -> void:
 		_float_pull = 1.3
 		_float_v += 10.0
 		_buzz(90)
+		_amb.play("plop", 0.9)
 		_add_ripple(_bobber_pos, true)
 		_set_status("BITE!  Press REEL now")
 
@@ -631,6 +690,7 @@ func _hook_fish() -> void:
 	_kick = 0.18
 	_fight_hint = ""
 	_buzz(120)
+	_amb.play("splash", 1.0)
 	_splash(_bobber_pos, 1.2)
 	_show_fight_ui(true)
 
@@ -648,6 +708,7 @@ func _tick_fight(delta: float) -> void:
 	if _fishing._burst_mult > 1.0 and _rng.randf() < delta * 2.5:
 		_splash(f.pos, 0.8)
 		_buzz(25)
+		_amb.play("splash", 0.5)
 
 
 # ---------------------------------------------------------------- Nature of Code updates
@@ -745,6 +806,39 @@ func _update_particles(delta: float) -> void:
 					_particles.append(Noc.Particle.new(rc - Vector2(0.0, rr * 0.7), v, 0.0, _rng.randf_range(60.0, 140.0), 1.0, _rng.randf_range(1.5, 3.0), Color(1.0, 1.0, 1.0, 0.8)))
 
 
+## Boats follow the sea lane (Reynolds path following) and leave a wake of ripples.
+func _update_boats(delta: float) -> void:
+	for b in _boats:
+		b.apply_force(b.follow_path(_boat_lane, 30.0))
+		b.update(delta)
+		b.data["trail"] = float(b.data["trail"]) - delta
+		if float(b.data["trail"]) <= 0.0:
+			b.data["trail"] = 0.35
+			_add_ripple(b.pos - b.heading() * 40.0, true)
+
+
+## Where a neighbour's float sits: at the end of their line, bobbing on a slow wave.
+func _neighbor_float(a: Dictionary) -> Vector2:
+	var x := float(a["x"])
+	var ph := float(a["phase"])
+	return Vector2(x + sin(_time * 0.4 + ph) * 14.0 + sin(ph) * 30.0, float(a["y"]) - 30.0 - float(a["len"]) + sin(_time * 1.7 + ph) * 2.0)
+
+
+## Now and then another angler hooks something: a splash at their float and a sound, quieter
+## the further away they are.
+func _update_neighbors(delta: float) -> void:
+	if _crowd.is_empty():
+		return
+	_neighbor_clock -= delta
+	if _neighbor_clock > 0.0:
+		return
+	_neighbor_clock = _rng.randf_range(10.0, 22.0)
+	var a: Dictionary = _crowd[_rng.randi() % _crowd.size()]
+	var p := _neighbor_float(a)
+	_splash(p, 0.6)
+	_amb.play("splash", clampf(1.0 - absf(p.x) / 1400.0, 0.15, 0.6))
+
+
 # ---------------------------------------------------------------- fight results
 func _on_tension(_tension_n: float, ratio: float, bend: float) -> void:
 	_tension_ratio = ratio
@@ -777,6 +871,7 @@ func _on_caught(id: String, weight_kg: float) -> void:
 
 func _on_snapped(_id: String) -> void:
 	_buzz(300)
+	_amb.play("snap", 1.0)
 	_result_label.text = "Line snapped!"
 	_set_status("Too much tension. Ease off the reel on the runs")
 	_end_fight()
@@ -801,6 +896,13 @@ func _process(delta: float) -> void:
 		r["age"] = float(r["age"]) + delta
 	_ripples.assign(_ripples.filter(func(r: Dictionary) -> bool: return float(r["age"]) < 1.6))
 
+	_world.wind = _wind
+	_amb.gull_rate = 0.02 + 0.08 * _world.daylight
+	if _state == State.FIGHT and Input.is_action_pressed(&"reel_in"):
+		_reel_click -= delta
+		if _reel_click <= 0.0:
+			_reel_click = 0.06
+			_amb.play("click", 0.5)
 	_tint.color = _world.tint(_region_tint())
 	_water.set_daylight(_world.daylight)
 	_clock_label.text = _world.clock_text()
@@ -864,6 +966,7 @@ func _draw() -> void:
 	_draw_sparkles()
 	_draw_shore()
 	_draw_shoals()
+	_draw_boats()
 	_draw_fish()
 	_draw_ripples()
 	_draw_line_and_float()
@@ -947,13 +1050,15 @@ func _draw_crowd() -> void:
 	for a in _crowd:
 		var x := float(a["x"])
 		var ph := float(a["phase"])
-		var tip := Vector2(x + sin(ph) * 20.0, -30.0)
-		var end := Vector2(x + sin(_time * 0.4 + ph) * 14.0 + sin(ph) * 30.0, -float(a["len"]))
-		draw_line(Vector2(x, 20.0), tip, Color(0.2, 0.13, 0.08), 3.0)
+		var y := float(a["y"])
+		var tip := Vector2(x + sin(ph) * 20.0, y - 50.0)
+		var end := _neighbor_float(a)
+		draw_line(Vector2(x, y), tip, Color(0.2, 0.13, 0.08), 3.0)
 		draw_line(tip, end, Color(1.0, 1.0, 1.0, 0.35), 1.0)
 		draw_circle(end, 3.0, Color(0.95, 0.3, 0.2, 0.9))
-		draw_circle(Vector2(x, 26.0), 11.0, Color(0.25 + 0.3 * absf(sin(ph)), 0.25, 0.35))
-		draw_circle(Vector2(x, 24.0), 6.0, Color(0.9, 0.75, 0.6))
+		draw_circle(Vector2(x + 4.0, y + 9.0), 12.0, Color(0.0, 0.0, 0.0, 0.2))
+		draw_circle(Vector2(x, y + 6.0), 11.0, Color(0.25 + 0.3 * absf(sin(ph)), 0.25, 0.35))
+		draw_circle(Vector2(x, y + 4.0), 6.0, Color(0.9, 0.75, 0.6))
 
 
 func _draw_foam() -> void:
@@ -998,6 +1103,31 @@ func _draw_shoals() -> void:
 			var p: Vector2 = f.pos
 			var h: Vector2 = f.heading()
 			_draw_fish_shape(p, h, float(f.data["len"]), Color(0.05, 0.18, 0.24, 0.35))
+
+
+func _draw_boats() -> void:
+	for b in _boats:
+		var p: Vector2 = b.pos
+		var f: Vector2 = b.heading()
+		var s := f.orthogonal()
+		var ferry: bool = b.data["ferry"]
+		var l := 120.0 if ferry else 70.0
+		var w := 30.0 if ferry else 18.0
+		var hull := PackedVector2Array([p + f * l * 0.55, p + f * l * 0.25 + s * w, p - f * l * 0.45 + s * w, p - f * l * 0.45 - s * w, p + f * l * 0.25 - s * w])
+		var shadow := PackedVector2Array()
+		for q in hull:
+			shadow.append(q + Vector2(8.0, 12.0))
+		draw_colored_polygon(shadow, Color(0.0, 0.05, 0.1, 0.25))
+		draw_colored_polygon(hull, Color(0.95, 0.95, 0.93))
+		if ferry:
+			draw_rect(Rect2(p - Vector2(30.0, 14.0), Vector2(60.0, 28.0)), Color(0.85, 0.85, 0.82))
+			draw_circle(p - f * 10.0, 8.0, Color(0.85, 0.2, 0.15))
+			draw_circle(p - f * 10.0, 5.0, Color(0.15, 0.15, 0.15))
+		else:
+			var col: Color = b.data["color"]
+			draw_colored_polygon(PackedVector2Array([p + f * 8.0 + s * 9.0, p - f * 18.0 + s * 9.0, p - f * 18.0 - s * 9.0, p + f * 8.0 - s * 9.0]), col)
+		draw_line(p - f * l * 0.45 + s * w * 0.6, p - f * (l * 0.45 + 50.0) + s * w * 1.6, Color(1.0, 1.0, 1.0, 0.35), 2.0)
+		draw_line(p - f * l * 0.45 - s * w * 0.6, p - f * (l * 0.45 + 50.0) - s * w * 1.6, Color(1.0, 1.0, 1.0, 0.35), 2.0)
 
 
 func _draw_fish() -> void:

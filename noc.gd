@@ -66,6 +66,27 @@ class Vehicle:
 		var center := pos + heading() * distance
 		return seek(center + Vector2(cos(wander_theta), sin(wander_theta)) * radius)
 
+	## Reynolds path following on a closed polyline: predict where the agent will be, find the
+	## closest point on the path, and seek a little further along it. Off the path's radius the
+	## pull is strong; on it, a light pull keeps the agent aligned with the path direction.
+	func follow_path(path: PackedVector2Array, radius: float, lookahead: float = 50.0) -> Vector2:
+		var predict := pos + heading() * lookahead
+		var best := pos
+		var best_d := INF
+		var best_dir := Vector2.RIGHT
+		var n := path.size()
+		for i in n:
+			var a := path[i]
+			var b := path[(i + 1) % n]
+			var p := Geometry2D.get_closest_point_to_segment(predict, a, b)
+			var d := predict.distance_to(p)
+			if d < best_d:
+				best_d = d
+				best = p
+				best_dir = (b - a).normalized()
+		var force := seek(best + best_dir * 40.0)
+		return force if best_d > radius else force * 0.35
+
 	## Steers back inside bounds when closer than margin to an edge.
 	func contain(bounds: Rect2, margin: float) -> Vector2:
 		var desired := vel

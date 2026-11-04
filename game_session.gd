@@ -4,6 +4,9 @@
 class_name GameSession
 extends RefCounted
 
+## Shown on screen so a player can tell a fresh deploy from a page the browser cached.
+## Bump it with every build that changes behaviour.
+const BUILD := "build 8"
 const SAVE_PATH := "user://save.cfg"
 const START_RIG := "shore_spinning_rig"
 ## Shore rigs in shop order. Prices live on each rig in BiomeDB.RIGS ("price").

@@ -103,7 +103,7 @@ func _process(delta: float) -> void:
 func _build_header() -> void:
 	var header := Label.new()
 	header.name = "Header"
-	header.text = "Choose your fishing spot  -  Türkiye"
+	header.text = "Choose your fishing spot  -  Türkiye      [%s]" % GameSession.BUILD
 	header.position = Vector2(20, 14)
 	header.add_theme_font_size_override("font_size", 28)
 	header.add_theme_color_override("font_color", Color.WHITE)

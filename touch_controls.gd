@@ -1,9 +1,11 @@
 ## On-screen touch buttons for phones and tablets.
-## Each button fires the same input action the keyboard uses (boat_forward, reel_in, ...),
-## so no gameplay script needs to know whether the input came from a finger or a key.
-## Multi-touch is handled: two fingers can hold throttle and steer at once.
-## Button positions are in the 1280x720 design space. Godot maps touches into the same space,
-## so the buttons track the window size with no extra conversion.
+## Each button presses the same input action the keyboard uses (cast, reel_in, steer_left, ...),
+## so gameplay scripts do not care whether input came from a finger or a key.
+##
+## The buttons are GUI Controls, not a raw _input handler: on some mobile browsers raw _input
+## never sees the touch, while the GUI (the path every Button on the map uses) always does.
+## Godot's GUI gives each finger its own touch focus, so two buttons can be held at once.
+## Positions are in the 1280x720 design space, the same space Controls are laid out in.
 class_name TouchControls
 extends CanvasLayer
 
@@ -12,7 +14,7 @@ const TOUCH_SCALE := 1.35
 
 const BUTTONS := [
 	# [action, label, center_x, center_y, radius] in design coordinates (1280 x 720).
-	# Left cluster: boat.
+	# Left cluster: boat / aiming.
 	[&"boat_forward", "^", 110.0, 430.0, 60.0],
 	[&"steer_left", "<", 60.0, 580.0, 55.0],
 	[&"steer_right", ">", 200.0, 580.0, 55.0],
@@ -27,119 +29,108 @@ const BUTTONS := [
 	[&"bait_shallower", "SHAL", 1210.0, 220.0, 36.0],
 ]
 
-## Only these actions get a button. Empty = show all. Set before the node enters the tree.
-var enabled_actions: Array[StringName] = []
-
-## Pointer id used for mouse clicks (and for touches the browser only reports as mouse events).
-const MOUSE_ID := 1000
-
-## Action -> how many times a button for it has been pressed. Scenes compare this counter with the
-## value they saw last frame, so a quick tap is never missed between two physics frames.
+## Action -> how many times a button for it has been pressed. Scenes compare this counter with
+## the value they saw last frame, so a tap shorter than a frame is never lost.
 static var presses: Dictionary = {}
 
-## Pointer id (finger index or MOUSE_ID) -> index into BUTTONS, for the pointer holding it.
-var _held: Dictionary = {}
-var _pad: Control
-var _tap_pos := Vector2.ZERO
-var _tap_age := 99.0
+## Only these actions get a button. Empty = all. Set before the node enters the tree.
+var enabled_actions: Array[StringName] = []
+
+var _root: Control
 
 
 func _ready() -> void:
 	layer = 10
-	_pad = Control.new()
-	_pad.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_pad.draw.connect(_draw_pad)
-	add_child(_pad)
-
-
-func _process(delta: float) -> void:
-	if _tap_age < 0.6:
-		_tap_age += delta
-		_pad.queue_redraw()
-
-
-## Touches arrive as InputEventScreenTouch on most phones; some browsers (and every desktop)
-## deliver mouse events instead. Both go through the same path. If one tap produces both, the
-## second press finds the button already held and is ignored, and its release is a no-op.
-func _input(event: InputEvent) -> void:
-	if event is InputEventScreenTouch:
-		_pointer(event.index, event.position, event.pressed)
-	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		_pointer(MOUSE_ID, event.position, event.pressed)
-
-
-func _pointer(id: int, pos: Vector2, pressed: bool) -> void:
-	if pressed:
-		_tap_pos = pos
-		_tap_age = 0.0
-		_pad.queue_redraw()
-		var idx := _button_at(pos)
-		if idx >= 0 and not _held.values().has(idx):
-			_held[id] = idx
-			var action: StringName = BUTTONS[idx][0]
-			presses[action] = int(presses.get(action, 0)) + 1
-			_set_action(action, true)
-			get_viewport().set_input_as_handled()
-	elif _held.has(id):
-		_set_action(BUTTONS[_held[id]][0], false)
-		_held.erase(id)
-		_pad.queue_redraw()
-		get_viewport().set_input_as_handled()
-
-
-## Sets the action's state (read by Input.get_axis / is_action_pressed in the gameplay scripts)
-## and also sends the event (read by _unhandled_input handlers such as cast).
-func _set_action(action: StringName, pressed: bool) -> void:
-	if pressed:
-		Input.action_press(action, 1.0)
-	else:
-		Input.action_release(action)
-	var ev := InputEventAction.new()
-	ev.action = action
-	ev.pressed = pressed
-	ev.strength = 1.0 if pressed else 0.0
-	Input.parse_input_event(ev)
-
-
-func _is_enabled(action: StringName) -> bool:
-	return enabled_actions.is_empty() or enabled_actions.has(action)
-
-
-## Maps a touch position to a button index, or -1.
-## Godot already maps touches into the 1280x720 design space before _input (the window's stretch
-## transform is undone), so the table's coordinates compare directly. The second test, through the
-## inverse viewport transform, covers the case where a touch arrives in raw window pixels.
-func _button_at(pos: Vector2) -> int:
-	var alt := get_viewport().get_final_transform().affine_inverse() * pos
-	for i in BUTTONS.size():
-		var b: Array = BUTTONS[i]
-		if not _is_enabled(b[0]):
+	_root = Control.new()
+	_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_root)
+	for b: Array in BUTTONS:
+		var action: StringName = b[0]
+		if not (enabled_actions.is_empty() or enabled_actions.has(action)):
 			continue
-		var center := Vector2(b[2], b[3])
-		var reach: float = b[4] * TOUCH_SCALE * 1.2
-		if pos.distance_to(center) <= reach or alt.distance_to(center) <= reach:
-			return i
-	return -1
+		var btn := TouchButton.new()
+		btn.action = action
+		btn.label = b[1]
+		btn.radius = float(b[4]) * TOUCH_SCALE
+		btn.position = Vector2(b[2], b[3]) - Vector2.ONE * btn.radius
+		btn.size = Vector2.ONE * btn.radius * 2.0
+		_root.add_child(btn)
 
 
-func _draw_pad() -> void:
-	var font := ThemeDB.fallback_font
-	var held_set := _held.values()
-	for i in BUTTONS.size():
-		var b: Array = BUTTONS[i]
-		if not _is_enabled(b[0]):
-			continue
-		var center := Vector2(b[2], b[3])
-		var radius: float = b[4] * TOUCH_SCALE
-		var lit := held_set.has(i)
-		_pad.draw_circle(center, radius, Color(1, 1, 1, 0.45 if lit else 0.25))
-		_pad.draw_arc(center, radius, 0.0, TAU, 40, Color(1, 1, 1, 0.8), 3.0)
-		var size := 26 if String(b[1]).length() <= 2 else 20
-		var text_w := font.get_string_size(b[1], HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-		_pad.draw_string(font, center + Vector2(-text_w * 0.5, size * 0.35), b[1], HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(1, 1, 1, 0.85))
-	# Tap marker: shows where the game thinks the finger landed. If it is not under the finger,
-	# touch coordinates are being mapped wrongly on this device.
-	if _tap_age < 0.6:
-		var k := _tap_age / 0.6
-		_pad.draw_arc(_tap_pos, 18.0 + k * 26.0, 0.0, TAU, 32, Color(1.0, 0.9, 0.3, 0.9 * (1.0 - k)), 3.0)
+## One round button. Handles touch (per finger) and mouse (desktop, or browsers that turn touches
+## into mouse events). If a tap arrives both ways, the second press finds the button already down.
+class TouchButton extends Control:
+	const MOUSE_ID := 1000
+
+	var action: StringName
+	var label := ""
+	var radius := 50.0
+	var _pointers: Dictionary = {}       # pointer id -> true while it holds this button
+	var _tap := Vector2.ZERO
+	var _tap_age := 99.0
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_STOP
+
+	func _has_point(point: Vector2) -> bool:
+		return point.distance_to(size * 0.5) <= radius * 1.15
+
+	func _gui_input(event: InputEvent) -> void:
+		if event is InputEventScreenTouch:
+			_pointer(event.index, event.position, event.pressed)
+			accept_event()
+		elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+			_pointer(MOUSE_ID, event.position, event.pressed)
+			accept_event()
+
+	func _pointer(id: int, pos: Vector2, pressed: bool) -> void:
+		if pressed:
+			_tap = pos
+			_tap_age = 0.0
+			if _pointers.is_empty():
+				TouchControls.presses[action] = int(TouchControls.presses.get(action, 0)) + 1
+				_set_action(true)
+			_pointers[id] = true
+		elif _pointers.has(id):
+			_pointers.erase(id)
+			if _pointers.is_empty():
+				_set_action(false)
+		queue_redraw()
+
+	## Sets the action's state (read by Input.get_axis / is_action_pressed) and also sends the
+	## event (read by _unhandled_input handlers such as the boat sandbox's cast).
+	func _set_action(down: bool) -> void:
+		if down:
+			Input.action_press(action, 1.0)
+		else:
+			Input.action_release(action)
+		var ev := InputEventAction.new()
+		ev.action = action
+		ev.pressed = down
+		ev.strength = 1.0 if down else 0.0
+		Input.parse_input_event(ev)
+
+	func _process(delta: float) -> void:
+		if _tap_age < 0.5:
+			_tap_age += delta
+			queue_redraw()
+
+	func _notification(what: int) -> void:
+		# Losing the window or the node mid-press must not leave the action stuck down.
+		if (what == NOTIFICATION_EXIT_TREE or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT) and not _pointers.is_empty():
+			_pointers.clear()
+			_set_action(false)
+
+	func _draw() -> void:
+		var c := size * 0.5
+		var lit := not _pointers.is_empty()
+		draw_circle(c, radius, Color(1, 1, 1, 0.45 if lit else 0.22))
+		draw_arc(c, radius, 0.0, TAU, 40, Color(1, 1, 1, 0.85), 3.0)
+		var font := ThemeDB.fallback_font
+		var fs := 26 if label.length() <= 2 else 20
+		var tw := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		draw_string(font, c + Vector2(-tw * 0.5, fs * 0.35), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 1, 1, 0.9))
+		if _tap_age < 0.5:
+			var k := _tap_age / 0.5
+			draw_arc(_tap, 14.0 + k * 22.0, 0.0, TAU, 28, Color(1.0, 0.9, 0.3, 0.95 * (1.0 - k)), 3.0)

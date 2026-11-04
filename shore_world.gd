@@ -27,6 +27,11 @@ const CLOTHES := [
 
 var daylight := 1.0
 var spot: Dictionary = {}
+## Set by the shore scene each frame: cloud shadows drift with it.
+var wind := Vector2(20.0, 0.0)
+
+var _kind := ""
+var _clouds: Array[Dictionary] = []
 
 var _rng := RandomNumberGenerator.new()
 var _pal: Dictionary = {}
@@ -54,7 +59,13 @@ func setup(p_spot: Dictionary, seed_value: int) -> void:
 	_rng.seed = seed_value
 	_pal = _palette()
 	var kind: String = spot.get("kind", "rocky")
+	_kind = kind
 	_town_y0 = {"bridge": 430.0, "harbor": 150.0, "beach": 240.0}.get(kind, 215.0)
+	for i in 5:
+		var puffs: Array[Vector3] = []
+		for j in 5:
+			puffs.append(Vector3(_rng.randf_range(-160.0, 160.0), _rng.randf_range(-70.0, 70.0), _rng.randf_range(90.0, 170.0)))
+		_clouds.append({"pos": Vector2(_rng.randf_range(-2200.0, 2200.0), _rng.randf_range(-1100.0, 700.0)), "puffs": puffs})
 	_build_town()
 	_spawn_life()
 
@@ -172,7 +183,10 @@ func _spawn_life() -> void:
 		_gulls.append(g)
 
 
+## Where people stroll: the bridge deck on Galata (it is busy with pedestrians), else the promenade.
 func _walk_band() -> Rect2:
+	if _kind == "bridge":
+		return Rect2(-1600.0, 50.0, 3200.0, 48.0)
 	return Rect2(-1600.0, _town_y0 + 4.0, 3200.0, 48.0)
 
 
@@ -210,6 +224,15 @@ func _process(delta: float) -> void:
 		g.apply_force(g.wander(delta, 60.0, 30.0, 2.0) * 0.6)
 		g.apply_force(g.contain(sky, 160.0))
 		g.update(delta)
+
+	for cl in _clouds:
+		var p: Vector2 = cl["pos"]
+		p += (wind * 0.6 + Vector2(14.0, 0.0)) * delta
+		if p.x > 2300.0:
+			p.x = -2300.0
+		elif p.x < -2300.0:
+			p.x = 2300.0
+		cl["pos"] = p
 
 	_dyn.queue_redraw()
 	_sky.queue_redraw()
@@ -321,6 +344,12 @@ func _draw_dyn() -> void:
 
 
 func _draw_sky() -> void:
+	var shade := 0.07 * daylight
+	if shade > 0.005:
+		for cl in _clouds:
+			var cp: Vector2 = cl["pos"]
+			for pf: Vector3 in cl["puffs"]:
+				_sky.draw_circle(cp + Vector2(pf.x, pf.y), pf.z, Color(0.0, 0.05, 0.12, shade))
 	for g in _gulls:
 		var fl := sin(_time * 7.0 + float(g.data["phase"])) * 7.0
 		var h: Vector2 = g.heading()
