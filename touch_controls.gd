@@ -30,9 +30,18 @@ const BUTTONS := [
 ## Only these actions get a button. Empty = show all. Set before the node enters the tree.
 var enabled_actions: Array[StringName] = []
 
-## Finger index -> index into BUTTONS, for the touch that is currently holding it.
+## Pointer id used for mouse clicks (and for touches the browser only reports as mouse events).
+const MOUSE_ID := 1000
+
+## Action -> how many times a button for it has been pressed. Scenes compare this counter with the
+## value they saw last frame, so a quick tap is never missed between two physics frames.
+static var presses: Dictionary = {}
+
+## Pointer id (finger index or MOUSE_ID) -> index into BUTTONS, for the pointer holding it.
 var _held: Dictionary = {}
 var _pad: Control
+var _tap_pos := Vector2.ZERO
+var _tap_age := 99.0
 
 
 func _ready() -> void:
@@ -44,20 +53,39 @@ func _ready() -> void:
 	add_child(_pad)
 
 
+func _process(delta: float) -> void:
+	if _tap_age < 0.6:
+		_tap_age += delta
+		_pad.queue_redraw()
+
+
+## Touches arrive as InputEventScreenTouch on most phones; some browsers (and every desktop)
+## deliver mouse events instead. Both go through the same path. If one tap produces both, the
+## second press finds the button already held and is ignored, and its release is a no-op.
 func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
-		if event.pressed:
-			var idx := _button_at(event.position)
-			if idx >= 0 and not _held.values().has(idx):
-				_held[event.index] = idx
-				_set_action(BUTTONS[idx][0], true)
-				_pad.queue_redraw()
-				get_viewport().set_input_as_handled()
-		elif _held.has(event.index):
-			_set_action(BUTTONS[_held[event.index]][0], false)
-			_held.erase(event.index)
-			_pad.queue_redraw()
+		_pointer(event.index, event.position, event.pressed)
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_pointer(MOUSE_ID, event.position, event.pressed)
+
+
+func _pointer(id: int, pos: Vector2, pressed: bool) -> void:
+	if pressed:
+		_tap_pos = pos
+		_tap_age = 0.0
+		_pad.queue_redraw()
+		var idx := _button_at(pos)
+		if idx >= 0 and not _held.values().has(idx):
+			_held[id] = idx
+			var action: StringName = BUTTONS[idx][0]
+			presses[action] = int(presses.get(action, 0)) + 1
+			_set_action(action, true)
 			get_viewport().set_input_as_handled()
+	elif _held.has(id):
+		_set_action(BUTTONS[_held[id]][0], false)
+		_held.erase(id)
+		_pad.queue_redraw()
+		get_viewport().set_input_as_handled()
 
 
 ## Sets the action's state (read by Input.get_axis / is_action_pressed in the gameplay scripts)
@@ -110,3 +138,8 @@ func _draw_pad() -> void:
 		var size := 26 if String(b[1]).length() <= 2 else 20
 		var text_w := font.get_string_size(b[1], HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 		_pad.draw_string(font, center + Vector2(-text_w * 0.5, size * 0.35), b[1], HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(1, 1, 1, 0.85))
+	# Tap marker: shows where the game thinks the finger landed. If it is not under the finger,
+	# touch coordinates are being mapped wrongly on this device.
+	if _tap_age < 0.6:
+		var k := _tap_age / 0.6
+		_pad.draw_arc(_tap_pos, 18.0 + k * 26.0, 0.0, TAU, 32, Color(1.0, 0.9, 0.3, 0.9 * (1.0 - k)), 3.0)

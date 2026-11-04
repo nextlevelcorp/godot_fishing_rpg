@@ -39,6 +39,13 @@ jobs:
       - name: Import project resources
         run: $HOME/godot/Godot_v4.4-stable_linux.x86_64 --headless --path . --import || true
 
+      - name: Parse-check every game script
+        # Export only tokenizes scripts, so a type error would still ship and fail on the player's
+        # device. Loading each script with Godot itself catches it here and fails the build.
+        run: |
+          SCRIPTS=$(ls *.gd | sed 's|^|res://|')
+          $HOME/godot/Godot_v4.4-stable_linux.x86_64 --headless --path . -s res://.claude/scripts/godot-parse-check.gd -- $SCRIPTS
+
       - name: Export Web build
         run: |
           mkdir -p build/web
