@@ -11,6 +11,7 @@ const RIGS := {
 	"heavy_river_baitcaster": {"name": "Heavy River Baitcaster", "rod_stiffness": 170.0, "line_stiffness": 1500.0, "line_break_force_n": 110.0, "drag_max_n": 70.0, "spool_m": 140.0, "min_level": 10},
 	"deep_sea_boat_rig": {"name": "Deep Sea Boat Rig", "rod_stiffness": 190.0, "line_stiffness": 1700.0, "line_break_force_n": 95.0, "drag_max_n": 62.0, "spool_m": 260.0, "min_level": 15},
 	"heavy_saltwater_spinning": {"name": "Heavy Saltwater Spinning", "rod_stiffness": 210.0, "line_stiffness": 1900.0, "line_break_force_n": 125.0, "drag_max_n": 85.0, "spool_m": 200.0, "min_level": 20},
+	"titan_tackle_rig": {"name": "Titan Tackle Rig", "rod_stiffness": 230.0, "line_stiffness": 2100.0, "line_break_force_n": 240.0, "drag_max_n": 150.0, "spool_m": 300.0, "min_level": 30},
 }
 
 # ---------------------------------------------------------------- BAITS
@@ -68,6 +69,10 @@ const BITE_PROFILES := {
 	"coral_trout": {"caution": 0.30, "noise_hz": 1.6, "nibble_force_n": 4.0, "nibbles": Vector2i(0, 2), "strike_force_n": 26.0, "bite_window_s": 0.7, "spook_chance": 0.5},
 	"swordfish": {"caution": 0.60, "noise_hz": 0.5, "nibble_force_n": 8.0, "nibbles": Vector2i(2, 4), "strike_force_n": 60.0, "bite_window_s": 1.2, "spook_chance": 0.6, "max_nibble_s": 30.0, "appetite": 0.9},
 	"spanish_mackerel": {"caution": 0.10, "noise_hz": 3.0, "nibble_force_n": 5.0, "nibbles": Vector2i(0, 0), "strike_force_n": 32.0, "bite_window_s": 0.5, "spook_chance": 0.1, "self_hook_chance": 0.2, "max_nibble_s": 4.0, "appetite": 1.0},
+	# Glass Lagoon (invented)
+	"glass_snapper": {"caution": 0.35, "noise_hz": 2.2, "nibble_force_n": 1.2, "nibbles": Vector2i(2, 4), "strike_force_n": 5.0, "bite_window_s": 1.0, "spook_chance": 0.4, "appetite": 1.0},
+	"lagoon_grouper": {"caution": 0.45, "noise_hz": 0.6, "nibble_force_n": 6.0, "nibbles": Vector2i(1, 2), "strike_force_n": 45.0, "bite_window_s": 1.3, "spook_chance": 0.4, "max_nibble_s": 18.0},
+	"ember_barracuda": {"caution": 0.10, "noise_hz": 3.0, "nibble_force_n": 4.0, "nibbles": Vector2i(0, 0), "strike_force_n": 40.0, "bite_window_s": 0.6, "spook_chance": 0.1, "self_hook_chance": 0.3, "max_nibble_s": 4.0, "appetite": 1.0},
 }
 
 # ---------------------------------------------------------------- WEATHER TRAITS
@@ -128,6 +133,14 @@ const ZONES := {
 		"species": ["giant_trevally", "coral_trout", "spanish_mackerel", "swordfish"],
 		"description": "Turquoise flats, coral bommies and apex predators that smash poppers at the surface.",
 	},
+	"glass_lagoon": {
+		"name": "Glass Lagoon (invented)", "region": "Sunken Archipelago", "lat_lon": Vector2(10.00, 120.00),
+		"level_range": Vector2i(30, 40), "water_temp_c": Vector2(24.0, 29.0), "max_depth_m": 150.0,
+		"current_px_s": 22.0, "wind_px_s": 12.0,
+		"baits": ["surface_popper", "heavy_jig"], "rigs": ["titan_tackle_rig"],
+		"species": ["glass_snapper", "ember_barracuda", "lagoon_grouper"],
+		"description": "Invented: a drowned village under still, glassy water. Things down there are very large and very patient.",
+	},
 }
 
 var fish: Dictionary = {}
@@ -185,6 +198,10 @@ func _build_fish() -> Dictionary:
 		"coral_trout": _fish("Coral Trout", "Plectropomus leopardus", "predator", Vector2(0.8, 10.0), Vector2(0.40, 0.85), Vector2(3, 60), false, 36.0, 0.0026, Vector2(3.0, 5.0), Vector2(1.6, 2.2), 380),
 		"swordfish": _fish("Swordfish", "Xiphias gladius", "predator", Vector2(40.0, 450.0), Vector2(0.30, 0.80), Vector2(150, 600), false, 80.0, 0.0016, Vector2(2.5, 5.0), Vector2(1.6, 2.2), 2600),
 		"spanish_mackerel": _fish("Spanish Mackerel", "Scomberomorus commerson", "predator", Vector2(1.0, 30.0), Vector2(0.30, 0.80), Vector2(2, 70), false, 40.0, 0.0024, Vector2(2.0, 4.0), Vector2(1.7, 2.4), 420),
+		# Glass Lagoon (invented)
+		"glass_snapper": _fish("Glass Snapper (invented)", "Lutjanus vitreus", "prey", Vector2(0.3, 3.0), Vector2(0.40, 0.80), Vector2(3, 30), true, 9.0, 0.004, Vector2(3.0, 6.0), Vector2(1.4, 1.8), 55),
+		"ember_barracuda": _fish("Ember Barracuda (invented)", "Sphyraena ignea", "predator", Vector2(1.0, 15.0), Vector2(0.40, 0.85), Vector2(1, 25), true, 55.0, 0.0035, Vector2(2.5, 5.0), Vector2(1.9, 2.2), 110),
+		"lagoon_grouper": _fish("Lagoon Grouper (invented)", "Epinephelus lagunaris", "predator", Vector2(5.0, 60.0), Vector2(0.35, 0.75), Vector2(5, 40), false, 150.0, 0.0028, Vector2(4.0, 8.0), Vector2(1.7, 1.9), 180),
 	}
 
 
