@@ -20,12 +20,12 @@
 <!-- Written by /setup-engine. Read by /ux-design, /ux-review, /test-setup, /team-ui, and /dev-story -->
 <!-- to scope interaction specs, test helpers, and implementation to the correct input methods. -->
 
-- **Target Platforms**: PC, Web
-- **Input Methods**: Keyboard/Mouse
-- **Primary Input**: Keyboard/Mouse (W/S/A/D, Space, Up/Down)
+- **Target Platforms**: Mobile web (primary), PC web
+- **Input Methods**: Touch (on-screen buttons, touch_controls.gd), Keyboard/Mouse
+- **Primary Input**: Touch
 - **Gamepad Support**: Partial
-- **Touch Support**: Partial
-- **Platform Notes**: Web build ships to GitHub Pages (Compatibility renderer, WebGL 2). Keep the game playable with keyboard alone.
+- **Touch Support**: Full
+- **Platform Notes**: Mobile Safari is the main target. Web build on GitHub Pages (Compatibility renderer, WebGL 2). Every action must work from the touch buttons; keyboard is secondary.
 
 ## Naming Conventions
 

@@ -37,6 +37,7 @@ var _upgrade_index := 0
 func _ready() -> void:
 	_rng.randomize()
 	InputDefaults.ensure_all()
+	add_child(TouchControls.new())  # on-screen buttons for phones; same actions as the keyboard
 	var schools: Array[FishSchool] = [anchovy, bluefish, seabream]
 
 	progression.current_zone = start_zone
