@@ -7,6 +7,9 @@
 class_name TouchControls
 extends CanvasLayer
 
+## Buttons are drawn and hit-tested at this multiple of the listed radius, so thumbs can reach them.
+const TOUCH_SCALE := 1.35
+
 const BUTTONS := [
 	# [action, label, center_x, center_y, radius] in design coordinates (1280 x 720).
 	# Left cluster: boat.
@@ -16,12 +19,12 @@ const BUTTONS := [
 	[&"boat_back", "v", 110.0, 690.0, 40.0],
 	# Right cluster: fishing.
 	[&"reel_in", "REEL", 1100.0, 600.0, 80.0],
-	[&"cast", "CAST", 1100.0, 430.0, 55.0],
-	[&"anchor", "ANCH", 960.0, 690.0, 45.0],
-	[&"drag_up", "DRAG+", 960.0, 380.0, 38.0],
+	[&"cast", "CAST", 1100.0, 400.0, 55.0],
+	[&"anchor", "ANCH", 940.0, 695.0, 45.0],
+	[&"drag_up", "DRAG+", 940.0, 350.0, 38.0],
 	[&"drag_down", "DRAG-", 960.0, 470.0, 38.0],
-	[&"bait_deeper", "DEEP", 1200.0, 330.0, 36.0],
-	[&"bait_shallower", "SHAL", 1200.0, 250.0, 36.0],
+	[&"bait_deeper", "DEEP", 1210.0, 300.0, 36.0],
+	[&"bait_shallower", "SHAL", 1210.0, 220.0, 36.0],
 ]
 
 ## Finger index -> index into BUTTONS, for the touch that is currently holding it.
@@ -54,7 +57,13 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 
 
+## Sets the action's state (read by Input.get_axis / is_action_pressed in the gameplay scripts)
+## and also sends the event (read by _unhandled_input handlers such as cast).
 func _set_action(action: StringName, pressed: bool) -> void:
+	if pressed:
+		Input.action_press(action, 1.0)
+	else:
+		Input.action_release(action)
 	var ev := InputEventAction.new()
 	ev.action = action
 	ev.pressed = pressed
@@ -69,8 +78,8 @@ func _button_at_screen(screen_pos: Vector2) -> int:
 	for i in BUTTONS.size():
 		var b: Array = BUTTONS[i]
 		var center := xf * Vector2(b[2], b[3])
-		var radius: float = b[4] * scale_factor
-		if screen_pos.distance_to(center) <= radius * 1.15:
+		var radius: float = b[4] * TOUCH_SCALE * scale_factor
+		if screen_pos.distance_to(center) <= radius * 1.2:
 			return i
 	return -1
 
@@ -81,10 +90,10 @@ func _draw_pad() -> void:
 	for i in BUTTONS.size():
 		var b: Array = BUTTONS[i]
 		var center := Vector2(b[2], b[3])
-		var radius: float = b[4]
+		var radius: float = b[4] * TOUCH_SCALE
 		var lit := held_set.has(i)
-		_pad.draw_circle(center, radius, Color(1, 1, 1, 0.35 if lit else 0.18))
-		_pad.draw_arc(center, radius, 0.0, TAU, 40, Color(1, 1, 1, 0.6), 2.0)
-		var size := 18 if String(b[1]).length() <= 2 else 14
+		_pad.draw_circle(center, radius, Color(1, 1, 1, 0.45 if lit else 0.25))
+		_pad.draw_arc(center, radius, 0.0, TAU, 40, Color(1, 1, 1, 0.8), 3.0)
+		var size := 26 if String(b[1]).length() <= 2 else 20
 		var text_w := font.get_string_size(b[1], HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 		_pad.draw_string(font, center + Vector2(-text_w * 0.5, size * 0.35), b[1], HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(1, 1, 1, 0.85))
