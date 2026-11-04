@@ -5,5 +5,5 @@
 - Obtained from the unchanged mirror `BeyondHarnessLab/longway-bench-assets`, release
   `kenney-library-2026-10-19`, archive `kenney-library-2d.tar.gz`
   (sha256 501062fab296f27a8223272dd0beeca3e8bac278f820c5186bd231f37f1f3950, verified).
-- Files: `Sprites/Style A/Large (2x)` button and direction plates, and white icons from
+- Files: `Sprites/Style A/Large (2x)` button and direction plates, joystick pad and nub (`joystick_circle_pad_a`, `joystick_circle_nub_a`), and white icons from
   `Sprites/Icons/Large (2x)`, used by `touch_controls.gd`.

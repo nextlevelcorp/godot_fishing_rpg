@@ -87,6 +87,18 @@ const BITE_PROFILES := {
 	"leerfish": {"caution": 0.12, "noise_hz": 2.8, "nibble_force_n": 4.0, "nibbles": Vector2i(0, 1), "strike_force_n": 32.0, "bite_window_s": 0.6, "spook_chance": 0.2, "self_hook_chance": 0.25, "max_nibble_s": 6.0, "appetite": 1.0},
 	"saddled_bream": {"caution": 0.40, "noise_hz": 2.2, "nibble_force_n": 1.0, "nibbles": Vector2i(2, 4), "strike_force_n": 4.0, "bite_window_s": 1.0, "spook_chance": 0.5, "appetite": 1.0},
 	"garfish": {"caution": 0.30, "noise_hz": 2.6, "nibble_force_n": 0.8, "nibbles": Vector2i(1, 3), "strike_force_n": 3.0, "bite_window_s": 0.9, "spook_chance": 0.3, "appetite": 0.95},
+	# More shore species and other sea creatures (numbers are game-design values)
+	"flathead_grey_mullet": {"caution": 0.80, "noise_hz": 1.2, "nibble_force_n": 1.0, "nibbles": Vector2i(3, 7), "strike_force_n": 6.0, "bite_window_s": 0.7, "spook_chance": 0.9, "max_nibble_s": 25.0, "appetite": 0.7},
+	"white_seabream": {"caution": 0.60, "noise_hz": 1.5, "nibble_force_n": 1.6, "nibbles": Vector2i(2, 5), "strike_force_n": 7.0, "bite_window_s": 0.8, "spook_chance": 0.8, "appetite": 0.85},
+	"atlantic_mackerel": {"caution": 0.10, "noise_hz": 3.0, "nibble_force_n": 2.0, "nibbles": Vector2i(0, 1), "strike_force_n": 6.0, "bite_window_s": 0.8, "spook_chance": 0.1, "self_hook_chance": 0.4, "appetite": 1.1},
+	"whiting": {"caution": 0.30, "noise_hz": 1.8, "nibble_force_n": 1.0, "nibbles": Vector2i(1, 3), "strike_force_n": 3.0, "bite_window_s": 1.0, "spook_chance": 0.3, "appetite": 1.0},
+	"turbot": {"caution": 0.55, "noise_hz": 0.5, "nibble_force_n": 4.0, "nibbles": Vector2i(1, 2), "strike_force_n": 30.0, "bite_window_s": 1.4, "spook_chance": 0.4, "max_nibble_s": 20.0, "appetite": 0.7},
+	"greater_weever": {"caution": 0.20, "noise_hz": 2.2, "nibble_force_n": 1.2, "nibbles": Vector2i(0, 2), "strike_force_n": 4.0, "bite_window_s": 1.0, "spook_chance": 0.2, "appetite": 1.0},
+	"ornate_wrasse": {"caution": 0.25, "noise_hz": 3.0, "nibble_force_n": 0.6, "nibbles": Vector2i(2, 5), "strike_force_n": 2.0, "bite_window_s": 0.8, "spook_chance": 0.3, "appetite": 1.2},
+	"common_octopus": {"caution": 0.50, "noise_hz": 0.4, "nibble_force_n": 3.0, "nibbles": Vector2i(1, 2), "strike_force_n": 14.0, "bite_window_s": 2.0, "spook_chance": 0.3, "max_nibble_s": 30.0, "appetite": 0.8},
+	"common_cuttlefish": {"caution": 0.45, "noise_hz": 0.8, "nibble_force_n": 1.5, "nibbles": Vector2i(1, 3), "strike_force_n": 5.0, "bite_window_s": 1.4, "spook_chance": 0.5, "appetite": 0.9},
+	"european_squid": {"caution": 0.35, "noise_hz": 2.0, "nibble_force_n": 1.2, "nibbles": Vector2i(1, 2), "strike_force_n": 5.0, "bite_window_s": 1.0, "spook_chance": 0.5, "appetite": 1.0},
+	"blue_crab": {"caution": 0.30, "noise_hz": 1.0, "nibble_force_n": 2.0, "nibbles": Vector2i(2, 4), "strike_force_n": 4.0, "bite_window_s": 1.6, "spook_chance": 0.4, "appetite": 1.1},
 }
 
 # ---------------------------------------------------------------- WEATHER TRAITS
@@ -227,7 +239,43 @@ func _build_fish() -> Dictionary:
 		"leerfish": _fish("Leerfish (Sarikuyruk)", "Lichia amia", "predator", Vector2(1.0, 25.0), Vector2(0.40, 0.85), Vector2(1, 40), false, 45.0, 0.0032, Vector2(2.5, 5.0), Vector2(1.8, 2.2), 85),
 		"saddled_bream": _fish("Saddled Bream (Karagoz)", "Oblada melanura", "prey", Vector2(0.05, 0.8), Vector2(0.30, 0.80), Vector2(1, 30), true, 4.0, 0.0045, Vector2(3.0, 6.0), Vector2(1.3, 1.6), 22),
 		"garfish": _fish("Garfish (Zargana)", "Belone belone", "prey", Vector2(0.1, 1.0), Vector2(0.30, 0.80), Vector2(0.3, 10), true, 3.0, 0.005, Vector2(2.0, 5.0), Vector2(1.4, 1.8), 18),
+		# More shore species and other sea creatures (numbers are game-design values)
+		"flathead_grey_mullet": _fish("Flathead Grey Mullet (Kefal)", "Mugil cephalus", "prey", Vector2(0.3, 4.0), Vector2(0.30, 0.85), Vector2(0.3, 10), true, 14.0, 0.0035, Vector2(3.0, 6.0), Vector2(1.6, 1.9), 25),
+		"white_seabream": _fish("White Seabream (Sargoz)", "Diplodus sargus", "prey", Vector2(0.1, 1.5), Vector2(0.35, 0.80), Vector2(1, 30), false, 9.0, 0.004, Vector2(3.0, 6.0), Vector2(1.4, 1.8), 45),
+		"atlantic_mackerel": _fish("Atlantic Mackerel (Uskumru)", "Scomber scombrus", "prey", Vector2(0.1, 1.2), Vector2(0.25, 0.70), Vector2(1, 40), true, 6.0, 0.004, Vector2(2.0, 4.0), Vector2(1.6, 2.0), 20),
+		"whiting": _fish("Whiting (Mezgit)", "Merlangius merlangus", "prey", Vector2(0.05, 0.8), Vector2(0.15, 0.60), Vector2(5, 60), true, 3.0, 0.005, Vector2(4.0, 8.0), Vector2(1.2, 1.5), 18),
+		"turbot": _fish("Turbot (Kalkan)", "Scophthalmus maximus", "predator", Vector2(1.0, 12.0), Vector2(0.15, 0.60), Vector2(5, 70), false, 35.0, 0.0028, Vector2(5.0, 9.0), Vector2(1.3, 1.6), 160),
+		"greater_weever": _fish("Greater Weever (Trakonya)", "Trachinus draco", "predator", Vector2(0.05, 0.6), Vector2(0.30, 0.80), Vector2(1, 50), false, 4.0, 0.0045, Vector2(4.0, 7.0), Vector2(1.2, 1.5), 15),
+		"ornate_wrasse": _fish("Ornate Wrasse (Hanim Baligi)", "Thalassoma pavo", "prey", Vector2(0.02, 0.15), Vector2(0.40, 0.90), Vector2(1, 20), false, 2.0, 0.006, Vector2(2.0, 4.0), Vector2(1.3, 1.6), 8),
+		"common_octopus": _fish("Common Octopus (Ahtapot)", "Octopus vulgaris", "predator", Vector2(0.3, 6.0), Vector2(0.30, 0.80), Vector2(1, 40), false, 30.0, 0.0020, Vector2(6.0, 10.0), Vector2(1.2, 1.4), 90),
+		"common_cuttlefish": _fish("Common Cuttlefish (Murekkep Baligi)", "Sepia officinalis", "predator", Vector2(0.2, 2.5), Vector2(0.30, 0.80), Vector2(2, 40), false, 8.0, 0.0035, Vector2(4.0, 7.0), Vector2(1.5, 1.9), 60),
+		"european_squid": _fish("European Squid (Kalamar)", "Loligo vulgaris", "predator", Vector2(0.1, 1.5), Vector2(0.30, 0.80), Vector2(5, 60), true, 6.0, 0.004, Vector2(2.0, 4.0), Vector2(1.8, 2.3), 70),
+		"blue_crab": _fish("Blue Crab (Mavi Yengec)", "Callinectes sapidus", "predator", Vector2(0.1, 0.6), Vector2(0.40, 0.90), Vector2(0.5, 20), false, 4.0, 0.004, Vector2(5.0, 9.0), Vector2(1.1, 1.3), 35),
 	}
+
+
+# ---------------------------------------------------------------- ACTIVITY
+# When a species feeds most (game rule from general angling knowledge, not sourced per spot):
+#   night     squid, cuttlefish, octopus and whiting come up and feed after dark
+#   day       wrasse sleep at night; mullet, garfish and bream feed in daylight
+#   twilight  predators hunt hardest at dawn and dusk (the default)
+const ACTIVITY := {
+	"european_squid": "night", "common_cuttlefish": "night", "common_octopus": "night", "whiting": "night",
+	"ornate_wrasse": "day", "flathead_grey_mullet": "day", "garfish": "day", "saddled_bream": "day",
+	"gilthead_seabream": "day", "white_seabream": "day", "striped_sea_bream": "day",
+}
+
+
+## How hungry a species is at time_of_day (0 = midnight, 0.25 sunrise, 0.5 noon, 0.75 sunset).
+func activity_factor(species_id: String, time_of_day: float) -> float:
+	var sun := sin((time_of_day - 0.25) * TAU)                       # -1 midnight .. +1 noon
+	var twilight := clampf(1.0 - absf(sun) * 2.5, 0.0, 1.0)         # 1 near sunrise and sunset
+	match String(ACTIVITY.get(species_id, "twilight")):
+		"night":
+			return 0.15 + 1.6 * clampf(-sun, 0.0, 1.0) + 0.6 * twilight
+		"day":
+			return 0.1 + 1.1 * clampf(sun + 0.2, 0.0, 1.0) + 0.3 * twilight
+	return 0.45 + 1.4 * twilight + 0.15 * clampf(sun, 0.0, 1.0)
 
 
 # ---------------------------------------------------------------- LOOKUPS

@@ -1,7 +1,13 @@
 ## Shore fishing at a real spot picked on the Turkey map (see fishing_spots.gd).
 ##
-## Flow:  AIM (steer < >) -> hold CAST to charge, release to throw -> WAIT for a fish
-##        -> the fish swims in, NIBBLES the bait -> BITE (short window: press REEL) -> FIGHT -> result.
+## Flow:  walk the shore and the pier with the stick -> at the water's edge hold CAST to charge,
+##        aim with the stick, release to throw -> WAIT for a fish -> NIBBLES -> BITE (short window:
+##        press REEL) -> FIGHT (side view) -> result.
+##
+## Realism: the bottom drops away from the shore at the spot's slope (steep rocks, shallow sand);
+## the float holds the bait at a set depth (DEEP / SHAL), and a species only bites near its own
+## depth range and at its own feeding time (BiomeDB.activity_factor). Fish are not drawn from
+## above: you read the water (rings, shoals breaking the surface) and the float.
 ##
 ## Everything that moves follows Nature of Code rules (noc.gd):
 ##   the cast is a projectile under gravity, air drag and wind; the float is a damped spring;
@@ -9,7 +15,8 @@
 ##   particles; the line is a Verlet rope pushed by the current. The fight itself is
 ##   FishingController (spring-mass line, clutch, fatigue). The town behind is ShoreWorld.
 ##
-## Controls: steer_left / steer_right  aim     cast  hold = power, release = throw, tap while waiting = reel in
+## Controls: stick (steer_left/right, boat_forward/back)  walk, and aim while charging
+##           bait_deeper / bait_shallower  float depth     cast  hold = power, release = throw, tap while waiting = reel in
 ##           reel_in  set the hook on a bite, then hold to reel     drag_up / drag_down  clutch (fight)
 class_name ShoreFishing
 extends Node2D
@@ -20,18 +27,33 @@ const PX_PER_M := 10.0
 const ROD_LEN := 90.0
 const ROD_BEND_PX := 20.0
 const ROD_TIP_HEIGHT := 70.0      ## px above the water the bait starts its flight from
-const HAND := Vector2(0.0, 46.0)
-const HALF_WIDTH := 1800.0
+const HALF_WIDTH := 4000.0
 const MAP_SCENE := "res://turkey_map.tscn"
 const GRAVITY_Z := 520.0          ## px/s^2 pulling the flying bait down
 const AIR_DRAG := 0.35            ## 1/s horizontal drag on the flying bait
 const WATER_EDGE := -12.0         ## bait landing below this y hits water, above it hits the shore
-const SHOAL_BOUNDS := Rect2(-1100.0, -780.0, 2200.0, 720.0)
+const SHOAL_BOUNDS := Rect2(-3700.0, -900.0, 7400.0, 840.0)
 const ROPE_POINTS := 16
+const WALK_SPEED := 150.0          ## px/s, about 1.5 m/s
+const PIER_LEN := 420.0            ## the pier reaches 42 m out
+const PIER_HALF := 26.0
+const TIP_RADIUS := 100.0          ## walk this close to another angler to hear their tip
 
 var _rng := RandomNumberGenerator.new()
 var _spot: Dictionary = {}
 var _state := State.AIM
+
+# the player
+var _hand := Vector2(0.0, 46.0)    ## where the angler stands (hand height in the top-down view)
+var _facing := Vector2.UP
+var _moving := false
+var _walk_phase := 0.0
+var _walk_rects: Array[Rect2] = []
+var _has_pier := true
+var _pier_x := 900.0
+var _bait_depth := 2.0             ## float setting, metres below the surface
+var _tip_text := ""
+var _tip_pos := Vector2.ZERO
 var _time := 0.0
 
 # input edges, robust to quick taps (see TouchControls.presses)
@@ -124,6 +146,7 @@ var _power_bar: ProgressBar
 var _tension_bar: ProgressBar
 var _stamina_bar: ProgressBar
 var _tension_fill: StyleBoxFlat
+var _depth_label: Label
 
 
 func _ready() -> void:
@@ -133,6 +156,9 @@ func _ready() -> void:
 	if FishingSpots.get_spot(GameSession.spot_id).is_empty():
 		GameSession.spot_id = "galata_bridge"       # opened directly, not from the map
 	_spot = FishingSpots.get_spot(GameSession.spot_id)
+	_has_pier = _spot["kind"] != "bridge"
+	_pier_x = 900.0 if hash(GameSession.spot_id) % 2 == 0 else -900.0
+	_build_walkable()
 	_wind = Vector2(_rng.randf_range(-60.0, 60.0), _rng.randf_range(-15.0, 15.0))
 	_current = Vector2(_rng.randf_range(-14.0, 14.0), _rng.randf_range(-4.0, 4.0))
 	_cast_seen = int(TouchControls.presses.get(&"cast", 0))
@@ -167,7 +193,7 @@ func _ready() -> void:
 	_fishing.fish_escaped.connect(_on_escaped)
 	_fishing.tension_updated.connect(_on_tension)
 
-	_rope = Noc.Rope.new(ROPE_POINTS, HAND, HAND)
+	_rope = Noc.Rope.new(ROPE_POINTS, _hand, _hand)
 	_build_land()
 	_spawn_shoals()
 	_spawn_boats()
@@ -181,9 +207,10 @@ func _ready() -> void:
 	_build_vignette()
 	_build_hud()
 	var touch := TouchControls.new()
-	touch.enabled_actions.assign([&"steer_left", &"steer_right", &"cast", &"reel_in", &"drag_up", &"drag_down"])
+	touch.enabled_actions.assign([&"cast", &"reel_in", &"drag_up", &"drag_down", &"bait_deeper", &"bait_shallower"])
+	touch.joystick = true
 	add_child(touch)
-	_set_status("Aim with < >, then hold CAST to power up the throw")
+	_set_status("Walk with the stick. At the water's edge, hold CAST to throw")
 
 
 # ---------------------------------------------------------------- setup
@@ -225,19 +252,19 @@ func _build_land() -> void:
 	# the rail is lined with them; elsewhere a few locals fish the same water.
 	var crowd_y: float = {"bridge": 20.0, "harbor": 20.0, "beach": 34.0}.get(kind, 12.0)
 	var gap := Vector2(60.0, 130.0) if kind == "bridge" else Vector2(260.0, 520.0)
-	var cx := -1300.0
-	while cx < 1300.0:
-		if absf(cx) > 140.0:
+	var cx := -HALF_WIDTH + 200.0
+	while cx < HALF_WIDTH - 200.0:
+		if absf(cx) > 140.0 and absf(cx - _pier_x) > 70.0:
 			_crowd.append({"x": cx, "y": crowd_y, "len": rng.randf_range(90.0, 260.0), "phase": rng.randf() * TAU})
 		cx += rng.randf_range(gap.x, gap.y)
-	for i in 46:
-		_sparkles.append(Vector3(rng.randf_range(-1300.0, 1300.0), rng.randf_range(-1100.0, -40.0), rng.randf() * TAU))
+	for i in 140:
+		_sparkles.append(Vector3(rng.randf_range(-HALF_WIDTH, HALF_WIDTH), rng.randf_range(-1100.0, -40.0), rng.randf() * TAU))
 
 
 ## Two shoals of small fish that school (boids) in the shallows.
 func _spawn_shoals() -> void:
-	for g in 2:
-		var center := Vector2(_rng.randf_range(-600.0, 600.0), _rng.randf_range(-500.0, -150.0))
+	for g in 6:
+		var center := Vector2(_rng.randf_range(-3400.0, 3400.0), _rng.randf_range(-700.0, -150.0))
 		var group: Array = []
 		for i in 10:
 			var v := Noc.Vehicle.new(center + Vector2(_rng.randf_range(-40.0, 40.0), _rng.randf_range(-40.0, 40.0)), 70.0, 90.0)
@@ -248,7 +275,7 @@ func _spawn_shoals() -> void:
 
 ## Fishing boats (and a ferry on the Istanbul spot) sailing a loop out at sea.
 func _spawn_boats() -> void:
-	_boat_lane = PackedVector2Array([Vector2(-2300.0, -760.0), Vector2(2300.0, -820.0), Vector2(2300.0, -1060.0), Vector2(-2300.0, -1000.0)])
+	_boat_lane = PackedVector2Array([Vector2(-4600.0, -780.0), Vector2(4600.0, -840.0), Vector2(4600.0, -1080.0), Vector2(-4600.0, -1020.0)])
 	var count := 3
 	for i in count:
 		var ferry: bool = _spot["region"].contains("Istanbul") and i == 0
@@ -297,6 +324,8 @@ func _build_hud() -> void:
 	_spot_label.text = "%s  -  %s   |   %s" % [_spot["name"], _spot["region"], BiomeDB.get_rig(GameSession.rig_id).get("name", "")]
 	_clock_label = _make_label(ui, 18, Color(0.85, 0.92, 1.0))
 	_clock_label.position = Vector2(20.0, 40.0)
+	_depth_label = _make_label(ui, 18, Color(0.75, 0.95, 1.0))
+	_depth_label.position = Vector2(20.0, 64.0)
 	var build := _make_label(ui, 14, Color(1.0, 1.0, 1.0, 0.6))
 	build.position = Vector2(20.0, 694.0)
 	build.text = GameSession.BUILD
@@ -399,7 +428,7 @@ func _aim_dir() -> Vector2:
 
 func _rod_tip() -> Vector2:
 	var d := _aim_dir()
-	return HAND + d * ROD_LEN + d.orthogonal() * _rod_bend * ROD_BEND_PX
+	return _hand + d * ROD_LEN + d.orthogonal() * _rod_bend * ROD_BEND_PX
 
 
 func _set_status(text: String) -> void:
@@ -446,7 +475,7 @@ func _roll_species() -> String:
 	var weights: Array[float] = []
 	var total := 0.0
 	for id: String in ids:
-		var w := 1.0 / sqrt(float(BiomeDB.get_species(id)["base_price"]))
+		var w := _species_weight(id)
 		weights.append(w)
 		total += w
 	var pick := _rng.randf() * total
@@ -483,12 +512,18 @@ func _physics_process(delta: float) -> void:
 	_read_buttons()
 	match _state:
 		State.AIM:
-			_steer(delta)
+			_walk(delta)
+			_adjust_bait_depth(delta)
 			if _cast_edge:
-				_power = 0.0
-				_power_dir = 1.0
-				_state = State.CHARGE
-				_set_status("Release CAST to throw")
+				if _can_cast():
+					var lim := _aim_limit()
+					_aim = clampf(atan2(_facing.x, -_facing.y), -lim, lim)
+					_power = 0.0
+					_power_dir = 1.0
+					_state = State.CHARGE
+					_set_status("Aim with the stick, release CAST to throw")
+				else:
+					_set_status("Walk to the water's edge, or out on the pier, to cast")
 		State.CHARGE:
 			_steer(delta)
 			_power += _power_dir * delta / 1.1
@@ -514,7 +549,7 @@ func _physics_process(delta: float) -> void:
 			if _result_t <= 0.0:
 				_result_label.text = ""
 				_state = State.AIM
-				_set_status("Aim with < >, then hold CAST to power up the throw")
+				_set_status("Walk with the stick. At the water's edge, hold CAST to throw")
 	_update_float(delta)
 	_update_fish_agent(delta)
 	_update_rope(delta)
@@ -541,7 +576,125 @@ func _read_buttons() -> void:
 
 func _steer(delta: float) -> void:
 	var axis := Input.get_axis(&"steer_left", &"steer_right")
-	_aim = clampf(_aim + axis * 0.9 * delta, -0.9, 0.9)
+	var lim := _aim_limit()
+	_aim = clampf(_aim + axis * 0.9 * delta, -lim, lim)
+
+
+## On the pier you can throw to the sides as well; from the bank only out to sea.
+func _aim_limit() -> float:
+	return 1.45 if _on_pier() else 0.9
+
+
+# ---------------------------------------------------------------- walking, depth, tips
+func _build_walkable() -> void:
+	var bottom := 105.0 if _spot["kind"] == "bridge" else 132.0
+	_walk_rects.append(Rect2(-HALF_WIDTH + 80.0, 14.0, HALF_WIDTH * 2.0 - 160.0, bottom - 14.0))
+	if _has_pier:
+		_walk_rects.append(Rect2(_pier_x - PIER_HALF + 8.0, -PIER_LEN + 12.0, (PIER_HALF - 8.0) * 2.0, PIER_LEN + 40.0))
+
+
+func _walkable(p: Vector2) -> bool:
+	for r in _walk_rects:
+		if r.has_point(p):
+			return true
+	return false
+
+
+## The stick walks the angler; each axis is tried on its own so you slide along edges.
+func _walk(delta: float) -> void:
+	var mv := Input.get_vector(&"steer_left", &"steer_right", &"boat_forward", &"boat_back", 0.1)
+	_moving = mv.length() > 0.05
+	if not _moving:
+		return
+	_facing = mv.normalized()
+	_aim = atan2(_facing.x, -_facing.y)
+	var step := mv * WALK_SPEED * delta
+	var nx := _hand + Vector2(step.x, 0.0)
+	if _walkable(nx):
+		_hand = nx
+	var ny := _hand + Vector2(0.0, step.y)
+	if _walkable(ny):
+		_hand = ny
+	_walk_phase += step.length() * 0.12
+	_check_tip()
+
+
+func _adjust_bait_depth(delta: float) -> void:
+	var ax := Input.get_axis(&"bait_shallower", &"bait_deeper")
+	if absf(ax) > 0.0:
+		_bait_depth = clampf(_bait_depth + ax * 3.0 * delta, 0.5, 30.0)
+
+
+func _pier_rect() -> Rect2:
+	return Rect2(_pier_x - PIER_HALF, -PIER_LEN, PIER_HALF * 2.0, PIER_LEN + 20.0)
+
+
+func _on_pier() -> bool:
+	return _has_pier and _hand.y < 0.0 and _pier_rect().has_point(_hand)
+
+
+func _can_cast() -> bool:
+	return _hand.y < 48.0 or _on_pier()
+
+
+func _is_land(p: Vector2) -> bool:
+	return p.y > WATER_EDGE or (_has_pier and _pier_rect().has_point(p))
+
+
+## Water depth under a point: the bottom drops at the spot's slope from the shoreline (y = 0).
+func _water_depth(p: Vector2) -> float:
+	if _is_land(p):
+		return 0.0
+	var slope := float(_spot.get("slope", 0.25))
+	var maxd := float(_spot.get("max_depth_m", 15.0))
+	return clampf(maxf(-p.y, 0.0) / PX_PER_M * slope + 0.4, 0.4, maxd)
+
+
+## Where the bait actually hangs: the float setting, or just off the bottom in shallow water.
+func _eff_depth() -> float:
+	return clampf(_bait_depth, 0.3, maxf(_water_depth(_bobber_pos) - 0.2, 0.3))
+
+
+## How likely a species is to take the bait right now: rarity, depth match, feeding time.
+func _species_weight(id: String) -> float:
+	var sp := BiomeDB.get_species(id)
+	var w := 1.0 / sqrt(float(sp["base_price"]))
+	var dr: Vector2 = sp["depth_m"]
+	var d := _eff_depth()
+	var miss := maxf(dr.x - d, 0.0) + maxf(d - dr.y, 0.0)
+	w *= exp(-miss / 2.5)
+	w *= BiomeDB.activity_factor(id, _world.time_of_day)
+	return w
+
+
+## 1 = a normal amount of feeding at this depth and hour; lower means a longer wait.
+func _activity() -> float:
+	var base := 0.0
+	var now := 0.0
+	for id: String in _spot["species"]:
+		base += 1.0 / sqrt(float(BiomeDB.get_species(id)["base_price"]))
+		now += _species_weight(id)
+	return clampf(now / maxf(base, 0.0001), 0.15, 2.0)
+
+
+func _crowd_pos(a: Dictionary) -> Vector2:
+	return Vector2(float(a["x"]), float(a["y"]) + 6.0)
+
+
+## The nearest other angler within reach shares a tip about this spot.
+func _check_tip() -> void:
+	_tip_text = ""
+	var tips: Array = _spot.get("tips", [])
+	if tips.is_empty():
+		return
+	var best := TIP_RADIUS
+	for i in _crowd.size():
+		var cp := _crowd_pos(_crowd[i])
+		var d := cp.distance_to(_hand)
+		if d < best:
+			best = d
+			_tip_text = String(tips[i % tips.size()])
+			_tip_pos = cp
 
 
 func _do_cast() -> void:
@@ -564,8 +717,8 @@ func _tick_fly(delta: float) -> void:
 	if _b_z > 0.0:
 		return
 	_b_z = 0.0
-	if _bobber_pos.y > WATER_EDGE:
-		_retrieve("That landed on the shore")
+	if _is_land(_bobber_pos):
+		_retrieve("That landed on dry ground")
 		return
 	_cast_dist_m = _rod_tip().distance_to(_bobber_pos) / PX_PER_M
 	_splash(_bobber_pos, 1.0)
@@ -574,12 +727,13 @@ func _tick_fly(delta: float) -> void:
 	_float_v = 0.0
 	_float_pull = 0.0
 	_state = State.WAIT
-	_wait_t = _rng.randf_range(3.0, 9.0)
+	_wait_t = _rng.randf_range(4.0, 10.0) / _activity()
 	_ripple_clock = 0.0
-	_set_status("%.0f m out. Waiting...   (tap CAST to reel in)" % _cast_dist_m)
+	_set_status("%.0f m out, bait at %.1f m. Waiting...   (tap CAST to reel in)" % [_cast_dist_m, _eff_depth()])
 
 
 func _tick_wait(delta: float) -> void:
+	_adjust_bait_depth(delta)
 	if _cast_edge:
 		_retrieve("Reeled in")
 		return
@@ -668,7 +822,7 @@ func _fish_leaves(message: String) -> void:
 	_fish_mode = "leave"
 	_float_pull = 0.0
 	_state = State.WAIT
-	_wait_t = _rng.randf_range(4.0, 10.0)
+	_wait_t = _rng.randf_range(5.0, 12.0) / _activity()
 	_set_status(message)
 
 
@@ -737,10 +891,12 @@ func _update_fish_agent(delta: float) -> void:
 		"approach":
 			f.apply_force(f.arrive(_bobber_pos, 120.0))
 			f.apply_force(f.wander(delta, 30.0, 14.0, 4.0) * 0.4)
+			if f.pos.distance_to(_bobber_pos) < 90.0 and _rng.randf() < delta * 0.8:
+				_add_ripple(f.pos)            # nervous water: something moving near the float
 		"nibble":
 			f.apply_force(f.arrive(_bobber_pos + Vector2.from_angle(_time * 0.7) * 18.0, 60.0))
 		"bite":
-			var away := (_bobber_pos - HAND).normalized()
+			var away := (_bobber_pos - _hand).normalized()
 			f.apply_force(f.seek(_bobber_pos + away * 60.0) * 1.5)
 		"leave":
 			f.apply_force(f.flee(_bobber_pos, 5000.0))
@@ -786,6 +942,9 @@ func _update_shoals(delta: float) -> void:
 			if _fish_agent != null:
 				f.apply_force(f.flee(_fish_agent.pos, 90.0) * 1.5)
 			f.update(delta)
+		if _rng.randf() < delta * 0.5:
+			var g: Noc.Vehicle = group[_rng.randi() % group.size()]
+			_add_ripple(g.pos)               # a shoal dimpling the surface
 
 
 func _update_particles(delta: float) -> void:
@@ -920,6 +1079,9 @@ func _process(delta: float) -> void:
 	_fight_view.daylight = _world.daylight
 	_water.set_daylight(_world.daylight)
 	_clock_label.text = _world.clock_text()
+	var probe := _bobber_pos if (_state == State.WAIT or _state == State.BITE) else (_pred_landing if _state == State.CHARGE else _hand + _facing * 60.0)
+	var water := _water_depth(probe)
+	_depth_label.text = "Float depth %.1f m   |   Water %s" % [_bait_depth, ("%.1f m" % water) if water > 0.0 else "-"]
 
 	_power_bar.visible = _state == State.CHARGE
 	_power_bar.value = _power
@@ -951,22 +1113,22 @@ func _fight_feedback() -> void:
 ## Wide on the town while aiming, follows the throw, closes in on the float, and frames angler
 ## and fish together in the fight, getting closer as the fish comes in.
 func _update_camera(delta: float) -> void:
-	var target_pos := Vector2(0.0, 40.0)
-	var target_zoom := 0.72
+	var target_pos := _hand + Vector2(0.0, -90.0)
+	var target_zoom := 0.8
 	match _state:
 		State.CHARGE:
-			target_pos = HAND.lerp(_pred_landing, 0.45)
+			target_pos = _hand.lerp(_pred_landing, 0.45)
 		State.FLY:
-			target_pos = HAND.lerp(_bobber_pos, 0.6)
+			target_pos = _hand.lerp(_bobber_pos, 0.6)
 			target_zoom = 0.9
 		State.WAIT, State.BITE:
-			target_pos = HAND.lerp(_bobber_pos, 0.6)
+			target_pos = _hand.lerp(_bobber_pos, 0.6)
 			target_zoom = 1.25
 		State.FIGHT:
 			if _fight_agent != null:
 				var fp := _fight_agent.pos
-				target_pos = (HAND + fp) * 0.5
-				var span := HAND.distance_to(fp) + 260.0
+				target_pos = (_hand + fp) * 0.5
+				var span := _hand.distance_to(fp) + 260.0
 				target_zoom = clampf(get_viewport_rect().size.y * 0.9 / span, 0.7, 1.9)
 		State.RESULT:
 			target_zoom = 1.0
@@ -979,13 +1141,48 @@ func _update_camera(delta: float) -> void:
 func _draw() -> void:
 	_draw_sparkles()
 	_draw_shore()
-	_draw_shoals()
+	if _has_pier:
+		_draw_pier()
 	_draw_boats()
-	_draw_fish()
 	_draw_ripples()
 	_draw_line_and_float()
 	_draw_particles()
 	_draw_angler()
+	_draw_tip()
+
+
+## A timber pier out over the water: planks, posts and a rail on each side.
+func _draw_pier() -> void:
+	var r := _pier_rect()
+	draw_rect(Rect2(r.position + Vector2(8.0, 10.0), r.size), Color(0.0, 0.05, 0.1, 0.25))
+	draw_rect(r, Color(0.56, 0.41, 0.27))
+	var y := r.position.y
+	while y < r.end.y:
+		draw_line(Vector2(r.position.x, y), Vector2(r.end.x, y), Color(0.42, 0.30, 0.19), 2.0)
+		y += 16.0
+	y = r.position.y + 6.0
+	while y < -10.0:
+		for px in [r.position.x - 3.0, r.end.x + 3.0]:
+			draw_circle(Vector2(px, y), 6.0, Color(0.30, 0.21, 0.13))
+		y += 60.0
+	draw_line(Vector2(r.position.x + 3.0, r.position.y), Vector2(r.position.x + 3.0, 0.0), Color(0.70, 0.55, 0.38), 3.0)
+	draw_line(Vector2(r.end.x - 3.0, r.position.y), Vector2(r.end.x - 3.0, 0.0), Color(0.70, 0.55, 0.38), 3.0)
+
+
+## Speech bubble over the angler you are standing next to.
+func _draw_tip() -> void:
+	if _tip_text == "" or _state != State.AIM:
+		return
+	var font := ThemeDB.fallback_font
+	var width := 300.0
+	var box := Rect2(_tip_pos + Vector2(-width * 0.5, -150.0), Vector2(width, 96.0))
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(1.0, 0.98, 0.92, 0.95)
+	sb.set_corner_radius_all(14)
+	sb.draw(get_canvas_item(), box)
+	draw_colored_polygon(PackedVector2Array([box.position + Vector2(width * 0.5 - 10.0, box.size.y),
+		box.position + Vector2(width * 0.5 + 10.0, box.size.y), _tip_pos + Vector2(0.0, -40.0)]), Color(1.0, 0.98, 0.92, 0.95))
+	draw_multiline_string(font, box.position + Vector2(14.0, 26.0), _tip_text, HORIZONTAL_ALIGNMENT_LEFT, width - 28.0, 17, 4, Color(0.10, 0.14, 0.20))
 
 
 func _draw_sparkles() -> void:
@@ -1015,21 +1212,21 @@ func _draw_shore() -> void:
 		draw_rect(Rect2(-w, 112.0, w * 2.0, 8.0), base.lightened(0.18))
 		draw_rect(Rect2(-w, 40.0, w * 2.0, 4.0), base.lightened(0.08))
 		draw_rect(Rect2(-w, 80.0, w * 2.0, 4.0), base.lightened(0.08))
-		var lx := -1200.0
-		while lx <= 1200.0:
+		var lx := -HALF_WIDTH + 200.0
+		while lx <= HALF_WIDTH - 200.0:
 			draw_circle(Vector2(lx, 62.0), 7.0, Color(1.0, 0.95, 0.7))
 			lx += 240.0
 		_draw_crowd()
 	elif kind == "harbor":
 		draw_rect(Rect2(-w, 0.0, w * 2.0, 150.0), base)
 		draw_rect(Rect2(-w, 0.0, w * 2.0, 8.0), base.darkened(0.4))
-		var bx := -1200.0
-		while bx <= 1200.0:
+		var bx := -HALF_WIDTH + 200.0
+		while bx <= HALF_WIDTH - 200.0:
 			draw_circle(Vector2(bx, 26.0), 9.0, base.darkened(0.5))
 			draw_rect(Rect2(bx + 40.0, 60.0, 34.0, 26.0), Color(0.45, 0.32, 0.20))
 			draw_rect(Rect2(bx + 40.0, 60.0, 34.0, 26.0), Color(0.30, 0.20, 0.12), false, 2.0)
 			bx += 160.0
-		for side in [-1.0, 1.0]:
+		for side in [-1.0, 1.0, -3.0, 3.0]:
 			_draw_moored_boat(Vector2(430.0 * side, -58.0))
 	elif kind == "beach":
 		var poly := _edge_pts.duplicate()
@@ -1078,8 +1275,8 @@ func _draw_crowd() -> void:
 func _draw_foam() -> void:
 	for layer in 2:
 		var pts := PackedVector2Array()
-		var x := -1400.0
-		while x <= 1400.0:
+		var x := _cam.position.x - 1500.0
+		while x <= _cam.position.x + 1500.0:
 			pts.append(Vector2(x, -4.0 - float(layer) * 9.0 + sin(x * 0.02 + _time * 1.4 + float(layer)) * 5.0))
 			x += 50.0
 		draw_polyline(pts, Color(1.0, 1.0, 1.0, 0.55 - float(layer) * 0.2), 3.0)
@@ -1209,15 +1406,20 @@ func _draw_float(pos: Vector2, sink: float) -> void:
 
 func _draw_angler() -> void:
 	var d := _aim_dir()
-	draw_circle(HAND + Vector2(7.0, 14.0), 21.0, Color(0.0, 0.0, 0.0, 0.25))
-	draw_circle(HAND + Vector2(0.0, 10.0), 18.0, Color(0.15, 0.30, 0.55))
-	draw_circle(HAND + Vector2(0.0, 10.0), 10.0, Color(0.93, 0.75, 0.6))
-	draw_circle(HAND + Vector2(0.0, 7.0), 8.0, Color(0.9, 0.3, 0.2))
-	var ctrl := HAND + d * ROD_LEN * 0.55 + d.orthogonal() * _rod_bend * ROD_BEND_PX * 0.35
+	draw_circle(_hand + Vector2(7.0, 14.0), 21.0, Color(0.0, 0.0, 0.0, 0.25))
+	if _moving and _state == State.AIM:
+		var side := _facing.orthogonal() * 8.0
+		var swing := _facing * sin(_walk_phase) * 7.0
+		draw_circle(_hand + Vector2(0.0, 12.0) + side + swing, 6.0, Color(0.18, 0.16, 0.14))
+		draw_circle(_hand + Vector2(0.0, 12.0) - side - swing, 6.0, Color(0.18, 0.16, 0.14))
+	draw_circle(_hand + Vector2(0.0, 10.0), 18.0, Color(0.15, 0.30, 0.55))
+	draw_circle(_hand + Vector2(0.0, 10.0), 10.0, Color(0.93, 0.75, 0.6))
+	draw_circle(_hand + Vector2(0.0, 7.0), 8.0, Color(0.9, 0.3, 0.2))
+	var ctrl := _hand + d * ROD_LEN * 0.55 + d.orthogonal() * _rod_bend * ROD_BEND_PX * 0.35
 	var rod := PackedVector2Array()
 	var tip := _rod_tip()
 	for i in 11:
 		var t := float(i) / 10.0
-		rod.append(HAND.lerp(ctrl, t).lerp(ctrl.lerp(tip, t), t))
+		rod.append(_hand.lerp(ctrl, t).lerp(ctrl.lerp(tip, t), t))
 	draw_polyline(rod, Color(0.20, 0.13, 0.08), 5.0)
 	draw_polyline(rod, Color(0.55, 0.40, 0.25), 2.0)

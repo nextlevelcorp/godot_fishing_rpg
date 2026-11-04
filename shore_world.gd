@@ -11,9 +11,11 @@
 class_name ShoreWorld
 extends Node2D
 
-const WALKERS := 14
-const CATS := 3
-const GULLS := 7
+const WALKERS := 34
+const CATS := 7
+const GULLS := 12
+## Half the width of the town in px; matches ShoreFishing.HALF_WIDTH.
+const HALF := 4000.0
 const NIGHT := Color(0.30, 0.36, 0.60)
 const DUSK := Color(1.0, 0.70, 0.52)
 const CLOTHES := [
@@ -61,11 +63,11 @@ func setup(p_spot: Dictionary, seed_value: int) -> void:
 	var kind: String = spot.get("kind", "rocky")
 	_kind = kind
 	_town_y0 = {"bridge": 430.0, "harbor": 150.0, "beach": 240.0}.get(kind, 215.0)
-	for i in 5:
+	for i in 12:
 		var puffs: Array[Vector3] = []
 		for j in 5:
 			puffs.append(Vector3(_rng.randf_range(-160.0, 160.0), _rng.randf_range(-70.0, 70.0), _rng.randf_range(90.0, 170.0)))
-		_clouds.append({"pos": Vector2(_rng.randf_range(-2200.0, 2200.0), _rng.randf_range(-1100.0, 700.0)), "puffs": puffs})
+		_clouds.append({"pos": Vector2(_rng.randf_range(-HALF, HALF), _rng.randf_range(-1100.0, 700.0)), "puffs": puffs})
 	_build_town()
 	_spawn_life()
 
@@ -130,17 +132,17 @@ func _palette() -> Dictionary:
 func _build_town() -> void:
 	var walls: Array = _pal["walls"]
 	var roofs: Array = _pal["roofs"]
-	var lx := -1650.0
-	while lx <= 1650.0:
+	var lx := -HALF + 150.0
+	while lx <= HALF - 150.0:
 		_lamps.append(Vector2(lx, _town_y0 + 10.0))
 		if _rng.randf() < 0.5:
 			_benches.append(Vector2(lx + 90.0, _town_y0 + 30.0))
 		lx += 220.0
 	for row in 3:
 		var y := _town_y0 + 80.0 + float(row) * 150.0
-		var x := -1750.0 + _rng.randf_range(0.0, 60.0)
+		var x := -HALF + 50.0 + _rng.randf_range(0.0, 60.0)
 		var since_street := 0
-		while x < 1750.0:
+		while x < HALF - 50.0:
 			if since_street >= 4 and _rng.randf() < 0.5:
 				_trees.append({"pos": Vector2(x + 30.0, y + 50.0), "r": _rng.randf_range(22.0, 34.0), "phase": _rng.randf() * TAU})
 				x += 70.0
@@ -159,12 +161,12 @@ func _build_town() -> void:
 			})
 			x += w + _rng.randf_range(10.0, 28.0)
 			since_street += 1
-	for i in 26:
-		_trees.append({"pos": Vector2(_rng.randf_range(-1700.0, 1700.0), _town_y0 + _rng.randf_range(62.0, 72.0)),
+	for i in 64:
+		_trees.append({"pos": Vector2(_rng.randf_range(-HALF + 100.0, HALF - 100.0), _town_y0 + _rng.randf_range(62.0, 72.0)),
 			"r": _rng.randf_range(18.0, 28.0), "phase": _rng.randf() * TAU})
 	if _pal.get("skyline", false):
 		for i in 3:
-			_domes.append({"pos": Vector2(-700.0 + float(i) * 650.0 + _rng.randf_range(-80.0, 80.0), _town_y0 + 560.0), "r": _rng.randf_range(55.0, 80.0)})
+			_domes.append({"pos": Vector2(-2200.0 + float(i) * 2200.0 + _rng.randf_range(-200.0, 200.0), _town_y0 + 560.0), "r": _rng.randf_range(55.0, 80.0)})
 
 
 func _spawn_life() -> void:
@@ -174,11 +176,11 @@ func _spawn_life() -> void:
 		v.data = {"color": CLOTHES[_rng.randi() % CLOTHES.size()], "pause": 0.0, "step": _rng.randf() * TAU}
 		_walkers.append(v)
 	for i in CATS:
-		var c := Noc.Vehicle.new(Vector2(_rng.randf_range(-900.0, 900.0), _town_y0 + _rng.randf_range(20.0, 60.0)), 45.0, 70.0)
+		var c := Noc.Vehicle.new(Vector2(_rng.randf_range(-HALF + 300.0, HALF - 300.0), _town_y0 + _rng.randf_range(20.0, 60.0)), 45.0, 70.0)
 		c.data = {"color": [Color(0.95, 0.60, 0.25), Color(0.30, 0.30, 0.32), Color(0.92, 0.90, 0.86)][i % 3], "phase": _rng.randf() * TAU}
 		_cats.append(c)
 	for i in GULLS:
-		var g := Noc.Vehicle.new(Vector2(_rng.randf_range(-600.0, 600.0), _rng.randf_range(-700.0, -300.0)), 95.0, 60.0)
+		var g := Noc.Vehicle.new(Vector2(_rng.randf_range(-HALF + 500.0, HALF - 500.0), _rng.randf_range(-700.0, -300.0)), 95.0, 60.0)
 		g.data = {"phase": _rng.randf() * TAU}
 		_gulls.append(g)
 
@@ -186,8 +188,8 @@ func _spawn_life() -> void:
 ## Where people stroll: the bridge deck on Galata (it is busy with pedestrians), else the promenade.
 func _walk_band() -> Rect2:
 	if _kind == "bridge":
-		return Rect2(-1600.0, 50.0, 3200.0, 48.0)
-	return Rect2(-1600.0, _town_y0 + 4.0, 3200.0, 48.0)
+		return Rect2(-HALF + 200.0, 50.0, HALF * 2.0 - 400.0, 48.0)
+	return Rect2(-HALF + 200.0, _town_y0 + 4.0, HALF * 2.0 - 400.0, 48.0)
 
 
 # ---------------------------------------------------------------- simulation
@@ -210,7 +212,7 @@ func _process(delta: float) -> void:
 		v.update(delta)
 		v.data["step"] = float(v.data["step"]) + v.vel.length() * delta * 0.25
 
-	var cat_area := Rect2(-1500.0, _town_y0, 3000.0, 70.0)
+	var cat_area := Rect2(-HALF + 300.0, _town_y0, HALF * 2.0 - 600.0, 70.0)
 	for c in _cats:
 		c.apply_force(c.wander(delta, 24.0, 14.0, 4.0) * 0.7)
 		for v in _walkers:
@@ -218,7 +220,7 @@ func _process(delta: float) -> void:
 		c.apply_force(c.contain(cat_area, 10.0))
 		c.update(delta)
 
-	var sky := Rect2(-1500.0, -1200.0, 3000.0, 1300.0)
+	var sky := Rect2(-HALF + 300.0, -1200.0, HALF * 2.0 - 600.0, 1300.0)
 	Noc.flock(_gulls, 45.0, 180.0, 1.6, 0.9, 0.6)
 	for g in _gulls:
 		g.apply_force(g.wander(delta, 60.0, 30.0, 2.0) * 0.6)
@@ -228,10 +230,10 @@ func _process(delta: float) -> void:
 	for cl in _clouds:
 		var p: Vector2 = cl["pos"]
 		p += (wind * 0.6 + Vector2(14.0, 0.0)) * delta
-		if p.x > 2300.0:
-			p.x = -2300.0
-		elif p.x < -2300.0:
-			p.x = 2300.0
+		if p.x > HALF + 300.0:
+			p.x = -HALF - 300.0
+		elif p.x < -HALF - 300.0:
+			p.x = HALF + 300.0
 		cl["pos"] = p
 
 	_dyn.queue_redraw()
@@ -246,13 +248,13 @@ func _process(delta: float) -> void:
 func _draw_static() -> void:
 	var ground: Color = _pal["ground"]
 	var path: Color = _pal["path"]
-	_static.draw_rect(Rect2(-1900.0, _town_y0, 3800.0, 1100.0), ground)
-	_static.draw_rect(Rect2(-1900.0, _town_y0, 3800.0, 56.0), path)
-	var tx := -1900.0
-	while tx < 1900.0:
+	_static.draw_rect(Rect2(-HALF - 200.0, _town_y0, HALF * 2.0 + 400.0, 1100.0), ground)
+	_static.draw_rect(Rect2(-HALF - 200.0, _town_y0, HALF * 2.0 + 400.0, 56.0), path)
+	var tx := -HALF - 200.0
+	while tx < HALF + 200.0:
 		_static.draw_line(Vector2(tx, _town_y0), Vector2(tx, _town_y0 + 56.0), path.darkened(0.08), 1.0)
 		tx += 40.0
-	_static.draw_line(Vector2(-1900.0, _town_y0 + 56.0), Vector2(1900.0, _town_y0 + 56.0), path.darkened(0.2), 3.0)
+	_static.draw_line(Vector2(-HALF - 200.0, _town_y0 + 56.0), Vector2(HALF + 200.0, _town_y0 + 56.0), path.darkened(0.2), 3.0)
 	for b in _benches:
 		_static.draw_rect(Rect2(b + Vector2(3.0, 4.0), Vector2(46.0, 12.0)), Color(0.0, 0.0, 0.0, 0.2))
 		_static.draw_rect(Rect2(b, Vector2(46.0, 12.0)), Color(0.50, 0.32, 0.18))

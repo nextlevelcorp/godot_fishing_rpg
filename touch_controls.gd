@@ -52,6 +52,9 @@ static var presses: Dictionary = {}
 
 ## Only these actions get a button. Empty = all. Set before the node enters the tree.
 var enabled_actions: Array[StringName] = []
+## Adds an analog joystick at the bottom left that drives steer_left/right and boat_forward/back
+## with strength (walking in the shore scene). Set before the node enters the tree.
+var joystick := false
 
 var _root: Control
 
@@ -77,6 +80,19 @@ func _ready() -> void:
 		btn.icon = _load_art(look[1])
 		btn.icon_rot = look[2]
 		_root.add_child(btn)
+	if joystick:
+		_add_joystick()
+
+
+## Builds the joystick if requested. Called at the end of _ready.
+func _add_joystick() -> void:
+	var j := TouchJoystick.new()
+	j.radius = 105.0
+	j.pad = _load_art("joystick_circle_pad_a")
+	j.nub = _load_art("joystick_circle_nub_a")
+	j.position = Vector2(175.0, 555.0) - Vector2.ONE * j.radius * 1.25
+	j.size = Vector2.ONE * j.radius * 2.5
+	_root.add_child(j)
 
 
 func _load_art(art_name: String) -> Texture2D:
@@ -179,3 +195,86 @@ class TouchButton extends Control:
 		if _tap_age < 0.5:
 			var k := _tap_age / 0.5
 			draw_arc(_tap, 14.0 + k * 22.0, 0.0, TAU, 28, Color(1.0, 0.9, 0.3, 0.95 * (1.0 - k)), 3.0)
+
+
+## Analog stick: the thumb's offset from the centre, as a vector of length 0..1, is turned into
+## action strengths (Input.get_vector reads them as an analog direction). Touch and mouse both work.
+class TouchJoystick extends Control:
+	const MOUSE_ID := 1000
+	const DEADZONE := 0.15
+
+	var radius := 105.0
+	var pad: Texture2D
+	var nub: Texture2D
+	var _pointer := -1
+	var _vec := Vector2.ZERO
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_STOP
+
+	func _has_point(point: Vector2) -> bool:
+		return point.distance_to(size * 0.5) <= radius * 1.25
+
+	func _gui_input(event: InputEvent) -> void:
+		if event is InputEventScreenTouch:
+			if event.pressed and _pointer == -1:
+				_pointer = event.index
+				_move(event.position)
+			elif not event.pressed and event.index == _pointer:
+				_release()
+			accept_event()
+		elif event is InputEventScreenDrag:
+			if event.index == _pointer:
+				_move(event.position)
+			accept_event()
+		elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed and _pointer == -1:
+				_pointer = MOUSE_ID
+				_move(event.position)
+			elif not event.pressed and _pointer == MOUSE_ID:
+				_release()
+			accept_event()
+		elif event is InputEventMouseMotion and _pointer == MOUSE_ID:
+			_move(event.position)
+			accept_event()
+
+	func _move(p: Vector2) -> void:
+		var v := (p - size * 0.5) / radius
+		_vec = v.limit_length(1.0)
+		_apply()
+		queue_redraw()
+
+	func _release() -> void:
+		_pointer = -1
+		_vec = Vector2.ZERO
+		_apply()
+		queue_redraw()
+
+	func _apply() -> void:
+		_axis(&"steer_right", maxf(0.0, _vec.x))
+		_axis(&"steer_left", maxf(0.0, -_vec.x))
+		_axis(&"boat_back", maxf(0.0, _vec.y))
+		_axis(&"boat_forward", maxf(0.0, -_vec.y))
+
+	func _axis(action: StringName, strength: float) -> void:
+		if strength > DEADZONE:
+			Input.action_press(action, strength)
+		else:
+			Input.action_release(action)
+
+	func _notification(what: int) -> void:
+		if (what == NOTIFICATION_EXIT_TREE or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT) and _pointer != -1:
+			_release()
+
+	func _draw() -> void:
+		var c := size * 0.5
+		if pad != null:
+			draw_texture_rect(pad, Rect2(c - Vector2.ONE * radius, Vector2.ONE * radius * 2.0), false, Color(1.0, 1.0, 1.0, 0.8))
+		else:
+			draw_circle(c, radius, Color(1.0, 1.0, 1.0, 0.18))
+		var k := c + _vec * radius * 0.6
+		var nr := radius * 0.45
+		if nub != null:
+			draw_texture_rect(nub, Rect2(k - Vector2.ONE * nr, Vector2.ONE * nr * 2.0), false, Color(1.0, 1.0, 1.0, 0.95))
+		else:
+			draw_circle(k, nr, Color(1.0, 1.0, 1.0, 0.5))

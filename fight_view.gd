@@ -41,6 +41,21 @@ const FISH_SPRITES := {
 	"leerfish": ["fish_grey", Color(0.95, 1.0, 0.90)],
 	"saddled_bream": ["fish_grey", Color(0.80, 0.85, 0.90)],
 	"garfish": ["fish_green", Color(1.0, 1.0, 1.0)],
+	"flathead_grey_mullet": ["fish_grey", Color(0.85, 0.90, 0.95)],
+	"white_seabream": ["fish_grey", Color(1.0, 1.0, 1.0)],
+	"atlantic_mackerel": ["fish_blue", Color(0.70, 0.95, 0.85)],
+	"whiting": ["fish_grey", Color(0.95, 0.95, 1.0)],
+	"turbot": ["fish_brown", Color(0.80, 0.75, 0.60)],
+	"greater_weever": ["fish_brown", Color(1.0, 0.90, 0.70)],
+	"ornate_wrasse": ["fish_green", Color(1.0, 1.0, 1.0)],
+}
+
+## Creatures the fish pack has no sprite for: drawn procedurally, limbs on oscillators.
+const CREATURES := {
+	"common_octopus": "octopus",
+	"common_cuttlefish": "cuttlefish",
+	"european_squid": "squid",
+	"blue_crab": "crab",
 }
 
 ## Set by the shore scene before begin().
@@ -58,6 +73,9 @@ var _rng := RandomNumberGenerator.new()
 var _noise := FastNoiseLite.new()
 
 var _fish_tex: Texture2D
+var _creature := ""
+var _jellies: Array = []
+var _bed_crabs: Array = []
 var _fish_tint := Color.WHITE
 var _fish_len := 100.0
 var _depth_range := Vector2(1.0, 10.0)
@@ -103,6 +121,14 @@ func _ready() -> void:
 			_tex[n] = t
 	_rope = Noc.Rope.new(ROPE_POINTS, ROD_TIP, ROD_TIP)
 	_build_bed()
+	for i in 3:
+		var j := Noc.Vehicle.new(Vector2(_rng.randf_range(500.0, 1200.0), _rng.randf_range(260.0, 520.0)), 30.0, 40.0)
+		j.data = {"phase": _rng.randf() * TAU, "r": _rng.randf_range(16.0, 28.0)}
+		_jellies.append(j)
+	for i in 2:
+		var c := Noc.Vehicle.new(Vector2(_rng.randf_range(450.0, 1200.0), BED_Y - 6.0), 25.0, 40.0)
+		c.data = {"phase": _rng.randf() * TAU}
+		_bed_crabs.append(c)
 
 
 ## Lays out the seabed once: sand tiles, rocks, seaweed and background props, with sway phases.
@@ -129,6 +155,7 @@ func begin(fish_id: String, weight_kg: float, cast_dist_m: float) -> void:
 	var look: Array = FISH_SPRITES.get(fish_id, ["fish_blue", Color.WHITE])
 	_fish_tex = _tex.get(look[0], null)
 	_fish_tint = look[1]
+	_creature = String(CREATURES.get(fish_id, ""))
 	_fish_len = 60.0 + sqrt(maxf(weight_kg, 0.01)) * 45.0
 	var dr: Vector2 = sp.get("depth_m", Vector2(1.0, 10.0))
 	_depth_range = Vector2(clampf(dr.x, 0.5, MAX_DEPTH_M - 2.0), clampf(dr.y, 2.0, MAX_DEPTH_M - 1.0))
@@ -191,7 +218,33 @@ func _process(delta: float) -> void:
 	elif fishing != null and _active:
 		_simulate(delta)
 	_update_bubbles(delta)
+	_update_ambient(delta)
 	_canvas.queue_redraw()
+
+
+## Jellyfish pulse (an oscillator): each contraction is a burst of upward thrust, and between
+## pulses they sink and drift on Perlin noise. Crabs walk the bed and scuttle away from the fish.
+func _update_ambient(delta: float) -> void:
+	for j in _jellies:
+		var ph := float(j.data["phase"]) + delta * 2.2
+		j.data["phase"] = ph
+		var pulse := sin(ph)
+		if pulse > 0.6:
+			j.apply_force(Vector2(0.0, -70.0))
+		j.apply_force(Vector2(_noise.get_noise_2d(_time * 0.3, float(j.data["r"])) * 30.0, 18.0))
+		j.vel *= 1.0 - 0.8 * delta
+		j.update(delta)
+		j.pos.y = clampf(j.pos.y, SURFACE_Y + 50.0, BED_Y - 60.0)
+		if j.pos.x < 360.0 or j.pos.x > W - 20.0:
+			j.vel.x = -j.vel.x
+			j.pos.x = clampf(j.pos.x, 360.0, W - 20.0)
+	for c in _bed_crabs:
+		c.apply_force(c.wander(delta, 20.0, 10.0, 3.0) * 0.6)
+		if _fish_pos.y > BED_Y - 120.0:
+			c.apply_force(c.flee(_fish_pos, 160.0) * 2.0)
+		c.update(delta)
+		c.pos.y = BED_Y - 6.0
+		c.pos.x = clampf(c.pos.x, 380.0, W - 30.0)
 
 
 func _simulate(delta: float) -> void:
@@ -326,6 +379,9 @@ func _draw_view() -> void:
 			var s: float = f.data["scale"]
 			_draw_sprite(tx, f.pos, Vector2(s * signf(f.vel.x if absf(f.vel.x) > 1.0 else 1.0), s), 0.0, Color(0.6, 0.8, 0.9, 0.5))
 
+	for j in _jellies:
+		_draw_jelly(j.pos, float(j.data["r"]), sin(float(j.data["phase"])))
+
 	var top: Texture2D = _tex.get("terrain_sand_top_a", null)
 	var fill: Texture2D = _tex.get("terrain_sand_a", null)
 	var tx2 := 330.0
@@ -338,11 +394,15 @@ func _draw_view() -> void:
 	for item in _bed_items:
 		if not bool(item["back"]):
 			_draw_prop(item, Color.WHITE)
+	for cr in _bed_crabs:
+		_draw_creature("crab", cr.pos, signf(cr.vel.x) if absf(cr.vel.x) > 1.0 else 1.0, 0.0, 0.35, Color(0.85, 0.45, 0.30))
 
 	_draw_shore()
 	c.draw_polyline(_rope.pts, Color(1.0, 1.0, 1.0, 0.9), 2.0, true)
-	if _fish_tex != null:
-		var sc := _fish_len / 110.0
+	var sc := _fish_len / 110.0
+	if _creature != "":
+		_draw_creature(_creature, _fish_pos, _facing, _tilt * _facing, sc, Color.WHITE)
+	elif _fish_tex != null:
 		_draw_sprite(_fish_tex, _fish_pos, Vector2(sc * _facing, sc), _tilt * _facing, _fish_tint)
 	for b in _bubbles:
 		var bt: Texture2D = _tex.get("bubble_a", null)
@@ -372,9 +432,12 @@ func _draw_card() -> void:
 	_canvas.draw_string(font, rect.position + Vector2(24.0, 50.0), _catch_title, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 48.0, 30, Color(1.0, 0.92, 0.6))
 	for i in _catch_lines.size():
 		_canvas.draw_string(font, rect.position + Vector2(24.0, 96.0 + float(i) * 34.0), _catch_lines[i], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 200.0, 22, Color.WHITE)
-	if _fish_tex != null:
-		var big := minf(1.6, 150.0 / 110.0)
-		_draw_sprite(_fish_tex, rect.position + Vector2(rect.size.x - 100.0, 130.0), Vector2(big, big), sin(_time * 3.0) * 0.08, _fish_tint)
+	var big := minf(1.6, 150.0 / 110.0)
+	var at := rect.position + Vector2(rect.size.x - 100.0, 130.0)
+	if _creature != "":
+		_draw_creature(_creature, at, 1.0, sin(_time * 3.0) * 0.08, big, Color.WHITE)
+	elif _fish_tex != null:
+		_draw_sprite(_fish_tex, at, Vector2(big, big), sin(_time * 3.0) * 0.08, _fish_tint)
 
 
 ## Seaweed and rocks stand on the bed; seaweed sways on a sine oscillator around its base.
@@ -420,3 +483,97 @@ func _draw_angler() -> void:
 		rod.append(HAND.lerp(ctrl, t).lerp(ctrl.lerp(tip, t), t))
 	c.draw_polyline(rod, Color(0.20, 0.13, 0.08), 6.0, true)
 	c.draw_polyline(rod, Color(0.55, 0.40, 0.25), 2.5, true)
+
+
+# ---------------------------------------------------------------- procedural creatures
+## Draws a creature about 110 px long at scale 1, facing +x when facing = 1.
+func _draw_creature(kind: String, center: Vector2, facing: float, rot: float, scl: float, tint_col: Color) -> void:
+	var c := _canvas
+	c.draw_set_transform(center, rot, Vector2(scl * facing, scl))
+	match kind:
+		"octopus":
+			var col := Color(0.78, 0.36, 0.30) * tint_col
+			for i in 8:
+				var a := lerpf(-0.9, 0.9, float(i) / 7.0)
+				var p := Vector2(6.0, 8.0)
+				var pts := PackedVector2Array([p])
+				for k in 7:
+					var ang := a + sin(_time * 3.0 + float(i) * 0.8 + float(k) * 0.6) * 0.45
+					p += Vector2.from_angle(ang) * 9.0
+					pts.append(p)
+				c.draw_polyline(pts, col.darkened(0.1), 5.0 - float(i % 2), true)
+			_ellipse(Vector2(-22.0, -6.0), Vector2(30.0, 22.0), col)
+			c.draw_circle(Vector2(-2.0, -2.0), 16.0, col)
+			c.draw_circle(Vector2(6.0, -10.0), 5.0, Color(0.98, 0.95, 0.85))
+			c.draw_circle(Vector2(7.0, -10.0), 2.5, Color(0.05, 0.05, 0.05))
+		"squid":
+			var col2 := Color(0.95, 0.72, 0.78, 0.9) * tint_col
+			for i in 8:
+				var pts2 := PackedVector2Array([Vector2(26.0, -4.0 + float(i))])
+				var q := Vector2(26.0, -4.0 + float(i))
+				for k in 6:
+					q += Vector2(8.0, sin(_time * 5.0 + float(i) + float(k) * 0.7) * 2.5 + (float(i) - 3.5) * 0.6)
+					pts2.append(q)
+				c.draw_polyline(pts2, col2.darkened(0.15), 2.0, true)
+			c.draw_colored_polygon(PackedVector2Array([Vector2(-56.0, 0.0), Vector2(-30.0, -13.0), Vector2(22.0, -10.0),
+				Vector2(30.0, 0.0), Vector2(22.0, 10.0), Vector2(-30.0, 13.0)]), col2)
+			c.draw_colored_polygon(PackedVector2Array([Vector2(-56.0, 0.0), Vector2(-40.0, -22.0), Vector2(-30.0, -8.0)]), col2.darkened(0.08))
+			c.draw_colored_polygon(PackedVector2Array([Vector2(-56.0, 0.0), Vector2(-40.0, 22.0), Vector2(-30.0, 8.0)]), col2.darkened(0.08))
+			c.draw_circle(Vector2(20.0, -4.0), 4.0, Color(0.1, 0.1, 0.15))
+		"cuttlefish":
+			var col3 := Color(0.75, 0.66, 0.52) * tint_col
+			var fin := PackedVector2Array()
+			for i in 24:
+				var t := TAU * float(i) / 24.0
+				var wob := 1.0 + 0.08 * sin(t * 6.0 + _time * 8.0)
+				fin.append(Vector2(cos(t) * 44.0 * wob, sin(t) * 24.0 * wob))
+			c.draw_colored_polygon(fin, col3.lightened(0.15))
+			_ellipse(Vector2.ZERO, Vector2(38.0, 18.0), col3)
+			for k in 5:
+				var sx := -24.0 + float(k) * 11.0
+				c.draw_line(Vector2(sx, -14.0), Vector2(sx + 4.0, -4.0), col3.darkened(0.35), 3.0)
+			for i in 6:
+				var tip := Vector2(56.0, (float(i) - 2.5) * 4.0 + sin(_time * 4.0 + float(i)) * 3.0)
+				c.draw_line(Vector2(36.0, (float(i) - 2.5) * 2.0), tip, col3.darkened(0.1), 3.0)
+			c.draw_circle(Vector2(30.0, -6.0), 4.0, Color(0.1, 0.1, 0.1))
+		"crab":
+			var col4 := Color(0.28, 0.48, 0.82) * tint_col
+			for side in [-1.0, 1.0]:
+				for k in 3:
+					var base := Vector2(-14.0 + float(k) * 14.0, 6.0 * side)
+					var knee := base + Vector2(-6.0, 16.0 * side + sin(_time * 10.0 + float(k)) * 4.0)
+					c.draw_polyline(PackedVector2Array([base, knee, knee + Vector2(-4.0, 10.0 * side)]), col4.darkened(0.2), 4.0, true)
+			_ellipse(Vector2.ZERO, Vector2(30.0, 18.0), col4)
+			for side2 in [-1.0, 1.0]:
+				var arm := Vector2(26.0, 10.0 * side2)
+				c.draw_line(Vector2(18.0, 6.0 * side2), arm, col4.darkened(0.15), 5.0)
+				c.draw_circle(arm + Vector2(6.0, 0.0), 8.0, Color(0.9, 0.45, 0.30))
+			c.draw_circle(Vector2(18.0, -4.0), 3.0, Color(0.05, 0.05, 0.05))
+			c.draw_circle(Vector2(18.0, 4.0), 3.0, Color(0.05, 0.05, 0.05))
+	c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _ellipse(center: Vector2, radii: Vector2, col: Color) -> void:
+	var pts := PackedVector2Array()
+	for i in 20:
+		var t := TAU * float(i) / 20.0
+		pts.append(center + Vector2(cos(t) * radii.x, sin(t) * radii.y))
+	_canvas.draw_colored_polygon(pts, col)
+
+
+func _draw_jelly(pos: Vector2, r: float, pulse: float) -> void:
+	var c := _canvas
+	var wide := r * (1.0 + 0.15 * pulse)
+	var tall := r * (0.85 - 0.15 * pulse)
+	for i in 5:
+		var x0 := pos.x + (float(i) - 2.0) * wide * 0.35
+		var pts := PackedVector2Array()
+		for k in 8:
+			pts.append(Vector2(x0 + sin(_time * 2.0 + float(i) + float(k) * 0.8) * 4.0, pos.y + float(k) * r * 0.25))
+		c.draw_polyline(pts, Color(0.85, 0.75, 1.0, 0.35), 2.0, true)
+	var bell := PackedVector2Array()
+	for i in 13:
+		var t := PI + PI * float(i) / 12.0
+		bell.append(pos + Vector2(cos(t) * wide, sin(t) * tall))
+	c.draw_colored_polygon(bell, Color(0.85, 0.75, 1.0, 0.45))
+	c.draw_polyline(bell, Color(1.0, 0.95, 1.0, 0.6), 2.0, true)
