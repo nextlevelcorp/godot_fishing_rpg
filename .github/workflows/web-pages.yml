@@ -46,6 +46,23 @@ jobs:
           SCRIPTS=$(ls *.gd | sed 's|^|res://|')
           $HOME/godot/Godot_v4.4-stable_linux.x86_64 --headless --path . -s res://.claude/scripts/godot-parse-check.gd -- $SCRIPTS
 
+      - name: Smoke-run the map and the shore scene
+        # Runs each scene headless for 600 frames and fails on any script or engine error, so runtime
+        # problems (bad node paths, null access, type errors) stop the deploy instead of the player.
+        run: |
+          G=$HOME/godot/Godot_v4.4-stable_linux.x86_64
+          status=0
+          for scene in res://turkey_map.tscn res://shore_fishing.tscn; do
+            echo "== smoke: $scene"
+            timeout 120 $G --headless --path . "$scene" --quit-after 600 > smoke.log 2>&1 || echo "(exit code $?)"
+            cat smoke.log
+            if grep -E "SCRIPT ERROR|Parse Error|^ERROR:" smoke.log | grep -v -E "resources still in use at exit|ObjectDB instances leaked"; then
+              echo "::error::Smoke run of $scene printed errors"
+              status=1
+            fi
+          done
+          exit $status
+
       - name: Export Web build
         run: |
           mkdir -p build/web
