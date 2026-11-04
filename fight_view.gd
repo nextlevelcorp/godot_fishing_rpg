@@ -72,6 +72,13 @@ var _rope: Noc.Rope
 var _bubbles: Array = []
 var _small_fish: Array = []
 var _bed_items: Array[Dictionary] = []
+# catch presentation: the fish is lifted from the water on a spring, flapping, dripping water
+var _catch_t := 0.0
+var _catch_title := ""
+var _catch_lines := PackedStringArray()
+var _lift_v := Vector2.ZERO
+var _drips: Array = []
+var _card := StyleBoxFlat.new()
 
 
 func _ready() -> void:
@@ -144,6 +151,20 @@ func begin(fish_id: String, weight_kg: float, cast_dist_m: float) -> void:
 ## Fades the side view out (the top-down scene shows the result).
 func end() -> void:
 	_active = false
+	_catch_t = 0.0
+
+
+## Landed: lift the fish out of the water and show a catch card, then fade out on its own.
+func show_catch(title: String, lines: PackedStringArray) -> void:
+	_catch_title = title
+	_catch_lines = lines
+	_catch_t = 3.4
+	_lift_v = Vector2.ZERO
+	_active = true
+	_card.bg_color = Color(0.02, 0.10, 0.18, 0.92)
+	_card.set_corner_radius_all(18)
+	_card.set_border_width_all(3)
+	_card.border_color = Color(1.0, 0.85, 0.4, 0.9)
 
 
 func _x_for(dist_m: float) -> float:
@@ -162,7 +183,12 @@ func _process(delta: float) -> void:
 	_canvas.visible = true
 	_time += delta
 	_canvas.modulate = Color(tint.r, tint.g, tint.b, _alpha)
-	if fishing != null and _active:
+	if _catch_t > 0.0:
+		_catch_t -= delta
+		_animate_catch(delta)
+		if _catch_t <= 0.0:
+			_active = false
+	elif fishing != null and _active:
 		_simulate(delta)
 	_update_bubbles(delta)
 	_canvas.queue_redraw()
@@ -211,6 +237,31 @@ func _simulate(delta: float) -> void:
 		f.apply_force(f.flee(_fish_pos, 220.0) * 2.0)
 		f.apply_force(f.contain(area, 60.0))
 		f.update(delta)
+
+
+## Spring pull toward the angler's hand (Hooke), a flapping oscillation, and water dripping off
+## the fish as particles under gravity.
+func _animate_catch(delta: float) -> void:
+	var target := HAND + Vector2(80.0, -36.0)
+	var acc := (target - _fish_pos) * 30.0 - _lift_v * 8.0
+	_lift_v += acc * delta
+	_fish_pos += _lift_v * delta
+	_facing = -1.0
+	_tilt = sin(_time * 14.0) * 0.35 * clampf(_catch_t / 3.4, 0.2, 1.0)
+	_rod_bend = lerpf(_rod_bend, 0.5, delta * 4.0)
+	if _rng.randf() < delta * 18.0 and _fish_pos.y < SURFACE_Y:
+		_drips.append(Noc.Particle.new(_fish_pos + Vector2(_rng.randf_range(-_fish_len * 0.3, _fish_len * 0.3), 6.0),
+			Vector2(_rng.randf_range(-20.0, 20.0), _rng.randf_range(0.0, 40.0)), 0.0, 0.0, 1.2, _rng.randf_range(2.0, 4.0), Color(0.8, 0.95, 1.0, 0.9)))
+	var keep: Array = []
+	for d in _drips:
+		d.vel += Vector2(0.0, 700.0) * delta
+		d.pos += d.vel * delta
+		d.age += delta
+		if not d.dead() and d.pos.y < SURFACE_Y + 4.0:
+			keep.append(d)
+	_drips = keep
+	var mouth := _fish_pos + Vector2(_facing * _fish_len * 0.42, 0.0)
+	_rope.step(_rod_tip_now(), mouth, _rod_tip_now().distance_to(mouth), Vector2(0.0, 200.0), delta)
 
 
 func _rod_tip_now() -> Vector2:
@@ -300,6 +351,8 @@ func _draw_view() -> void:
 			var bs: float = b.size / 64.0
 			_draw_sprite(bt, b.pos, Vector2(bs, bs), 0.0, Color(1.0, 1.0, 1.0, 0.85 * k))
 
+	for d in _drips:
+		_canvas.draw_circle(d.pos, float(d.size), Color(0.8, 0.95, 1.0, 0.85))
 	var surf := PackedVector2Array()
 	var x := 0.0
 	while x <= W:
@@ -307,6 +360,21 @@ func _draw_view() -> void:
 		x += 16.0
 	c.draw_polyline(surf, Color(1.0, 1.0, 1.0, 0.7), 3.0, true)
 	_draw_angler()
+	if _catch_t > 0.0:
+		_draw_card()
+
+
+func _draw_card() -> void:
+	var appear := clampf((3.4 - _catch_t) * 4.0, 0.0, 1.0)
+	var rect := Rect2(Vector2(660.0, 230.0 + (1.0 - appear) * 40.0), Vector2(520.0, 230.0))
+	_card.draw(_canvas.get_canvas_item(), rect)
+	var font := ThemeDB.fallback_font
+	_canvas.draw_string(font, rect.position + Vector2(24.0, 50.0), _catch_title, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 48.0, 30, Color(1.0, 0.92, 0.6))
+	for i in _catch_lines.size():
+		_canvas.draw_string(font, rect.position + Vector2(24.0, 96.0 + float(i) * 34.0), _catch_lines[i], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 200.0, 22, Color.WHITE)
+	if _fish_tex != null:
+		var big := minf(1.6, 150.0 / 110.0)
+		_draw_sprite(_fish_tex, rect.position + Vector2(rect.size.x - 100.0, 130.0), Vector2(big, big), sin(_time * 3.0) * 0.08, _fish_tint)
 
 
 ## Seaweed and rocks stand on the bed; seaweed sways on a sine oscillator around its base.

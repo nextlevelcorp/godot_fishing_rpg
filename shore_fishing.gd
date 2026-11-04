@@ -852,9 +852,11 @@ func _on_tension(_tension_n: float, ratio: float, bend: float) -> void:
 	_shake = ratio * ratio
 
 
-func _end_fight() -> void:
+## keep_view: leave the side view up (the catch card is showing and fades out on its own).
+func _end_fight(keep_view: bool = false) -> void:
 	_show_fight_ui(false)
-	_fight_view.end()
+	if not keep_view:
+		_fight_view.end()
 	_fish_id = ""
 	_fight_agent = null
 	_rod_bend_target = 0.0
@@ -871,9 +873,12 @@ func _on_caught(id: String, weight_kg: float) -> void:
 	GameSession.record_catch(id, sp["name"], weight_kg, value)
 	_update_coins()
 	var badge := "NEW SPECIES!  " if first else ("NEW RECORD!  " if record else "")
-	_result_label.text = "%sCAUGHT!\n%s  %.2f kg   +%d" % [badge, sp["name"], weight_kg, value]
+	var lines := PackedStringArray(["%.2f kg" % weight_kg, "+%d coins" % value, String(sp["scientific"])])
+	_fight_view.show_catch(badge + String(sp["name"]), lines)
+	_result_label.text = ""
 	_set_status("Nice one")
-	_end_fight()
+	_amb.play("splash", 0.7)
+	_end_fight(true)
 
 
 func _on_snapped(_id: String) -> void:
