@@ -12,6 +12,7 @@ const RIGS := {
 	"deep_sea_boat_rig": {"name": "Deep Sea Boat Rig", "rod_stiffness": 190.0, "line_stiffness": 1700.0, "line_break_force_n": 95.0, "drag_max_n": 62.0, "spool_m": 260.0, "min_level": 15},
 	"heavy_saltwater_spinning": {"name": "Heavy Saltwater Spinning", "rod_stiffness": 210.0, "line_stiffness": 1900.0, "line_break_force_n": 125.0, "drag_max_n": 85.0, "spool_m": 200.0, "min_level": 20},
 	"titan_tackle_rig": {"name": "Titan Tackle Rig", "rod_stiffness": 230.0, "line_stiffness": 2100.0, "line_break_force_n": 240.0, "drag_max_n": 150.0, "spool_m": 300.0, "min_level": 30},
+	"shore_spinning_rig": {"name": "Shore Spinning Rig", "rod_stiffness": 100.0, "line_stiffness": 1000.0, "line_break_force_n": 55.0, "drag_max_n": 34.0, "spool_m": 140.0, "min_level": 1},
 }
 
 # ---------------------------------------------------------------- BAITS
@@ -73,6 +74,17 @@ const BITE_PROFILES := {
 	"glass_snapper": {"caution": 0.35, "noise_hz": 2.2, "nibble_force_n": 1.2, "nibbles": Vector2i(2, 4), "strike_force_n": 5.0, "bite_window_s": 1.0, "spook_chance": 0.4, "appetite": 1.0},
 	"lagoon_grouper": {"caution": 0.45, "noise_hz": 0.6, "nibble_force_n": 6.0, "nibbles": Vector2i(1, 2), "strike_force_n": 45.0, "bite_window_s": 1.3, "spook_chance": 0.4, "max_nibble_s": 18.0},
 	"ember_barracuda": {"caution": 0.10, "noise_hz": 3.0, "nibble_force_n": 4.0, "nibbles": Vector2i(0, 0), "strike_force_n": 40.0, "bite_window_s": 0.6, "spook_chance": 0.1, "self_hook_chance": 0.3, "max_nibble_s": 4.0, "appetite": 1.0},
+	# Turkey shore spots (species names from the sourced spot notes; numbers are game-design values)
+	"mediterranean_horse_mackerel": {"caution": 0.25, "noise_hz": 3.0, "nibble_force_n": 0.8, "nibbles": Vector2i(1, 4), "strike_force_n": 3.0, "bite_window_s": 1.0, "spook_chance": 0.2, "appetite": 1.0},
+	"atlantic_bonito": {"caution": 0.08, "noise_hz": 3.2, "nibble_force_n": 4.0, "nibbles": Vector2i(0, 0), "strike_force_n": 22.0, "bite_window_s": 0.6, "spook_chance": 0.1, "self_hook_chance": 0.3, "max_nibble_s": 4.0, "appetite": 1.0},
+	"black_scorpionfish": {"caution": 0.60, "noise_hz": 0.8, "nibble_force_n": 1.5, "nibbles": Vector2i(1, 3), "strike_force_n": 6.0, "bite_window_s": 1.2, "spook_chance": 0.5, "appetite": 0.8},
+	"striped_sea_bream": {"caution": 0.65, "noise_hz": 1.0, "nibble_force_n": 1.6, "nibbles": Vector2i(2, 5), "strike_force_n": 8.0, "bite_window_s": 0.9, "spook_chance": 0.9, "max_nibble_s": 22.0, "appetite": 0.85},
+	"dusky_grouper": {"caution": 0.45, "noise_hz": 0.6, "nibble_force_n": 6.0, "nibbles": Vector2i(1, 2), "strike_force_n": 40.0, "bite_window_s": 1.2, "spook_chance": 0.4, "max_nibble_s": 18.0, "appetite": 0.8},
+	"common_dentex": {"caution": 0.20, "noise_hz": 2.0, "nibble_force_n": 4.0, "nibbles": Vector2i(0, 1), "strike_force_n": 26.0, "bite_window_s": 0.7, "spook_chance": 0.3, "self_hook_chance": 0.2, "max_nibble_s": 8.0, "appetite": 0.9},
+	"greater_amberjack": {"caution": 0.10, "noise_hz": 3.0, "nibble_force_n": 5.0, "nibbles": Vector2i(0, 0), "strike_force_n": 36.0, "bite_window_s": 0.6, "spook_chance": 0.2, "self_hook_chance": 0.25, "max_nibble_s": 5.0, "appetite": 1.0},
+	"leerfish": {"caution": 0.12, "noise_hz": 2.8, "nibble_force_n": 4.0, "nibbles": Vector2i(0, 1), "strike_force_n": 32.0, "bite_window_s": 0.6, "spook_chance": 0.2, "self_hook_chance": 0.25, "max_nibble_s": 6.0, "appetite": 1.0},
+	"saddled_bream": {"caution": 0.40, "noise_hz": 2.2, "nibble_force_n": 1.0, "nibbles": Vector2i(2, 4), "strike_force_n": 4.0, "bite_window_s": 1.0, "spook_chance": 0.5, "appetite": 1.0},
+	"garfish": {"caution": 0.30, "noise_hz": 2.6, "nibble_force_n": 0.8, "nibbles": Vector2i(1, 3), "strike_force_n": 3.0, "bite_window_s": 0.9, "spook_chance": 0.3, "appetite": 0.95},
 }
 
 # ---------------------------------------------------------------- WEATHER TRAITS
@@ -202,6 +214,17 @@ func _build_fish() -> Dictionary:
 		"glass_snapper": _fish("Glass Snapper (invented)", "Lutjanus vitreus", "prey", Vector2(0.3, 3.0), Vector2(0.40, 0.80), Vector2(3, 30), true, 9.0, 0.004, Vector2(3.0, 6.0), Vector2(1.4, 1.8), 55),
 		"ember_barracuda": _fish("Ember Barracuda (invented)", "Sphyraena ignea", "predator", Vector2(1.0, 15.0), Vector2(0.40, 0.85), Vector2(1, 25), true, 55.0, 0.0035, Vector2(2.5, 5.0), Vector2(1.9, 2.2), 110),
 		"lagoon_grouper": _fish("Lagoon Grouper (invented)", "Epinephelus lagunaris", "predator", Vector2(5.0, 60.0), Vector2(0.35, 0.75), Vector2(5, 40), false, 150.0, 0.0028, Vector2(4.0, 8.0), Vector2(1.7, 1.9), 180),
+		# Turkey shore spots (see fishing_spots.gd for the sources behind each spot's species list)
+		"mediterranean_horse_mackerel": _fish("Mediterranean Horse Mackerel (Istavrit)", "Trachurus mediterraneus", "prey", Vector2(0.03, 0.35), Vector2(0.30, 0.80), Vector2(1, 60), true, 3.0, 0.005, Vector2(3.0, 6.0), Vector2(1.3, 1.6), 14),
+		"atlantic_bonito": _fish("Atlantic Bonito (Palamut)", "Sarda sarda", "predator", Vector2(0.5, 6.0), Vector2(0.35, 0.80), Vector2(0.5, 40), true, 22.0, 0.0032, Vector2(2.5, 5.0), Vector2(1.8, 2.3), 55),
+		"black_scorpionfish": _fish("Black Scorpionfish (Iskorpit)", "Scorpaena porcus", "predator", Vector2(0.05, 0.8), Vector2(0.30, 0.80), Vector2(1, 50), false, 5.0, 0.0045, Vector2(4.0, 8.0), Vector2(1.2, 1.5), 30),
+		"striped_sea_bream": _fish("Striped Seabream (Mirmir)", "Lithognathus mormyrus", "prey", Vector2(0.1, 1.5), Vector2(0.35, 0.80), Vector2(1, 40), false, 7.0, 0.004, Vector2(3.0, 6.0), Vector2(1.3, 1.7), 35),
+		"dusky_grouper": _fish("Dusky Grouper (Lagos)", "Epinephelus marginatus", "predator", Vector2(2.0, 40.0), Vector2(0.40, 0.80), Vector2(5, 200), false, 85.0, 0.0030, Vector2(3.0, 7.0), Vector2(1.7, 2.1), 150),
+		"common_dentex": _fish("Common Dentex (Sinarit)", "Dentex dentex", "predator", Vector2(0.8, 12.0), Vector2(0.35, 0.75), Vector2(5, 100), false, 32.0, 0.0032, Vector2(3.0, 6.0), Vector2(1.6, 2.0), 95),
+		"greater_amberjack": _fish("Greater Amberjack (Akya)", "Seriola dumerili", "predator", Vector2(2.0, 40.0), Vector2(0.40, 0.85), Vector2(5, 120), false, 60.0, 0.0030, Vector2(2.5, 5.0), Vector2(1.8, 2.3), 110),
+		"leerfish": _fish("Leerfish (Sarikuyruk)", "Lichia amia", "predator", Vector2(1.0, 25.0), Vector2(0.40, 0.85), Vector2(1, 40), false, 45.0, 0.0032, Vector2(2.5, 5.0), Vector2(1.8, 2.2), 85),
+		"saddled_bream": _fish("Saddled Bream (Karagoz)", "Oblada melanura", "prey", Vector2(0.05, 0.8), Vector2(0.30, 0.80), Vector2(1, 30), true, 4.0, 0.0045, Vector2(3.0, 6.0), Vector2(1.3, 1.6), 22),
+		"garfish": _fish("Garfish (Zargana)", "Belone belone", "prey", Vector2(0.1, 1.0), Vector2(0.30, 0.80), Vector2(0.3, 10), true, 3.0, 0.005, Vector2(2.0, 5.0), Vector2(1.4, 1.8), 18),
 	}
 
 

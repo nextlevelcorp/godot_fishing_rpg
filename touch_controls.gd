@@ -27,6 +27,9 @@ const BUTTONS := [
 	[&"bait_shallower", "SHAL", 1210.0, 220.0, 36.0],
 ]
 
+## Only these actions get a button. Empty = show all. Set before the node enters the tree.
+var enabled_actions: Array[StringName] = []
+
 ## Finger index -> index into BUTTONS, for the touch that is currently holding it.
 var _held: Dictionary = {}
 var _pad: Control
@@ -71,12 +74,18 @@ func _set_action(action: StringName, pressed: bool) -> void:
 	Input.parse_input_event(ev)
 
 
+func _is_enabled(action: StringName) -> bool:
+	return enabled_actions.is_empty() or enabled_actions.has(action)
+
+
 ## Maps a screen position to a button index, or -1.
 func _button_at_screen(screen_pos: Vector2) -> int:
 	var xf := get_viewport().get_final_transform()
 	var scale_factor := xf.get_scale().x
 	for i in BUTTONS.size():
 		var b: Array = BUTTONS[i]
+		if not _is_enabled(b[0]):
+			continue
 		var center := xf * Vector2(b[2], b[3])
 		var radius: float = b[4] * TOUCH_SCALE * scale_factor
 		if screen_pos.distance_to(center) <= radius * 1.2:
@@ -89,6 +98,8 @@ func _draw_pad() -> void:
 	var held_set := _held.values()
 	for i in BUTTONS.size():
 		var b: Array = BUTTONS[i]
+		if not _is_enabled(b[0]):
+			continue
 		var center := Vector2(b[2], b[3])
 		var radius: float = b[4] * TOUCH_SCALE
 		var lit := held_set.has(i)

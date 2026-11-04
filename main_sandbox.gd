@@ -38,6 +38,16 @@ func _ready() -> void:
 	_rng.randomize()
 	InputDefaults.ensure_all()
 	add_child(TouchControls.new())  # on-screen buttons for phones; same actions as the keyboard
+	var back_layer := CanvasLayer.new()
+	back_layer.layer = 20
+	var back_button := Button.new()
+	back_button.text = "MAP"
+	back_button.position = Vector2(570.0, 640.0)
+	back_button.size = Vector2(140.0, 56.0)
+	back_button.add_theme_font_size_override("font_size", 24)
+	back_button.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://turkey_map.tscn"))
+	back_layer.add_child(back_button)
+	add_child(back_layer)
 	var schools: Array[FishSchool] = [anchovy, bluefish, seabream]
 
 	progression.current_zone = start_zone

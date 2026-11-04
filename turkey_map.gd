@@ -1,0 +1,273 @@
+## Stylised map of Turkey. Tap a pin to choose a real fishing spot, then go fishing there.
+## The coastline is a hand-simplified outline in (lat, lon): it looks right at game scale but is not
+## survey data. Pins use the town-level coordinates in fishing_spots.gd.
+class_name TurkeyMap
+extends Control
+
+const LAT_MIN := 35.6
+const LAT_MAX := 42.4
+const LON_MIN := 25.5
+const LON_MAX := 45.0
+const REF_LAT_DEG := 39.0       ## longitude is squeezed by cos(this) so the shape is not stretched
+
+const PIN_SIZE := 44.0
+const TOP_BAR := 64.0
+const PANEL_HEIGHT := 250.0
+
+const SEA_TOP := Color(0.02, 0.26, 0.42)
+const SEA_BOTTOM := Color(0.02, 0.52, 0.68)
+const SEA_LABEL := Color(1, 1, 1, 0.35)
+const LAND := Color(0.88, 0.80, 0.58)
+const LAND_SHADOW := Color(0.0, 0.1, 0.2, 0.35)
+const LAND_EDGE := Color(1.0, 0.97, 0.85, 0.95)
+const PIN_COLOR := Color(1.0, 0.45, 0.20)
+const PIN_SELECTED := Color(1.0, 0.85, 0.20)
+
+## Turkey, clockwise from the north-west corner (lat, lon). Stylised.
+const OUTLINE: Array[Vector2] = [
+	Vector2(41.74, 26.36), Vector2(41.90, 26.60), Vector2(42.00, 27.20), Vector2(41.98, 28.02),
+	Vector2(41.60, 28.10), Vector2(41.35, 28.70), Vector2(41.22, 29.12), Vector2(41.17, 29.61),
+	Vector2(41.12, 30.15), Vector2(41.10, 30.70), Vector2(41.09, 31.12), Vector2(41.28, 31.42),
+	Vector2(41.45, 31.79), Vector2(41.75, 32.38), Vector2(41.88, 32.95), Vector2(41.98, 33.77),
+	Vector2(42.10, 34.95), Vector2(41.80, 35.25), Vector2(41.72, 35.95), Vector2(41.29, 36.33),
+	Vector2(41.15, 37.00), Vector2(40.98, 37.88), Vector2(40.92, 38.39), Vector2(41.02, 39.72),
+	Vector2(41.03, 40.52), Vector2(41.40, 41.43), Vector2(41.52, 41.53), Vector2(41.55, 42.50),
+	Vector2(41.50, 43.20), Vector2(40.95, 43.65), Vector2(40.45, 43.60), Vector2(40.05, 44.10),
+	Vector2(39.70, 44.50), Vector2(39.40, 44.80), Vector2(38.40, 44.35), Vector2(37.60, 44.75),
+	Vector2(37.30, 44.60), Vector2(37.10, 43.80), Vector2(37.15, 42.35), Vector2(37.05, 41.20),
+	Vector2(36.85, 40.05), Vector2(36.70, 38.95), Vector2(36.83, 38.00), Vector2(36.60, 37.10),
+	Vector2(36.20, 36.65), Vector2(35.85, 36.15), Vector2(36.10, 35.90), Vector2(36.60, 36.20),
+	Vector2(36.85, 36.00), Vector2(36.75, 35.80), Vector2(36.55, 35.40), Vector2(36.80, 34.64),
+	Vector2(36.38, 33.93), Vector2(36.07, 32.83), Vector2(36.54, 32.00), Vector2(36.78, 31.45),
+	Vector2(36.88, 30.70), Vector2(36.40, 30.40), Vector2(36.30, 30.15), Vector2(36.20, 29.64),
+	Vector2(36.27, 29.42), Vector2(36.62, 29.10), Vector2(36.76, 28.80), Vector2(36.85, 28.27),
+	Vector2(36.70, 27.55), Vector2(37.03, 27.43), Vector2(37.40, 27.25), Vector2(37.86, 27.26),
+	Vector2(38.15, 26.80), Vector2(38.30, 26.25), Vector2(38.67, 26.50), Vector2(39.07, 26.85),
+	Vector2(39.31, 26.69), Vector2(39.48, 26.08), Vector2(39.90, 26.18), Vector2(40.04, 26.20),
+	Vector2(40.45, 26.15), Vector2(40.75, 26.05), Vector2(41.25, 26.40),
+]
+
+## The Sea of Marmara, drawn in sea colour on top of the land.
+const MARMARA: Array[Vector2] = [
+	Vector2(40.40, 26.72), Vector2(40.60, 27.00), Vector2(40.90, 27.45), Vector2(40.97, 28.00),
+	Vector2(41.00, 28.65), Vector2(41.02, 29.00), Vector2(40.80, 29.15), Vector2(40.78, 29.60),
+	Vector2(40.73, 29.95), Vector2(40.72, 29.40), Vector2(40.55, 29.20), Vector2(40.38, 28.90),
+	Vector2(40.40, 28.30), Vector2(40.38, 27.80), Vector2(40.40, 27.30),
+]
+
+const SEA_LABELS := [
+	["BLACK SEA", 43.0, 34.0],
+	["AEGEAN", 38.7, 25.9],
+	["MEDITERRANEAN", 35.9, 31.0],
+]
+
+var _map_rect := Rect2()
+var _land_pts := PackedVector2Array()
+var _marmara_pts := PackedVector2Array()
+var _pins: Dictionary = {}              # spot id -> Button
+var _selected := ""
+var _time := 0.0
+
+var _panel: PanelContainer
+var _title: Label
+var _sub: Label
+var _fish_label: Label
+var _note_label: Label
+var _go_button: Button
+
+
+func _ready() -> void:
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_build_header()
+	_build_pins()
+	_build_panel()
+	resized.connect(_layout)
+	_layout()
+	if GameSession.spot_id != "" and _pins.has(GameSession.spot_id):
+		_select(GameSession.spot_id)
+
+
+func _process(delta: float) -> void:
+	_time += delta
+	if _selected != "":
+		queue_redraw()
+
+
+# ---------------------------------------------------------------- building the UI
+func _build_header() -> void:
+	var header := Label.new()
+	header.name = "Header"
+	header.text = "Choose your fishing spot  -  Türkiye"
+	header.position = Vector2(20, 14)
+	header.add_theme_font_size_override("font_size", 28)
+	header.add_theme_color_override("font_color", Color.WHITE)
+	header.add_theme_color_override("font_outline_color", Color(0, 0.1, 0.2, 0.9))
+	header.add_theme_constant_override("outline_size", 6)
+	add_child(header)
+
+
+func _build_pins() -> void:
+	for id: String in FishingSpots.ids():
+		var b := Button.new()
+		b.name = "Pin_" + id
+		b.custom_minimum_size = Vector2(PIN_SIZE, PIN_SIZE)
+		b.size = Vector2(PIN_SIZE, PIN_SIZE)
+		b.focus_mode = Control.FOCUS_NONE
+		_style_pin(b, false)
+		b.pressed.connect(_select.bind(id))
+		add_child(b)
+		_pins[id] = b
+
+
+func _style_pin(b: Button, selected: bool) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = PIN_SELECTED if selected else PIN_COLOR
+	sb.set_corner_radius_all(int(PIN_SIZE * 0.5))
+	sb.set_border_width_all(4)
+	sb.border_color = Color.WHITE
+	sb.shadow_color = Color(0, 0, 0, 0.35)
+	sb.shadow_size = 6
+	for state in ["normal", "hover", "pressed", "focus"]:
+		b.add_theme_stylebox_override(state, sb)
+
+
+func _build_panel() -> void:
+	_panel = PanelContainer.new()
+	_panel.name = "InfoPanel"
+	_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	_panel.offset_left = 12.0
+	_panel.offset_right = -12.0
+	_panel.offset_top = -PANEL_HEIGHT
+	_panel.offset_bottom = -12.0
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.02, 0.10, 0.18, 0.88)
+	style.set_corner_radius_all(18)
+	style.set_content_margin_all(16)
+	_panel.add_theme_stylebox_override("panel", style)
+	add_child(_panel)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	_panel.add_child(box)
+
+	_title = _make_label(box, 26, Color.WHITE)
+	_sub = _make_label(box, 17, Color(0.8, 0.9, 1.0))
+	_fish_label = _make_label(box, 18, Color(1.0, 0.9, 0.6))
+	_note_label = _make_label(box, 14, Color(0.7, 0.8, 0.9))
+	_title.text = "Tap a pin to pick a spot"
+	_sub.text = "Each pin is a real place where people fish in Türkiye."
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	box.add_child(row)
+
+	_go_button = Button.new()
+	_go_button.text = "FISH HERE"
+	_go_button.custom_minimum_size = Vector2(240, 60)
+	_go_button.add_theme_font_size_override("font_size", 24)
+	_go_button.disabled = true
+	_go_button.pressed.connect(_on_go_pressed)
+	row.add_child(_go_button)
+
+	var sandbox := Button.new()
+	sandbox.text = "Boat sandbox"
+	sandbox.custom_minimum_size = Vector2(200, 60)
+	sandbox.add_theme_font_size_override("font_size", 20)
+	sandbox.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://main_sandbox.tscn"))
+	row.add_child(sandbox)
+
+
+func _make_label(parent: Control, size: int, color: Color) -> Label:
+	var l := Label.new()
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(l)
+	return l
+
+
+# ---------------------------------------------------------------- layout and projection
+func _layout() -> void:
+	_map_rect = Rect2(Vector2(16, TOP_BAR), size - Vector2(32, TOP_BAR + PANEL_HEIGHT + 20.0))
+	_land_pts = _project_all(OUTLINE)
+	_marmara_pts = _project_all(MARMARA)
+	for id: String in _pins:
+		var b: Button = _pins[id]
+		b.position = _project(FishingSpots.get_spot(id)["lat_lon"]) - b.size * 0.5
+	queue_redraw()
+
+
+func _project_all(points: Array[Vector2]) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for p in points:
+		out.append(_project(p))
+	return out
+
+
+## (lat, lon) -> local pixel position inside the map rect, keeping the shape proportions.
+func _project(lat_lon: Vector2) -> Vector2:
+	var kx := cos(deg_to_rad(REF_LAT_DEG))
+	var w := (LON_MAX - LON_MIN) * kx
+	var h := LAT_MAX - LAT_MIN
+	var s := minf(_map_rect.size.x / w, _map_rect.size.y / h)
+	var origin := _map_rect.position + (_map_rect.size - Vector2(w, h) * s) * 0.5
+	return origin + Vector2((lat_lon.y - LON_MIN) * kx, LAT_MAX - lat_lon.x) * s
+
+
+# ---------------------------------------------------------------- drawing
+func _draw() -> void:
+	var r := Rect2(Vector2.ZERO, size)
+	var corners := PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)])
+	draw_polygon(corners, PackedColorArray([SEA_TOP, SEA_TOP, SEA_BOTTOM, SEA_BOTTOM]))
+
+	if _land_pts.size() >= 3:
+		var shadow := PackedVector2Array()
+		for p in _land_pts:
+			shadow.append(p + Vector2(0, 7))
+		draw_colored_polygon(shadow, LAND_SHADOW)
+		draw_colored_polygon(_land_pts, LAND)
+	if _marmara_pts.size() >= 3:
+		draw_colored_polygon(_marmara_pts, SEA_BOTTOM.lerp(SEA_TOP, 0.35))
+	if _land_pts.size() >= 3:
+		var edge := _land_pts.duplicate()
+		edge.append(_land_pts[0])
+		draw_polyline(edge, LAND_EDGE, 3.0, true)
+
+	var font := ThemeDB.fallback_font
+	for entry in SEA_LABELS:
+		var pos := _project(Vector2(entry[1], entry[2]))
+		draw_string(font, pos, entry[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 22, SEA_LABEL)
+
+	if _selected != "" and _pins.has(_selected):
+		var b: Button = _pins[_selected]
+		var c := b.position + b.size * 0.5
+		var pulse := 0.5 + 0.5 * sin(_time * 3.0)
+		draw_arc(c, PIN_SIZE * 0.5 + 8.0 + pulse * 8.0, 0.0, TAU, 40, Color(1, 1, 1, 0.8 - pulse * 0.5), 3.0)
+		var name_text: String = FishingSpots.get_spot(_selected)["name"]
+		var tw := font.get_string_size(name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+		draw_string(font, c + Vector2(-tw * 0.5, -PIN_SIZE * 0.5 - 14.0), name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color.WHITE)
+
+
+# ---------------------------------------------------------------- selecting
+func _select(id: String) -> void:
+	_selected = id
+	for pid: String in _pins:
+		_style_pin(_pins[pid], pid == id)
+	var s := FishingSpots.get_spot(id)
+	_title.text = "%s  (%s)" % [s["name"], s["local_name"]]
+	_sub.text = "%s  -  %s" % [s["region"], s["blurb"]]
+	var names: Array[String] = []
+	for sid: String in s["species"]:
+		names.append(String(BiomeDB.get_species(sid).get("name", sid)))
+	_fish_label.text = "Fish here: " + ", ".join(names)
+	_note_label.text = "Evidence: %s (%d sources). %s Pin is town-level, not the exact mark." % [s["evidence"], s["sources"].size(), s["species_note"]]
+	_go_button.disabled = false
+	queue_redraw()
+
+
+func _on_go_pressed() -> void:
+	if _selected == "":
+		return
+	GameSession.spot_id = _selected
+	get_tree().change_scene_to_file("res://shore_fishing.tscn")
