@@ -108,6 +108,7 @@ var _reel_click := 0.0
 
 # nodes
 var _amb: Ambience
+var _fight_view: FightView
 var _water: WaterSurface
 var _cam: Camera2D
 var _tint: CanvasModulate
@@ -173,6 +174,10 @@ func _ready() -> void:
 	_amb = Ambience.new()
 	_amb.surf_level = 0.75 if _spot["kind"] == "rocky" else 0.55
 	add_child(_amb)
+	_fight_view = FightView.new()
+	_fight_view.fishing = _fishing
+	_fight_view.spot = _spot
+	add_child(_fight_view)
 	_build_vignette()
 	_build_hud()
 	var touch := TouchControls.new()
@@ -693,6 +698,7 @@ func _hook_fish() -> void:
 	_amb.play("splash", 1.0)
 	_splash(_bobber_pos, 1.2)
 	_show_fight_ui(true)
+	_fight_view.begin(_fish_id, _weight_kg, _cast_dist_m)
 
 
 ## The FishingController decides how far out the fish is; the visible fish is an agent that
@@ -848,6 +854,7 @@ func _on_tension(_tension_n: float, ratio: float, bend: float) -> void:
 
 func _end_fight() -> void:
 	_show_fight_ui(false)
+	_fight_view.end()
 	_fish_id = ""
 	_fight_agent = null
 	_rod_bend_target = 0.0
@@ -904,6 +911,8 @@ func _process(delta: float) -> void:
 			_reel_click = 0.06
 			_amb.play("click", 0.5)
 	_tint.color = _world.tint(_region_tint())
+	_fight_view.tint = _tint.color
+	_fight_view.daylight = _world.daylight
 	_water.set_daylight(_world.daylight)
 	_clock_label.text = _world.clock_text()
 
