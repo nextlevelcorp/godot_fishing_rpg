@@ -14,19 +14,20 @@ const TOUCH_SCALE := 1.35
 
 const BUTTONS := [
 	# [action, label, center_x, center_y, radius] in design coordinates (1280 x 720).
-	# Left cluster: boat / aiming.
+	# Left cluster: boat / aiming (legacy boat game).
 	[&"boat_forward", "^", 110.0, 430.0, 60.0],
 	[&"steer_left", "<", 60.0, 580.0, 55.0],
 	[&"steer_right", ">", 200.0, 580.0, 55.0],
 	[&"boat_back", "v", 110.0, 690.0, 40.0],
-	# Right cluster: fishing.
-	[&"reel_in", "REEL", 1100.0, 600.0, 80.0],
-	[&"cast", "CAST", 1100.0, 400.0, 55.0],
-	[&"anchor", "ANCH", 940.0, 695.0, 45.0],
-	[&"drag_up", "DRAG+", 940.0, 350.0, 38.0],
-	[&"drag_down", "DRAG-", 960.0, 470.0, 38.0],
-	[&"bait_deeper", "DEEP", 1210.0, 300.0, 36.0],
-	[&"bait_shallower", "SHAL", 1210.0, 220.0, 36.0],
+	# Right side: fishing. Kept at least 130 px from the right edge and 70 px from the bottom, away
+	# from notches, rounded corners and browser toolbars. Two small columns sit left of CAST/REEL.
+	[&"cast", "CAST", 1090.0, 360.0, 52.0],
+	[&"reel_in", "REEL", 1090.0, 535.0, 66.0],
+	[&"drag_up", "CLUTCH+", 945.0, 440.0, 36.0],
+	[&"drag_down", "CLUTCH-", 945.0, 555.0, 36.0],
+	[&"bait_deeper", "DEEP", 810.0, 440.0, 36.0],
+	[&"bait_shallower", "SHAL", 810.0, 555.0, 36.0],
+	[&"anchor", "ANCH", 945.0, 325.0, 40.0],
 ]
 
 ## Button art: Kenney Mobile Controls (CC0), assets/kenney_mobile_controls/.
@@ -120,7 +121,7 @@ class TouchButton extends Control:
 		mouse_filter = Control.MOUSE_FILTER_STOP
 
 	func _has_point(point: Vector2) -> bool:
-		return point.distance_to(size * 0.5) <= radius * 1.15
+		return point.distance_to(size * 0.5) <= radius * 1.05
 
 	func _gui_input(event: InputEvent) -> void:
 		if event is InputEventScreenTouch:

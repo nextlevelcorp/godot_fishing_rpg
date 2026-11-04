@@ -34,6 +34,7 @@ const AIR_DRAG := 0.35            ## 1/s horizontal drag on the flying bait
 const WATER_EDGE := -12.0         ## bait landing below this y hits water, above it hits the shore
 const SHOAL_BOUNDS := Rect2(-3700.0, -900.0, 7400.0, 840.0)
 const ROPE_POINTS := 16
+const RETRIEVE_SPEED := 55.0         ## px/s the bait travels while REEL is held (about 5.5 m/s)
 const WALK_SPEED := 150.0          ## px/s, about 1.5 m/s
 const PIER_LEN := 420.0            ## the pier reaches 42 m out
 const PIER_HALF := 26.0
@@ -53,6 +54,10 @@ var _has_pier := true
 var _pier_x := 900.0
 var _bait_depth := 2.0             ## float setting, metres below the surface
 var _tip_text := ""
+var _toast_text := ""
+var _toast_t := 0.0
+var _debug_label: Label
+var _toast_label: Label
 var _tip_pos := Vector2.ZERO
 var _time := 0.0
 
@@ -329,6 +334,8 @@ func _build_hud() -> void:
 	var build := _make_label(ui, 14, Color(1.0, 1.0, 1.0, 0.6))
 	build.position = Vector2(20.0, 694.0)
 	build.text = GameSession.BUILD
+	_debug_label = _make_label(ui, 14, Color(1.0, 0.9, 0.5, 0.9))
+	_debug_label.position = Vector2(110.0, 694.0)
 
 	_status = _make_label(ui, 30, Color.WHITE)
 	_status.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
@@ -342,6 +349,12 @@ func _build_hud() -> void:
 	_result_label.offset_bottom = 310.0
 	_result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_result_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+	_toast_label = _make_label(ui, 34, Color(0.8, 1.0, 1.0))
+	_toast_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_toast_label.offset_top = 330.0
+	_toast_label.offset_bottom = 380.0
+	_toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	_coins_label = _make_label(ui, 22, Color(1.0, 0.9, 0.5))
 	_coins_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
@@ -369,8 +382,8 @@ func _build_hud() -> void:
 	_power_bar.step = 0.001
 	_power_bar.show_percentage = false
 	_power_bar.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	_power_bar.offset_left = -260.0
-	_power_bar.offset_right = 260.0
+	_power_bar.offset_left = -200.0
+	_power_bar.offset_right = 200.0
 	_power_bar.offset_top = -64.0
 	_power_bar.offset_bottom = -34.0
 	_power_bar.visible = false
@@ -506,10 +519,24 @@ func _predict() -> void:
 	_pred_landing = p
 
 
+## Diagnostic line (bottom of the screen): what the game believes is pressed. If a button is held
+## and its name is missing here, the touch never reached the game; if it is listed but nothing
+## happens, the problem is in the game logic. Remove once touch is confirmed on devices.
+func _update_debug() -> void:
+	var down: PackedStringArray = []
+	for a in [&"cast", &"reel_in", &"drag_up", &"drag_down", &"bait_deeper", &"bait_shallower"]:
+		if Input.is_action_pressed(a):
+			down.append(String(a))
+	var mv := Input.get_vector(&"steer_left", &"steer_right", &"boat_forward", &"boat_back", 0.1)
+	_debug_label.text = "[%s]  state %s  fish %s  stick %.1f,%.1f  pressed: %s" % [GameSession.BUILD, State.keys()[_state], ("yes" if _fish_id != "" else "no"), mv.x, mv.y, ", ".join(down) if not down.is_empty() else "-"]
+
+
 # ---------------------------------------------------------------- state machine
 func _physics_process(delta: float) -> void:
 	_time += delta
 	_read_buttons()
+	if _state != State.FIGHT:
+		_adjust_clutch(delta)
 	match _state:
 		State.AIM:
 			_walk(delta)
@@ -623,6 +650,23 @@ func _adjust_bait_depth(delta: float) -> void:
 	var ax := Input.get_axis(&"bait_shallower", &"bait_deeper")
 	if absf(ax) > 0.0:
 		_bait_depth = clampf(_bait_depth + ax * 3.0 * delta, 0.5, 30.0)
+		_flash("Float depth %.1f m" % _bait_depth)
+
+
+## The clutch (drag) is set before the fight, like on a real reel; during the fight
+## FishingController adjusts it itself from the same actions.
+func _adjust_clutch(delta: float) -> void:
+	var ax := Input.get_axis(&"drag_down", &"drag_up")
+	if absf(ax) > 0.0:
+		var upper := minf(_fishing.drag_max_n, _fishing.line_break_force_n * 0.95)
+		_fishing.drag_setting_n = clampf(_fishing.drag_setting_n + ax * _fishing.drag_adjust_n_s * delta, _fishing.drag_min_n, upper)
+		_flash("Clutch %.0f N" % _fishing.drag_setting_n)
+
+
+## A short on-screen readout of a setting that was just changed.
+func _flash(text: String) -> void:
+	_toast_text = text
+	_toast_t = 1.1
 
 
 func _pier_rect() -> Rect2:
@@ -729,7 +773,7 @@ func _tick_fly(delta: float) -> void:
 	_state = State.WAIT
 	_wait_t = _rng.randf_range(4.0, 10.0) / _activity()
 	_ripple_clock = 0.0
-	_set_status("%.0f m out, bait at %.1f m. Waiting...   (tap CAST to reel in)" % [_cast_dist_m, _eff_depth()])
+	_set_status("%.0f m out, bait at %.1f m. Waiting...   Hold REEL to bring the bait in" % [_cast_dist_m, _eff_depth()])
 
 
 func _tick_wait(delta: float) -> void:
@@ -737,6 +781,17 @@ func _tick_wait(delta: float) -> void:
 	if _cast_edge:
 		_retrieve("Reeled in")
 		return
+	# Holding REEL winds the bait in: the float travels back toward the rod at RETRIEVE_SPEED.
+	# A tap while a fish is nibbling still counts as a strike attempt (handled below).
+	if Input.is_action_pressed(&"reel_in") and not _reel_edge:
+		var tip := _rod_tip()
+		var to_rod := tip - _bobber_pos
+		if to_rod.length() < 40.0:
+			_retrieve("Bait is back")
+			return
+		_bobber_pos += to_rod.normalized() * RETRIEVE_SPEED * delta
+		_float_x = lerpf(_float_x, 0.3, delta * 4.0)
+		_ripple_clock += delta * 2.0
 	_ripple_clock += delta
 	if _ripple_clock > 1.9:
 		_ripple_clock = 0.0
@@ -1081,7 +1136,10 @@ func _process(delta: float) -> void:
 	_clock_label.text = _world.clock_text()
 	var probe := _bobber_pos if (_state == State.WAIT or _state == State.BITE) else (_pred_landing if _state == State.CHARGE else _hand + _facing * 60.0)
 	var water := _water_depth(probe)
-	_depth_label.text = "Float depth %.1f m   |   Water %s" % [_bait_depth, ("%.1f m" % water) if water > 0.0 else "-"]
+	_depth_label.text = "Float %.1f m  |  Water %s  |  Clutch %.0f N" % [_bait_depth, ("%.1f m" % water) if water > 0.0 else "-", _fishing.drag_setting_n]
+	_toast_t = maxf(0.0, _toast_t - delta)
+	_toast_label.text = _toast_text if _toast_t > 0.0 else ""
+	_update_debug()
 
 	_power_bar.visible = _state == State.CHARGE
 	_power_bar.value = _power
