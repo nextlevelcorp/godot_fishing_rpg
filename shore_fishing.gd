@@ -63,6 +63,8 @@ var _xp_bar: ProgressBar
 var _goal_labels: Array[Label] = []
 var _summary: PanelContainer
 var _hud_root: Control
+var _weather: WeatherFx
+var _weather_kind := "clear"
 var _tip_pos := Vector2.ZERO
 var _time := 0.0
 
@@ -170,7 +172,8 @@ func _ready() -> void:
 	_has_pier = _spot["kind"] != "bridge"
 	_pier_x = 900.0 if hash(GameSession.spot_id) % 2 == 0 else -900.0
 	_build_walkable()
-	_wind = Vector2(_rng.randf_range(-60.0, 60.0), _rng.randf_range(-15.0, 15.0))
+	_weather_kind = WeatherFx.roll(_rng)
+	_wind = Vector2(_rng.randf_range(-60.0, 60.0), _rng.randf_range(-15.0, 15.0)) * float(WeatherFx.KINDS[_weather_kind]["wind"])
 	_current = Vector2(_rng.randf_range(-14.0, 14.0), _rng.randf_range(-4.0, 4.0))
 	_cast_seen = int(TouchControls.presses.get(&"cast", 0))
 	_reel_seen = int(TouchControls.presses.get(&"reel_in", 0))
@@ -331,6 +334,9 @@ func _build_hud() -> void:
 	ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(ui)
 	_hud_root = ui
+	_weather = WeatherFx.new()
+	_weather.setup(_weather_kind)
+	ui.add_child(_weather)
 
 	_spot_label = _make_label(ui, 22, Color.WHITE)
 	_spot_label.position = Vector2(20.0, 10.0)
@@ -760,7 +766,7 @@ func _activity() -> float:
 	for id: String in _spot["species"]:
 		base += 1.0 / sqrt(float(BiomeDB.get_species(id)["base_price"]))
 		now += _species_weight(id)
-	return clampf(now / maxf(base, 0.0001), 0.15, 2.0)
+	return clampf(now / maxf(base, 0.0001) * float(WeatherFx.KINDS[_weather_kind]["activity"]), 0.15, 2.0)
 
 
 func _crowd_pos(a: Dictionary) -> Vector2:
@@ -1360,7 +1366,7 @@ func _process(delta: float) -> void:
 	_fight_view.tint = _tint.color
 	_fight_view.daylight = _world.daylight
 	_water.set_daylight(_world.daylight)
-	_clock_label.text = _world.clock_text()
+	_clock_label.text = "%s   |   %s" % [_world.clock_text(), _weather.label()]
 	var probe := _bobber_pos if (_state == State.WAIT or _state == State.BITE) else (_pred_landing if _state == State.CHARGE else _hand + _facing * 60.0)
 	var water := _water_depth(probe)
 	_depth_label.text = "Float %.1f m  |  Water %s  |  Clutch %.0f N" % [_bait_depth, ("%.1f m" % water) if water > 0.0 else "-", _fishing.drag_setting_n]
