@@ -93,7 +93,7 @@ static func draw(ci: CanvasItem, id: String, center: Vector2, length: float, rot
 	# A painted sprite in assets/art/fish/<id>.png (see docs/ART_BRIEF_AI.md) replaces the drawing.
 	var tex := sprite(id)
 	if tex != null:
-		var sc := length / (float(tex.get_width()) * 0.9)
+		var sc := length / float(tex.get_width())          # sprites are trimmed to the fish
 		ci.draw_set_transform(center, rot, Vector2(facing * sc, sc))
 		ci.draw_texture(tex, -tex.get_size() * 0.5, Color(dim, dim, dim))
 		ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
