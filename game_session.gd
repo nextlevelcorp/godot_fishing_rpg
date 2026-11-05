@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Shown on screen so a player can tell a fresh deploy from a page the browser cached.
 ## Bump it with every build that changes behaviour.
-const BUILD := "build 25"
+const BUILD := "build 26"
 const SAVE_PATH := "user://save.cfg"
 const SAVE_VERSION := 1
 const START_RIG := "shore_spinning_rig"

@@ -280,11 +280,13 @@ func _build_land() -> void:
 	# Other anglers along the shore. The Galata survey counted about 200 a day on the bridge, so
 	# the rail is lined with them; elsewhere a few locals fish the same water.
 	var crowd_y: float = {"bridge": 20.0, "harbor": 20.0, "beach": 34.0}.get(kind, 12.0)
-	var gap := Vector2(60.0, 130.0) if kind == "bridge" else Vector2(260.0, 520.0)
+	var gap := Vector2(60.0, 130.0) if kind == "bridge" else Vector2(150.0, 320.0)
 	var cx := -HALF_WIDTH + 200.0
 	while cx < HALF_WIDTH - 200.0:
 		if absf(cx) > 140.0 and absf(cx - _pier_x) > 70.0:
-			_crowd.append({"x": cx, "y": crowd_y, "len": rng.randf_range(90.0, 260.0), "phase": rng.randf() * TAU})
+			_crowd.append({"x": cx, "y": crowd_y, "len": rng.randf_range(90.0, 260.0), "phase": rng.randf() * TAU,
+				"state": "wait", "t": rng.randf_range(4.0, 40.0), "shirt": Color(rng.randf_range(0.2, 0.7), rng.randf_range(0.2, 0.5), rng.randf_range(0.25, 0.6)),
+				"hat": rng.randf() < 0.5, "kg": 0.3, "sp": ""})
 		cx += rng.randf_range(gap.x, gap.y)
 	for i in 140:
 		_sparkles.append(Vector3(rng.randf_range(-HALF_WIDTH, HALF_WIDTH), rng.randf_range(-1100.0, -40.0), rng.randf() * TAU))
@@ -1159,22 +1161,76 @@ func _update_boats(delta: float) -> void:
 func _neighbor_float(a: Dictionary) -> Vector2:
 	var x := float(a["x"])
 	var ph := float(a["phase"])
-	return Vector2(x + sin(_time * 0.4 + ph) * 14.0 + sin(ph) * 30.0, float(a["y"]) - 30.0 - float(a["len"]) + sin(_time * 1.7 + ph) * 2.0)
+	var out := Vector2(x + sin(_time * 0.4 + ph) * 14.0 + sin(ph) * 30.0, float(a["y"]) - 30.0 - float(a["len"]) + sin(_time * 1.7 + ph) * 2.0)
+	match String(a.get("state", "wait")):
+		"fight":
+			# the fish pulls the float under and drags it about, and it comes closer as they reel
+			var k := clampf(float(a["t"]) / 7.0, 0.15, 1.0)
+			out = _neighbor_tip(a).lerp(out, k) + Vector2(sin(_time * 3.1 + ph) * 22.0, cos(_time * 2.3 + ph) * 8.0)
+		"land", "cast":
+			out = _neighbor_tip(a) + Vector2(0.0, 26.0)
+	return out
+
+
+## Rod tip of another angler: the rod rises from their hands toward the water and bends on a fish.
+func _neighbor_tip(a: Dictionary) -> Vector2:
+	var hold := _neighbor_hold(a)
+	var ph := float(a["phase"])
+	var st := String(a.get("state", "wait"))
+	var lean := sin(ph) * 22.0
+	if st == "fight":
+		return hold + Vector2(lean + sin(_time * 4.0 + ph) * 10.0, -48.0)
+	if st == "land":
+		return hold + Vector2(lean * 0.3, -82.0)
+	if st == "cast":
+		var k := clampf(float(a["t"]) / 0.8, 0.0, 1.0)
+		return hold + Vector2(lean, -80.0).rotated(k * 1.6)
+	return hold + Vector2(lean, -78.0 + sin(_time * 1.2 + ph) * 2.0)
+
+
+func _neighbor_hold(a: Dictionary) -> Vector2:
+	return Vector2(float(a["x"]), float(a["y"]) + 18.0) + Vector2(5.0, -36.0)
 
 
 ## Now and then another angler hooks something: a splash at their float and a sound, quieter
 ## the further away they are.
 func _update_neighbors(delta: float) -> void:
-	if _crowd.is_empty():
-		return
-	_neighbor_clock -= delta
-	if _neighbor_clock > 0.0:
-		return
-	_neighbor_clock = _rng.randf_range(10.0, 22.0)
-	var a: Dictionary = _crowd[_rng.randi() % _crowd.size()]
-	var p := _neighbor_float(a)
-	_splash(p, 0.6)
-	_amb.play("splash", clampf(1.0 - absf(p.x) / 1400.0, 0.15, 0.6))
+	# Each other angler runs the same loop as you: wait, bite and fight, land the fish, cast again.
+	# Bites come faster when the fish are feeding (same activity as yours).
+	var species: Array = _spot["species"]
+	for a in _crowd:
+		var t := float(a["t"]) - delta
+		var st := String(a["state"])
+		if t <= 0.0:
+			var near := absf(float(a["x"]) - _cam.position.x) < 1300.0 and not _pov_on
+			match st:
+				"wait":
+					st = "fight"
+					t = _rng.randf_range(4.0, 9.0)
+					a["sp"] = String(species[_rng.randi() % species.size()]) if not species.is_empty() else ""
+					a["kg"] = BiomeDB.roll_weight_kg(String(a["sp"]), _rng) if String(a["sp"]) != "" else 0.4
+					if near:
+						_splash(_neighbor_float(a), 0.7)
+						_amb.play("splash", clampf(1.0 - absf(float(a["x"]) - _cam.position.x) / 1400.0, 0.15, 0.6))
+				"fight":
+					if _rng.randf() < 0.25:
+						st = "cast"                                  # it got away
+						t = 0.8
+					else:
+						st = "land"
+						t = 2.4
+						if near:
+							_amb.play("drips", 0.4)
+				"land":
+					st = "cast"
+					t = 0.8
+				_:
+					st = "wait"
+					t = _rng.randf_range(12.0, 45.0) / maxf(_activity(), 0.3)
+					if near:
+						_amb.play("cast", 0.25)
+		a["t"] = t
+		a["state"] = st
 
 
 # ---------------------------------------------------------------- fight results
@@ -1500,6 +1556,7 @@ func _draw() -> void:
 	_draw_shore()
 	if _has_pier:
 		_draw_pier()
+	_draw_crowd()
 	_draw_boats()
 	_draw_ripples()
 	_draw_line_and_float()
@@ -1574,7 +1631,6 @@ func _draw_shore() -> void:
 		while lx <= HALF_WIDTH - 200.0:
 			draw_circle(Vector2(lx, 62.0), 7.0, Color(1.0, 0.95, 0.7))
 			lx += 240.0
-		_draw_crowd()
 	elif kind == "harbor":
 		draw_rect(Rect2(-w, 0.0, w * 2.0, 150.0), base)
 		draw_rect(Rect2(-w, 0.0, w * 2.0, 8.0), base.darkened(0.4))
@@ -1618,15 +1674,35 @@ func _draw_shore() -> void:
 func _draw_crowd() -> void:
 	for a in _crowd:
 		var x := float(a["x"])
-		var ph := float(a["phase"])
+		if absf(x - _cam.position.x) > 1500.0:
+			continue
 		var y := float(a["y"])
-		var tip := Vector2(x + sin(ph) * 20.0, y - 50.0)
+		var hold := _neighbor_hold(a)
+		var tip := _neighbor_tip(a)
 		var end := _neighbor_float(a)
-		draw_line(Vector2(x, y), tip, Color(0.2, 0.13, 0.08), 3.0)
-		draw_line(tip, end, Color(1.0, 1.0, 1.0, 0.35), 1.0)
-		draw_circle(end, 3.0, Color(0.95, 0.3, 0.2, 0.9))
-		Figure.draw_person(self, Vector2(x, y + 18.0), Vector2.UP, 0.0, false,
-			{"shirt": Color(0.25 + 0.3 * absf(sin(ph)), 0.25, 0.35), "hat": Color(0.80, 0.75, 0.60) if int(x) % 3 == 0 else null}, 1.3)
+		var st := String(a["state"])
+		var look := {"shirt": a["shirt"], "hat": Color(0.80, 0.75, 0.60) if bool(a["hat"]) else null}
+		Figure.draw_person(self, Vector2(x, y + 18.0), Vector2.UP, 0.0, false, look, 1.3, hold)
+		# rod: bends toward the fish in a fight
+		var bend := 18.0 if st == "fight" else 4.0
+		var ctrl := hold.lerp(tip, 0.5) + (tip - hold).orthogonal().normalized() * bend
+		var rod := PackedVector2Array()
+		for i in 7:
+			var k := float(i) / 6.0
+			rod.append(hold.lerp(ctrl, k).lerp(ctrl.lerp(tip, k), k))
+		draw_polyline(rod, Color(0.18, 0.13, 0.09), 2.5)
+		if st == "land" and String(a["sp"]) != "":
+			# the catch swings on the line under the tip, flapping
+			var fish_at := tip + Vector2(sin(_time * 5.0) * 4.0, 30.0)
+			draw_line(tip, fish_at, Color(1.0, 1.0, 1.0, 0.5), 1.0)
+			RealFish.draw(self, String(a["sp"]), fish_at + Vector2(0.0, 10.0), clampf(18.0 + float(a["kg"]) * 6.0, 18.0, 46.0),
+				PI * 0.5 + sin(_time * 9.0) * 0.4, 1.0, _time * 18.0, 0.8, _world.daylight, 1.0)
+		else:
+			draw_line(tip, end, Color(1.0, 1.0, 1.0, 0.45 if st == "fight" else 0.3), 1.0)
+			if st != "fight":
+				draw_circle(end, 3.0, Color(0.95, 0.3, 0.2, 0.9))
+			else:
+				draw_arc(end, 6.0 + sin(_time * 6.0) * 2.0, 0.0, TAU, 10, Color(1.0, 1.0, 1.0, 0.6), 1.5)
 
 
 func _draw_foam() -> void:
@@ -1778,7 +1854,9 @@ func _draw_angler() -> void:
 	var d := _aim_dir()
 	# Three-quarter view: the angler stands with the rod hand at chest height (see Figure).
 	var look_dir := _facing if _state == State.AIM else d
-	Figure.draw_person(self, _hand + Vector2(0.0, 22.0), look_dir, _walk_phase, _moving and _state == State.AIM, ANGLER_LOOK, 1.5)
+	# Feet sit behind and below the rod hand, so both hands grip the rod in front of the chest.
+	var feet := _hand - look_dir.normalized() * 10.0 + Vector2(0.0, 40.0)
+	Figure.draw_person(self, feet, look_dir, _walk_phase, _moving and _state == State.AIM, ANGLER_LOOK, 1.5, _hand)
 	var ctrl := _hand + d * ROD_LEN * 0.55 + d.orthogonal() * _rod_bend * ROD_BEND_PX * 0.35
 	var rod := PackedVector2Array()
 	var tip := _rod_tip()
