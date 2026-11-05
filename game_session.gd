@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Shown on screen so a player can tell a fresh deploy from a page the browser cached.
 ## Bump it with every build that changes behaviour.
-const BUILD := "build 26"
+const BUILD := "build 27"
 const SAVE_PATH := "user://save.cfg"
 const SAVE_VERSION := 1
 const START_RIG := "shore_spinning_rig"
@@ -36,6 +36,9 @@ static var coins := 0
 static var sound_on := true
 static var vibration_on := true
 static var tutorial_done := false
+## Bait and hook on the line (see Tackle). Saved.
+static var bait_id := "sea_worm"
+static var hook_id := "h4"
 static var xp := 0
 static var rig_id := START_RIG
 static var owned_rigs: Array[String] = [START_RIG]
@@ -105,6 +108,10 @@ static func load_once() -> void:
 	sound_on = bool(cfg.get_value("settings", "sound_on", true))
 	vibration_on = bool(cfg.get_value("settings", "vibration_on", true))
 	tutorial_done = bool(cfg.get_value("settings", "tutorial_done", false))
+	var b: Variant = cfg.get_value("tackle", "bait", "sea_worm")
+	bait_id = String(b) if (b is String and Tackle.BAITS.has(b)) else "sea_worm"
+	var hk: Variant = cfg.get_value("tackle", "hook", "h4")
+	hook_id = String(hk) if (hk is String and Tackle.HOOKS.has(hk)) else "h4"
 	best_kg = _clean(cfg.get_value("journal", "best_kg", {}), true)
 	counts = _clean(cfg.get_value("journal", "counts", {}), false)
 	for k: String in counts:
@@ -123,6 +130,8 @@ static func save() -> void:
 	cfg.set_value("settings", "sound_on", sound_on)
 	cfg.set_value("settings", "vibration_on", vibration_on)
 	cfg.set_value("settings", "tutorial_done", tutorial_done)
+	cfg.set_value("tackle", "bait", bait_id)
+	cfg.set_value("tackle", "hook", hook_id)
 	cfg.set_value("journal", "best_kg", best_kg)
 	cfg.set_value("journal", "counts", counts)
 	var err := cfg.save(SAVE_PATH)
@@ -134,6 +143,14 @@ static func save() -> void:
 static func set_sound(on: bool) -> void:
 	sound_on = on
 	AudioServer.set_bus_mute(0, not on)
+	save()
+
+
+static func set_tackle(bait: String, hook: String) -> void:
+	if Tackle.BAITS.has(bait):
+		bait_id = bait
+	if Tackle.HOOKS.has(hook):
+		hook_id = hook
 	save()
 
 

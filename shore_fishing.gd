@@ -71,6 +71,11 @@ var _summary: PanelContainer
 var _hud_root: Control
 var _weather: WeatherFx
 var _pov_on := false
+var _bait_on := true               ## false once small fish have stripped the hook
+var _empty_t := 0.0
+var _escape_reason := ""
+var _overhook_t := 0.0
+var _tackle_panel: PanelContainer
 var _build_label: Label
 var _fps_t := 0.0
 var _lamp_noise := FastNoiseLite.new()
@@ -416,6 +421,15 @@ func _build_hud() -> void:
 		_world.time_of_day = fmod(_world.time_of_day + 1.0 / 24.0, 1.0)
 		_flash("Time %s" % _world.clock_text()))
 	ui.add_child(hour_btn)
+
+	var bait_btn := Button.new()
+	bait_btn.text = "BAIT / HOOK"
+	bait_btn.add_theme_font_size_override("font_size", 20)
+	bait_btn.position = Vector2(160.0, 96.0)
+	bait_btn.size = Vector2(170.0, 48.0)
+	bait_btn.focus_mode = Control.FOCUS_NONE
+	bait_btn.pressed.connect(_open_tackle_panel)
+	ui.add_child(bait_btn)
 
 	var star := TextureRect.new()
 	star.texture = load("res://assets/kenney_game_icons/star.png") as Texture2D
@@ -775,6 +789,7 @@ func _species_weight(id: String) -> float:
 	var miss := maxf(dr.x - d, 0.0) + maxf(d - dr.y, 0.0)
 	w *= exp(-miss / 2.5)
 	w *= BiomeDB.activity_factor(id, _world.time_of_day)
+	w *= Tackle.bite_factor(id, GameSession.bait_id, GameSession.hook_id)
 	return w
 
 
@@ -816,6 +831,8 @@ func _do_cast() -> void:
 	_b_vz = lerpf(150.0, 330.0, _power)
 	_fish_id = ""
 	_state = State.FLY
+	_bait_on = true
+	_empty_t = 0.0
 	_set_status("")
 	_fight_view.begin_cast()
 	_amb.play("cast", 0.9)
@@ -867,7 +884,18 @@ func _tick_wait(delta: float) -> void:
 		_ripple_clock = 0.0
 		_add_ripple(_bobber_pos)
 	if _fish_id == "":
-		_wait_t -= delta
+		if not _bait_on:
+			# Bare hook: nothing will come. A real angler notices the float has gone dead.
+			_empty_t += delta
+			if _empty_t > 20.0:
+				_empty_t = 0.0
+				_flash("Nothing for a while. Is the bait still on? Reel in to check")
+			return
+		if Tackle.is_lure(GameSession.bait_id):
+			# A lure only fishes while it moves.
+			_wait_t -= delta * (1.6 if Input.is_action_pressed(&"reel_in") else 0.08)
+		else:
+			_wait_t -= delta
 		_quiet_t += delta
 		if _quiet_t > 12.0:
 			_quiet_t = 0.0
@@ -900,6 +928,8 @@ func _fish_arrives() -> void:
 	_prof = BiomeDB.get_bite_profile(_fish_id)
 	var nr: Vector2i = _prof["nibbles"]
 	_nib_left = _rng.randi_range(nr.x, nr.y)
+	if Tackle.is_lure(GameSession.bait_id):
+		_nib_left = 0                     # a predator hits a moving lure at once
 	var sp := BiomeDB.get_species(_fish_id)
 	var fight: Dictionary = sp["fight"]
 	var wt: Vector2 = sp["weight_kg"]
@@ -921,6 +951,10 @@ func _fish_event() -> void:
 		if _fish_agent != null:
 			_fish_agent.vel += (_bobber_pos - _fish_agent.pos).normalized() * 60.0
 		_set_status("Nibble!  Wait for the real bite")
+		if _rng.randf() < Tackle.steal_chance(GameSession.bait_id):
+			_bait_on = false
+			_fish_leaves("The float went still")
+			return
 		var hz := maxf(float(_prof["noise_hz"]), 0.5)
 		_event_t = _rng.randf_range(0.6, 1.4) * 2.5 / hz
 	else:
@@ -963,10 +997,19 @@ func _retrieve(message: String) -> void:
 	_float_pull = 0.0
 	_state = State.AIM
 	_fight_view.end()
+	if not _bait_on:
+		message = "The bait was gone, picked off by small fish. You bait up again"
+		_bait_on = true
 	_set_status(message + ".   Aim and throw again")
 
 
 func _hook_fish() -> void:
+	# Does the strike set the hook? Depends on the hook size against this fish's mouth.
+	if _rng.randf() > Tackle.hookup_chance(_fish_id, GameSession.hook_id, GameSession.bait_id):
+		var mis := Tackle.hook_misfit(_fish_id, GameSession.hook_id, GameSession.bait_id)
+		var why := "  (hook too big for its mouth)" if mis > 0 else ("  (hook too small to hold)" if mis < 0 else "")
+		_fish_leaves("Missed! The hook did not set" + why)
+		return
 	var species := BiomeDB.get_species(_fish_id)
 	_weight_kg = BiomeDB.roll_weight_kg(_fish_id, _rng)
 	_fishing.apply_rig(BiomeDB.get_rig(GameSession.rig_id))
@@ -992,6 +1035,16 @@ func _hook_fish() -> void:
 func _tick_fight(delta: float) -> void:
 	if _fight_agent == null:
 		return
+	# A hook pulled harder than its wire can take opens up and the fish is gone.
+	if _fishing.tension_n > Tackle.hook_strength(GameSession.hook_id, GameSession.bait_id):
+		_overhook_t += delta
+		if _overhook_t > 0.35:
+			_overhook_t = 0.0
+			_escape_reason = "The hook opened up: %s is too light for this fish" % Tackle.hook_name(GameSession.hook_id)
+			_fishing._finish(FishingController.State.ESCAPED)
+			return
+	else:
+		_overhook_t = maxf(0.0, _overhook_t - delta)
 	var target := _rod_tip() + _aim_dir() * _fishing.fish_pos_m * PX_PER_M
 	var f := _fight_agent
 	f.apply_force(f.arrive(target, 80.0) * 2.0)
@@ -1032,6 +1085,7 @@ func _update_pov() -> void:
 			v.target_z = maxf(_fishing.fish_pos_m, 1.0)
 			v.target_h = 0.0
 	v.tension = _tension_ratio if _state == State.FIGHT else 0.0
+	v.lure = Tackle.is_lure(GameSession.bait_id)
 	v.reeling = Input.is_action_pressed(&"reel_in")
 	v.time_of_day = _world.time_of_day
 	v.wind_x = _wind.x
@@ -1260,7 +1314,8 @@ func _on_caught(id: String, weight_kg: float) -> void:
 	_update_coins()
 	_update_progress_ui()
 	var badge := "NEW SPECIES!  " if bool(res["first"]) else ("NEW RECORD!  " if bool(res["record"]) else "")
-	var lines := PackedStringArray(["%.2f kg   +%d coins   +%d XP" % [weight_kg, value, int(res["xp"])], String(sp["scientific"])])
+	var lines := PackedStringArray(["%.2f kg   +%d coins   +%d XP" % [weight_kg, value, int(res["xp"])], String(sp["scientific"]),
+		"On %s, hook %s" % [String(Tackle.BAITS[GameSession.bait_id]["name"]).to_lower(), Tackle.hook_name(GameSession.hook_id)]])
 	var done: Array = res["goals_done"]
 	for g: Dictionary in done:
 		lines.append("Goal done: %s  (+%d coins)" % [g["text"], int(g["coins"])])
@@ -1400,6 +1455,70 @@ func _show_summary() -> void:
 	_hud_root.add_child(_summary)
 
 
+## Bait and hook choice. Only while not fishing: you change tackle with the line in.
+func _open_tackle_panel() -> void:
+	if _state != State.AIM:
+		_flash("Reel in first to change bait or hook")
+		return
+	if _tackle_panel != null and is_instance_valid(_tackle_panel):
+		_tackle_panel.queue_free()
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.offset_left = -470.0
+	panel.offset_right = 470.0
+	panel.offset_top = -300.0
+	panel.offset_bottom = 300.0
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.02, 0.10, 0.18, 0.95)
+	style.set_corner_radius_all(18)
+	style.set_content_margin_all(18)
+	panel.add_theme_stylebox_override("panel", style)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
+	_plain_label(box, 26, Color(1.0, 0.92, 0.6)).text = "Bait"
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	box.add_child(grid)
+	for id: String in Tackle.BAIT_ORDER:
+		var b := _tackle_button(Tackle.bait_name(id), id == GameSession.bait_id, Vector2(290.0, 50.0))
+		b.pressed.connect(func() -> void:
+			GameSession.set_tackle(id, GameSession.hook_id)
+			_open_tackle_panel())
+		grid.add_child(b)
+	_plain_label(box, 26, Color(1.0, 0.92, 0.6)).text = "Hook size"
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	box.add_child(row)
+	for hid: String in Tackle.HOOK_ORDER:
+		var hb := _tackle_button(Tackle.hook_name(hid), hid == GameSession.hook_id, Vector2(140.0, 50.0))
+		hb.pressed.connect(func() -> void:
+			GameSession.set_tackle(GameSession.bait_id, hid)
+			_open_tackle_panel())
+		row.add_child(hb)
+	var hint := _plain_label(box, 16, Color(0.8, 0.9, 1.0))
+	hint.text = "Bream like mussel and worm, mullet bread, bluefish and seabass live bait or a spoon, horse mackerel the çapari. Small hooks for small mouths; a big hook scares them off. A small hook can open up on a big fish. Lures catch only while you reel. Soft baits get picked off by small fish."
+	var done := _tackle_button("DONE", false, Vector2(200.0, 56.0))
+	done.pressed.connect(func() -> void: panel.queue_free())
+	box.add_child(done)
+	_tackle_panel = panel
+	_hud_root.add_child(panel)
+
+
+func _tackle_button(text: String, selected: bool, min_size: Vector2) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.custom_minimum_size = min_size
+	b.add_theme_font_size_override("font_size", 18)
+	b.focus_mode = Control.FOCUS_NONE
+	if selected:
+		b.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
+		b.text = "> " + text
+	return b
+
+
 ## First-visit coach card: the loop in five lines. Shown once, saved when dismissed.
 func _show_tutorial() -> void:
 	var card := PanelContainer.new()
@@ -1458,7 +1577,8 @@ func _on_snapped(_id: String) -> void:
 
 func _on_escaped(_id: String) -> void:
 	_result_label.text = "It got away"
-	_set_status("The line went slack for too long")
+	_set_status(_escape_reason if _escape_reason != "" else "The line went slack for too long")
+	_escape_reason = ""
 	_end_fight()
 
 
@@ -1491,7 +1611,8 @@ func _process(delta: float) -> void:
 	_clock_label.text = "%s   |   %s" % [_world.clock_text(), _weather.label()]
 	var probe := _bobber_pos if (_state == State.WAIT or _state == State.BITE) else (_pred_landing if _state == State.CHARGE else _hand + _facing * 60.0)
 	var water := _water_depth(probe)
-	_depth_label.text = "Float %.1f m  |  Water %s  |  Clutch %.0f N" % [_bait_depth, ("%.1f m" % water) if water > 0.0 else "-", _fishing.drag_setting_n]
+	_depth_label.text = "Float %.1f m  |  Water %s  |  Clutch %.0f N  |  %s, hook %s" % [_bait_depth, ("%.1f m" % water) if water > 0.0 else "-",
+		_fishing.drag_setting_n, String(Tackle.BAITS[GameSession.bait_id]["name"]), Tackle.hook_name(GameSession.hook_id)]
 	_toast_t = maxf(0.0, _toast_t - delta)
 	_toast_label.text = _toast_text if _toast_t > 0.0 else ""
 

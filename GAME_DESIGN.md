@@ -58,6 +58,15 @@ From the moment the cast is released until the fish is landed or lost, the scree
 
 Sound (`ambience.gd`) was rebuilt: splash is band-passed noise with a falling pitch plus bubble drops; the float going under is a rising-pitch bubble bloop; cast and strike are a rod swish; a run plays the clutch ratchet; a snapped line cracks and twangs; output is soft-limited.
 
+## Bait and hook (build 27)
+The BAIT / HOOK button (shore HUD, only with the line in) chooses one of nine baits and six hook sizes (`tackle.gd`, saved in `GameSession`).
+- **Which fish come:** each species' bite weight is multiplied by its liking for the bait (`Tackle.PREF`; e.g. gilthead seabream 1.4 on mussel, grey mullet 1.5 on bread dough, bluefish 1.4 on live bait, horse mackerel 1.5 on a çapari string; unlisted baits 0.15) and by the hook fit: each size too big for the mouth (`Tackle.MOUTH`) multiplies by 0.35. A poor choice also lengthens the wait, since activity drops.
+- **Hook-up:** a strike sets the hook with chance 0.9, times 0.55 per size too big and 0.75 per size too small; a miss says why.
+- **Hook strength:** each size opens up above a pull (No. 12 14 N ... 3/0 170 N). Tension above it for 0.35 s loses the fish ("The hook opened up").
+- **Bait theft:** each nibble may strip a soft bait (bread 35 %, mussel 25 %, worm 22 %, squid 8 %, live bait 5 %). A bare hook gets no bites; reeling in shows the bait was gone and re-baits.
+- **Lures** (spoon, çapari) fish only while you reel: waiting time runs 1.6x while reeling and 0.08x when still; predators hit them without nibbling. The çapari carries its own No. 8 hooks.
+Bait choices follow common Turkish shore-angling practice; all numbers are game-design fill. Test: bread dough at a harbour catches mostly mullet; a 3/0 hook gets no horse mackerel; a No. 12 hook loses a big bluefish when the clutch is set high.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

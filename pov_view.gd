@@ -46,6 +46,7 @@ var target_x := 0.0               ## m right of the aim line
 var target_z := 20.0              ## m ahead
 var target_h := 0.0               ## m above the water (flying bait)
 var float_dip := 0.0              ## 0 floating, 1 pulled under
+var lure := false                 ## a lure has no float: only the line entering the water shows
 
 var _open := false
 var _pitch := REST_PITCH          ## camera looks down by this many px (tilts as the fish comes close)
@@ -683,7 +684,10 @@ func _ellipse_line(ctr: Vector2, r: Vector2, col: Color, width: float) -> void:
 ## The float (red tip, white body) or the flying bait or, in the fight, the jumping fish.
 func _draw_target() -> void:
 	var c := _canvas
-	if phase == "float":
+	if phase == "float" and lure:
+		var pl := _proj(target_x, target_z, 0.0)
+		_ellipse_line(pl, Vector2(5.0, 1.8), Color(1.0, 1.0, 1.0, 0.6), 1.2)
+	elif phase == "float":
 		var p := _proj(target_x, target_z, 0.0)
 		var s := clampf(F * 0.05 / target_z, 2.5, 14.0)
 		var dip := clampf(float_dip, 0.0, 1.4)

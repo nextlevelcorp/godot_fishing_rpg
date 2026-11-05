@@ -69,6 +69,17 @@ const DEFAULT := {"back": Color(0.45, 0.50, 0.55), "belly": Color(0.92, 0.93, 0.
 const SAMPLES := 16
 
 
+static var _sprites: Dictionary = {}
+
+
+## The painted sprite for a species if one has been added, else null (cached either way).
+static func sprite(id: String) -> Texture2D:
+	if not _sprites.has(id):
+		var path := "res://assets/art/fish/%s.png" % id
+		_sprites[id] = load(path) as Texture2D if ResourceLoader.exists(path) else null
+	return _sprites[id] as Texture2D
+
+
 static func look(id: String) -> Dictionary:
 	return LOOKS.get(id, DEFAULT)
 
@@ -78,8 +89,16 @@ static func look(id: String) -> Dictionary:
 ## flex: 0 stiff .. 1 full swimming bend; light: 0 night .. 1 day; wet: 0..1 sheen.
 static func draw(ci: CanvasItem, id: String, center: Vector2, length: float, rot: float, facing: float,
 		phase: float, flex: float, light: float, wet: float = 0.6) -> void:
-	var lk := look(id)
 	var dim := lerpf(0.35, 1.0, light)
+	# A painted sprite in assets/art/fish/<id>.png (see docs/ART_BRIEF_AI.md) replaces the drawing.
+	var tex := sprite(id)
+	if tex != null:
+		var sc := length / (float(tex.get_width()) * 0.9)
+		ci.draw_set_transform(center, rot, Vector2(facing * sc, sc))
+		ci.draw_texture(tex, -tex.get_size() * 0.5, Color(dim, dim, dim))
+		ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		return
+	var lk := look(id)
 	var shade := Color(dim, dim, dim)
 	var back: Color = lk["back"]
 	var belly: Color = lk["belly"]
