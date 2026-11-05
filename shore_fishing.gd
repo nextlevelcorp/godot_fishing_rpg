@@ -67,6 +67,7 @@ var _goal_labels: Array[Label] = []
 var _summary: PanelContainer
 var _hud_root: Control
 var _weather: WeatherFx
+var _pov_on := false
 var _build_label: Label
 var _fps_t := 0.0
 var _lamp_noise := FastNoiseLite.new()
@@ -148,7 +149,7 @@ var _reel_click := 0.0
 
 # nodes
 var _amb: Ambience
-var _fight_view: FightView
+var _fight_view: PovView
 var _water: WaterSurface
 var _cam: Camera2D
 var _tint: CanvasModulate
@@ -222,9 +223,10 @@ func _ready() -> void:
 	_amb = Ambience.new()
 	_amb.surf_level = 0.75 if _spot["kind"] == "rocky" else 0.55
 	add_child(_amb)
-	_fight_view = FightView.new()
+	_fight_view = PovView.new()
 	_fight_view.fishing = _fishing
 	_fight_view.spot = _spot
+	_fight_view.kind = String(_spot["kind"])
 	add_child(_fight_view)
 	_build_vignette()
 	_build_hud()
@@ -633,9 +635,11 @@ func _physics_process(delta: float) -> void:
 			if _result_t <= 0.0:
 				_result_label.text = ""
 				_state = State.AIM
+				_fight_view.end()
 				_set_status("Walk with the stick. At the water's edge, hold CAST to throw")
 	_update_float(delta)
 	_update_fish_agent(delta)
+	_update_pov()
 	_update_rope(delta)
 	_update_shoals(delta)
 	_update_particles(delta)
@@ -807,6 +811,8 @@ func _do_cast() -> void:
 	_fish_id = ""
 	_state = State.FLY
 	_set_status("")
+	_fight_view.begin_cast()
+	_amb.play("cast", 0.9)
 
 
 ## Projectile: wind and air drag on the ground velocity, gravity on the height.
@@ -950,6 +956,7 @@ func _retrieve(message: String) -> void:
 		_fish_mode = "leave"
 	_float_pull = 0.0
 	_state = State.AIM
+	_fight_view.end()
 	_set_status(message + ".   Aim and throw again")
 
 
@@ -967,7 +974,8 @@ func _hook_fish() -> void:
 	_kick = 0.18
 	_fight_hint = ""
 	_buzz(120)
-	_amb.play("splash", 1.0)
+	_amb.play("strike", 1.0)
+	_amb.play("splash", 0.8)
 	_splash(_bobber_pos, 1.2)
 	_show_fight_ui(true)
 	_fight_view.begin(_fish_id, _weight_kg, _cast_dist_m)
@@ -986,7 +994,48 @@ func _tick_fight(delta: float) -> void:
 	if _fishing._burst_mult > 1.0 and _rng.randf() < delta * 2.5:
 		_splash(f.pos, 0.8)
 		_buzz(25)
-		_amb.play("splash", 0.5)
+		_amb.play("drag", 0.7)
+
+
+# ---------------------------------------------------------------- first-person view
+## Feeds the first-person view: where the bait, float or fish is, in metres right of and ahead of
+## the rod tip along the aim line, and hides the top-down world while the view covers it.
+func _update_pov() -> void:
+	var v := _fight_view
+	var right := Vector2(cos(_aim), sin(_aim))
+	var fwd := _aim_dir()
+	var tip := _rod_tip()
+	match _state:
+		State.FLY:
+			var rel := _bobber_pos - tip
+			v.phase = "fly"
+			v.target_x = rel.dot(right) / PX_PER_M
+			v.target_z = maxf(rel.dot(fwd) / PX_PER_M, 1.0)
+			v.target_h = _b_z / PX_PER_M * 0.5
+		State.WAIT, State.BITE:
+			var rel2 := _bobber_pos - tip
+			v.phase = "float"
+			v.target_x = rel2.dot(right) / PX_PER_M
+			v.target_z = maxf(rel2.dot(fwd) / PX_PER_M, 1.0)
+			v.target_h = 0.0
+			v.float_dip = _float_x
+		State.FIGHT:
+			v.phase = "fight"
+			if _fight_agent != null:
+				v.target_x = clampf((_fight_agent.pos - tip).dot(right) / PX_PER_M, -12.0, 12.0)
+			v.target_z = maxf(_fishing.fish_pos_m, 1.0)
+			v.target_h = 0.0
+	v.tension = _tension_ratio if _state == State.FIGHT else 0.0
+	v.reeling = Input.is_action_pressed(&"reel_in")
+	v.time_of_day = _world.time_of_day
+	v.wind_x = _wind.x
+	v.wave_amp = float(WeatherFx.KINDS[_weather_kind]["wind"])
+	v.on_pier = _on_pier()
+	v.eye_h = 8.0 if v.kind == "bridge" else (4.5 if v.on_pier else 2.6)
+	var pov := v.is_open()
+	_world.visible = not pov
+	_water.visible = not pov
+	_pov_on = pov
 
 
 # ---------------------------------------------------------------- Nature of Code updates
@@ -1398,7 +1447,8 @@ func _process(delta: float) -> void:
 		_tension_label.text = "Line %.0f / %.0f N    Clutch %.0f N    Fish %.0f m away" % [_fishing.tension_n, _fishing.line_break_force_n, _fishing.drag_setting_n, _fishing.fish_pos_m]
 
 	_update_camera(delta)
-	queue_redraw()
+	if not _pov_on:
+		queue_redraw()
 
 
 ## Coaching line during the fight.
