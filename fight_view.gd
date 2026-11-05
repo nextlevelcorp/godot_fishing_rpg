@@ -426,12 +426,12 @@ func _draw_view() -> void:
 
 func _draw_card() -> void:
 	var appear := clampf((3.4 - _catch_t) * 4.0, 0.0, 1.0)
-	var rect := Rect2(Vector2(660.0, 230.0 + (1.0 - appear) * 40.0), Vector2(520.0, 230.0))
+	var rect := Rect2(Vector2(660.0, 230.0 + (1.0 - appear) * 40.0), Vector2(520.0, 290.0))
 	_card.draw(_canvas.get_canvas_item(), rect)
 	var font := ThemeDB.fallback_font
 	_canvas.draw_string(font, rect.position + Vector2(24.0, 50.0), _catch_title, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 48.0, 30, Color(1.0, 0.92, 0.6))
 	for i in _catch_lines.size():
-		_canvas.draw_string(font, rect.position + Vector2(24.0, 96.0 + float(i) * 34.0), _catch_lines[i], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 200.0, 22, Color.WHITE)
+		_canvas.draw_string(font, rect.position + Vector2(24.0, 94.0 + float(i) * 32.0), _catch_lines[i], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 200.0, 22, Color.WHITE)
 	var big := minf(1.6, 150.0 / 110.0)
 	var at := rect.position + Vector2(rect.size.x - 100.0, 130.0)
 	if _creature != "":

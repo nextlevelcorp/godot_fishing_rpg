@@ -36,6 +36,14 @@ Map: pick a spot -> walk the shore or pier -> read the water (rings, shoals) -> 
 | Town and life | `shore_world.gd` | per-sea town, day-night, walkers, cats, gulls, clouds |
 | Sound | `ambience.gd` | procedural surf, gulls, splash, plop, click, snap |
 
+## Progression (build 15)
+- **XP per catch** = `sqrt(base_price) x kg^0.4 x 4`, +25 for a species logged for the first time, +10 for a new personal record. Knobs: `GameSession.XP_*`.
+- **Level n** needs `40 x (n-1)^1.7` XP in total, max level 30 (`LEVEL_K`, `LEVEL_POW`).
+- **Spot unlocks** by level, `unlock_level` in `fishing_spots.gd`: Dikili 1, Antalya 1, Teos 2, Çeşme 3, Galata 4, Sinop 5, Trabzon 6, Fethiye 8, Kaş 10. Locked pins are grey on the map and the button reads "LOCKED - LEVEL N". (Unlock levels are game-design fill.)
+- **Outing goals** (3 per visit, `ShoreFishing._make_goals`): catch 3 fish (40 coins); log a new species (60 coins + 15 XP) or catch 2 different species; land one fish of at least 0.45 x the heaviest weight a spot species can reach (80 coins).
+- **Outing summary** when leaving with progress: catches, coins, XP, new species, records, goals, unlocks.
+- **Test:** catch a fish, XP bar grows; reach level 2, Teos unlocks; leave the shore, summary shows; reload page, level and XP persist.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

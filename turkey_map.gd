@@ -88,6 +88,7 @@ func _ready() -> void:
 	_build_pins()
 	_build_panel()
 	_build_overlay()
+	_update_coins()
 	resized.connect(_layout)
 	_layout()
 	if GameSession.spot_id != "" and _pins.has(GameSession.spot_id):
@@ -143,9 +144,9 @@ func _build_pins() -> void:
 		_pins[id] = b
 
 
-func _style_pin(b: Button, selected: bool) -> void:
+func _style_pin(b: Button, selected: bool, locked: bool = false) -> void:
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = PIN_SELECTED if selected else PIN_COLOR
+	sb.bg_color = Color(0.45, 0.47, 0.5) if locked else (PIN_SELECTED if selected else PIN_COLOR)
 	sb.set_corner_radius_all(int(PIN_SIZE * 0.5))
 	sb.set_border_width_all(4)
 	sb.border_color = Color.WHITE
@@ -277,7 +278,7 @@ func _draw() -> void:
 func _select(id: String) -> void:
 	_selected = id
 	for pid: String in _pins:
-		_style_pin(_pins[pid], pid == id)
+		_style_pin(_pins[pid], pid == id, not GameSession.is_unlocked(FishingSpots.get_spot(pid)))
 	var s := FishingSpots.get_spot(id)
 	_title.text = "%s  (%s)" % [s["name"], s["local_name"]]
 	_sub.text = "%s  -  %s" % [s["region"], s["blurb"]]
@@ -287,7 +288,14 @@ func _select(id: String) -> void:
 	var ids: Array = s["species"]
 	_fish_label.text = "Fish here (%d/%d caught): %s" % [_caught_count(ids), ids.size(), ", ".join(names)]
 	_note_label.text = "Evidence: %s (%d sources). %s Pin is town-level, not the exact mark." % [s["evidence"], s["sources"].size(), s["species_note"]]
-	_go_button.disabled = false
+	var need := int(s.get("unlock_level", 1))
+	if GameSession.is_unlocked(s):
+		_go_button.disabled = false
+		_go_button.text = "FISH HERE"
+	else:
+		_go_button.disabled = true
+		_go_button.text = "LOCKED - LEVEL %d" % need
+		_note_label.text = "Reach level %d to fish here (you are level %d). Catch fish at other spots to earn XP. %s" % [need, GameSession.level(), _note_label.text]
 	queue_redraw()
 
 
@@ -300,7 +308,10 @@ func _caught_count(ids: Array) -> int:
 
 
 func _update_coins() -> void:
-	_coins_label.text = "Coins: %d" % GameSession.coins
+	var prog := GameSession.level_progress()
+	_coins_label.text = "Level %d  (%d/%d XP)   Coins: %d" % [GameSession.level(), int(prog.x), int(prog.y), GameSession.coins]
+	for pid: String in _pins:
+		_style_pin(_pins[pid], pid == _selected, not GameSession.is_unlocked(FishingSpots.get_spot(pid)))
 
 
 func _make_button(text: String, width: float, on_press: Callable) -> Button:
@@ -406,7 +417,7 @@ func _open_journal() -> void:
 
 
 func _on_go_pressed() -> void:
-	if _selected == "":
+	if _selected == "" or not GameSession.is_unlocked(FishingSpots.get_spot(_selected)):
 		return
 	GameSession.spot_id = _selected
 	get_tree().change_scene_to_file("res://shore_fishing.tscn")

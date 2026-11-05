@@ -58,6 +58,11 @@ var _toast_text := ""
 var _toast_t := 0.0
 var _toast_label: Label
 var _quiet_t := 0.0
+var _level_label: Label
+var _xp_bar: ProgressBar
+var _goal_labels: Array[Label] = []
+var _summary: PanelContainer
+var _hud_root: Control
 var _tip_pos := Vector2.ZERO
 var _time := 0.0
 
@@ -161,6 +166,7 @@ func _ready() -> void:
 	if FishingSpots.get_spot(GameSession.spot_id).is_empty():
 		GameSession.spot_id = "galata_bridge"       # opened directly, not from the map
 	_spot = FishingSpots.get_spot(GameSession.spot_id)
+	GameSession.start_outing(_make_goals())
 	_has_pier = _spot["kind"] != "bridge"
 	_pier_x = 900.0 if hash(GameSession.spot_id) % 2 == 0 else -900.0
 	_build_walkable()
@@ -324,6 +330,7 @@ func _build_hud() -> void:
 	ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(ui)
+	_hud_root = ui
 
 	_spot_label = _make_label(ui, 22, Color.WHITE)
 	_spot_label.position = Vector2(20.0, 10.0)
@@ -372,7 +379,7 @@ func _build_hud() -> void:
 	map_btn.offset_right = -20.0
 	map_btn.offset_top = 10.0
 	map_btn.offset_bottom = 66.0
-	map_btn.pressed.connect(func() -> void: get_tree().change_scene_to_file(MAP_SCENE))
+	map_btn.pressed.connect(_on_map_pressed)
 	ui.add_child(map_btn)
 
 	# Squid, octopus and cuttlefish feed at night; this skips the clock forward an hour.
@@ -386,6 +393,39 @@ func _build_hud() -> void:
 		_world.time_of_day = fmod(_world.time_of_day + 1.0 / 24.0, 1.0)
 		_flash("Time %s" % _world.clock_text()))
 	ui.add_child(hour_btn)
+
+	var star := TextureRect.new()
+	star.texture = load("res://assets/kenney_game_icons/star.png") as Texture2D
+	star.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	star.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	star.position = Vector2(20.0, 152.0)
+	star.size = Vector2(22.0, 22.0)
+	star.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(star)
+	_level_label = _make_label(ui, 18, Color(1.0, 0.93, 0.6))
+	_level_label.position = Vector2(48.0, 148.0)
+	_xp_bar = ProgressBar.new()
+	_xp_bar.min_value = 0.0
+	_xp_bar.max_value = 1.0
+	_xp_bar.step = 0.001
+	_xp_bar.show_percentage = false
+	_xp_bar.position = Vector2(20.0, 178.0)
+	_xp_bar.size = Vector2(250.0, 10.0)
+	_xp_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(_xp_bar)
+	var target := TextureRect.new()
+	target.texture = load("res://assets/kenney_game_icons/target.png") as Texture2D
+	target.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	target.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	target.position = Vector2(20.0, 196.0)
+	target.size = Vector2(20.0, 20.0)
+	target.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(target)
+	for i in 3:
+		var gl := _make_label(ui, 16, Color(0.9, 0.97, 1.0))
+		gl.position = Vector2(46.0, 194.0 + float(i) * 24.0)
+		_goal_labels.append(gl)
+	_update_progress_ui()
 
 	_power_bar = ProgressBar.new()
 	_power_bar.min_value = 0.0
@@ -1088,17 +1128,157 @@ func _end_fight(keep_view: bool = false) -> void:
 func _on_caught(id: String, weight_kg: float) -> void:
 	var sp := BiomeDB.get_species(id)
 	var value := int(round(float(sp["base_price"]) * pow(maxf(weight_kg, 0.05), 0.8)))
-	var first := not GameSession.counts.has(id)
-	var record := not first and weight_kg > float(GameSession.best_kg.get(id, 0.0))
-	GameSession.record_catch(id, sp["name"], weight_kg, value)
+	var res := GameSession.record_catch(id, String(sp["name"]), weight_kg, value, int(sp["base_price"]))
 	_update_coins()
-	var badge := "NEW SPECIES!  " if first else ("NEW RECORD!  " if record else "")
-	var lines := PackedStringArray(["%.2f kg" % weight_kg, "+%d coins" % value, String(sp["scientific"])])
+	_update_progress_ui()
+	var badge := "NEW SPECIES!  " if bool(res["first"]) else ("NEW RECORD!  " if bool(res["record"]) else "")
+	var lines := PackedStringArray(["%.2f kg   +%d coins   +%d XP" % [weight_kg, value, int(res["xp"])], String(sp["scientific"])])
+	var done: Array = res["goals_done"]
+	for g: Dictionary in done:
+		lines.append("Goal done: %s  (+%d coins)" % [g["text"], int(g["coins"])])
+	if bool(res["level_up"]):
+		lines.append("LEVEL UP!  Level %d%s" % [int(res["level"]), _unlock_text(int(res["level"]))])
+		_buzz(200)
 	_fight_view.show_catch(badge + String(sp["name"]), lines)
 	_result_label.text = ""
 	_set_status("Nice one")
 	_amb.play("splash", 0.7)
 	_end_fight(true)
+
+
+## Names of the spots that open at this level, for the level-up line: "  -  Unlocked: Galata Bridge".
+func _unlock_text(lv: int) -> String:
+	var names: PackedStringArray = []
+	for id: String in FishingSpots.ids():
+		var sp := FishingSpots.get_spot(id)
+		if int(sp.get("unlock_level", 1)) == lv:
+			names.append(String(sp["name"]))
+	return "" if names.is_empty() else "  -  Unlocked: " + ", ".join(names)
+
+
+## Three goals for this outing, built from the spot's own data (see GAME_DESIGN.md, Progression):
+## catch 3 fish; log a new species (or 2 different ones when everything here is logged); land one
+## fish of a reachable weight. Reward numbers are tuning knobs.
+func _make_goals() -> Array[Dictionary]:
+	var goals: Array[Dictionary] = []
+	goals.append({"kind": "count", "text": "Catch 3 fish", "target": 3, "progress": 0, "coins": 40, "xp": 0, "done": false})
+	var ids: Array = _spot["species"]
+	var unlogged := 0
+	for id: String in ids:
+		if not GameSession.counts.has(id):
+			unlogged += 1
+	if unlogged > 0:
+		goals.append({"kind": "new", "text": "Log a new species", "target": 1, "progress": 0, "coins": 60, "xp": 15, "done": false})
+	else:
+		goals.append({"kind": "distinct", "text": "Catch 2 different species", "target": 2, "progress": 0, "coins": 60, "xp": 15, "done": false})
+	var best_max := 0.0
+	for id: String in ids:
+		var wr: Vector2 = BiomeDB.get_species(id)["weight_kg"]
+		if wr.y <= 12.0 and wr.y > best_max:
+			best_max = wr.y
+	if best_max > 0.0:
+		var kg := snappedf(best_max * 0.45, 0.1)
+		goals.append({"kind": "weight", "text": "Land a fish of %.1f kg or more" % kg, "target": kg, "progress": 0, "coins": 80, "xp": 0, "done": false})
+	return goals
+
+
+func _update_progress_ui() -> void:
+	var lv := GameSession.level()
+	var pr := GameSession.level_progress()
+	_level_label.text = "Level %d   %d / %d XP" % [lv, int(pr.x), int(pr.y)] if lv < GameSession.MAX_LEVEL else "Level %d (max)" % lv
+	_xp_bar.value = pr.x / maxf(pr.y, 1.0)
+	var goals: Array = GameSession.outing.get("goals", [])
+	for i in _goal_labels.size():
+		if i < goals.size():
+			var g: Dictionary = goals[i]
+			_goal_labels[i].text = GameSession.goal_line(g)
+			_goal_labels[i].modulate = Color(0.6, 1.0, 0.7) if bool(g["done"]) else Color.WHITE
+		else:
+			_goal_labels[i].text = ""
+
+
+## MAP: not in the middle of a fight; with something to report, show the outing summary first.
+func _on_map_pressed() -> void:
+	if _state == State.FIGHT:
+		_flash("Finish the fight first")
+		return
+	var out := GameSession.outing
+	var goals: Array = out.get("goals", [])
+	var any_goal := false
+	for g: Dictionary in goals:
+		if int(g["progress"]) > 0:
+			any_goal = true
+	if int(out.get("catches", 0)) == 0 and not any_goal:
+		get_tree().change_scene_to_file(MAP_SCENE)
+		return
+	_show_summary()
+
+
+func _show_summary() -> void:
+	if _summary != null and is_instance_valid(_summary):
+		_summary.queue_free()
+	var out := GameSession.outing
+	_summary = PanelContainer.new()
+	_summary.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_summary.offset_left = -330.0
+	_summary.offset_right = 330.0
+	_summary.offset_top = -250.0
+	_summary.offset_bottom = 250.0
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.02, 0.10, 0.18, 0.96)
+	style.set_corner_radius_all(18)
+	style.set_content_margin_all(20)
+	style.set_border_width_all(2)
+	style.border_color = Color(1.0, 0.85, 0.4, 0.8)
+	_summary.add_theme_stylebox_override("panel", style)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	_summary.add_child(box)
+	var title := _plain_label(box, 30, Color(1.0, 0.92, 0.6))
+	title.text = "Outing summary  -  %s" % _spot["name"]
+	var lines: PackedStringArray = []
+	lines.append("Fish landed: %d" % int(out.get("catches", 0)))
+	lines.append("XP earned: %d     Coins earned: %d" % [int(out.get("xp", 0)), int(out.get("coins", 0))])
+	var fresh: Array = out.get("new_species", [])
+	lines.append("New species: " + (", ".join(PackedStringArray(fresh)) if not fresh.is_empty() else "none"))
+	var recs: Array = out.get("records", [])
+	lines.append("Records: " + (", ".join(PackedStringArray(recs)) if not recs.is_empty() else "none"))
+	var lv := GameSession.level()
+	lines.append("Level %d%s" % [lv, "   (was %d)" % int(out.get("start_level", lv)) if lv > int(out.get("start_level", lv)) else ""])
+	for ln in lines:
+		_plain_label(box, 22, Color.WHITE).text = ln
+	var goals: Array = out.get("goals", [])
+	var gh := _plain_label(box, 22, Color(0.8, 0.95, 1.0))
+	gh.text = "Goals"
+	for g: Dictionary in goals:
+		var gl := _plain_label(box, 20, Color(0.6, 1.0, 0.7) if bool(g["done"]) else Color(0.85, 0.9, 0.95))
+		gl.text = "  " + GameSession.goal_line(g)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	box.add_child(row)
+	var back := Button.new()
+	back.text = "BACK TO MAP"
+	back.custom_minimum_size = Vector2(260.0, 60.0)
+	back.add_theme_font_size_override("font_size", 24)
+	back.pressed.connect(func() -> void: get_tree().change_scene_to_file(MAP_SCENE))
+	row.add_child(back)
+	var keep := Button.new()
+	keep.text = "KEEP FISHING"
+	keep.custom_minimum_size = Vector2(260.0, 60.0)
+	keep.add_theme_font_size_override("font_size", 24)
+	keep.pressed.connect(func() -> void: _summary.queue_free())
+	row.add_child(keep)
+	_hud_root.add_child(_summary)
+
+
+func _plain_label(parent: Control, size: int, color: Color) -> Label:
+	var l := Label.new()
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(l)
+	return l
 
 
 func _on_snapped(_id: String) -> void:
