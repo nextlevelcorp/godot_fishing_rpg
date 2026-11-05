@@ -58,6 +58,7 @@ var _toast_text := ""
 var _toast_t := 0.0
 var _debug_label: Label
 var _toast_label: Label
+var _quiet_t := 0.0
 var _tip_pos := Vector2.ZERO
 var _time := 0.0
 
@@ -215,6 +216,7 @@ func _ready() -> void:
 	touch.enabled_actions.assign([&"cast", &"reel_in", &"drag_up", &"drag_down", &"bait_deeper", &"bait_shallower"])
 	touch.joystick = true
 	add_child(touch)
+	add_child(DeviceGuard.new())
 	_set_status("Walk with the stick. At the water's edge, hold CAST to throw")
 
 
@@ -335,7 +337,7 @@ func _build_hud() -> void:
 	build.position = Vector2(20.0, 694.0)
 	build.text = GameSession.BUILD
 	_debug_label = _make_label(ui, 14, Color(1.0, 0.9, 0.5, 0.9))
-	_debug_label.position = Vector2(110.0, 694.0)
+	_debug_label.position = Vector2(110.0, 662.0)
 
 	_status = _make_label(ui, 30, Color.WHITE)
 	_status.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
@@ -375,6 +377,18 @@ func _build_hud() -> void:
 	map_btn.offset_bottom = 66.0
 	map_btn.pressed.connect(func() -> void: get_tree().change_scene_to_file(MAP_SCENE))
 	ui.add_child(map_btn)
+
+	# Squid, octopus and cuttlefish feed at night; this skips the clock forward an hour.
+	var hour_btn := Button.new()
+	hour_btn.text = "+1 hour"
+	hour_btn.add_theme_font_size_override("font_size", 20)
+	hour_btn.position = Vector2(20.0, 96.0)
+	hour_btn.size = Vector2(130.0, 48.0)
+	hour_btn.focus_mode = Control.FOCUS_NONE
+	hour_btn.pressed.connect(func() -> void:
+		_world.time_of_day = fmod(_world.time_of_day + 1.0 / 24.0, 1.0)
+		_flash("Time %s" % _world.clock_text()))
+	ui.add_child(hour_btn)
 
 	_power_bar = ProgressBar.new()
 	_power_bar.min_value = 0.0
@@ -528,7 +542,7 @@ func _update_debug() -> void:
 		if Input.is_action_pressed(a):
 			down.append(String(a))
 	var mv := Input.get_vector(&"steer_left", &"steer_right", &"boat_forward", &"boat_back", 0.1)
-	_debug_label.text = "[%s]  state %s  fish %s  stick %.1f,%.1f  pressed: %s" % [GameSession.BUILD, State.keys()[_state], ("yes" if _fish_id != "" else "no"), mv.x, mv.y, ", ".join(down) if not down.is_empty() else "-"]
+	_debug_label.text = "[%s]  state %s  fish %s  stick %.1f,%.1f  pressed: %s\ntouch events: raw %d  gui %d   last: %s" % [GameSession.BUILD, State.keys()[_state], ("yes" if _fish_id != "" else "no"), mv.x, mv.y, ", ".join(down) if not down.is_empty() else "-", TouchControls.count_input, TouchControls.count_gui, TouchControls.last_event]
 
 
 # ---------------------------------------------------------------- state machine
@@ -798,6 +812,11 @@ func _tick_wait(delta: float) -> void:
 		_add_ripple(_bobber_pos)
 	if _fish_id == "":
 		_wait_t -= delta
+		_quiet_t += delta
+		if _quiet_t > 12.0:
+			_quiet_t = 0.0
+			if _activity() < 0.5:
+				_flash("Quiet water: little feeds at this depth and hour")
 		if _wait_t <= 0.0:
 			_fish_arrives()
 		return
@@ -935,7 +954,9 @@ func _update_float(delta: float) -> void:
 	var r := Noc.spring_step(_float_x, _float_v, rest, 70.0, 7.0, delta)
 	_float_x = r.x
 	_float_v = r.y
-	_bobber_pos += _current * delta * 0.25
+	var drifted := _bobber_pos + _current * delta * 0.25
+	if not _is_land(drifted):          # the current never pushes the float onto the planks or the shore
+		_bobber_pos = drifted
 
 
 func _update_fish_agent(delta: float) -> void:

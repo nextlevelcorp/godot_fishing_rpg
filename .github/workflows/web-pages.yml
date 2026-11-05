@@ -63,10 +63,31 @@ jobs:
           done
           exit $status
 
-      - name: Export Web build
+      - name: Export Web build (unique file names, no stale cache)
+        # Godot's web files (index.pck, index.wasm) get cached hard by phones, so a new deploy could
+        # keep showing the old game. Each build is exported under its own name (g<run number>) and
+        # index.html is a tiny loader that reads version.json (never cached) and opens that page.
         run: |
+          set -e
           mkdir -p build/web
-          $HOME/godot/Godot_v4.4-stable_linux.x86_64 --headless --path . --export-release "Web" build/web/index.html
+          PAGE="g${GITHUB_RUN_NUMBER}"
+          $HOME/godot/Godot_v4.4-stable_linux.x86_64 --headless --path . --export-release "Web" "build/web/${PAGE}.html"
+          printf '{"page":"%s.html","build":"%s"}\n' "$PAGE" "$GITHUB_RUN_NUMBER" > build/web/version.json
+          cat > build/web/index.html <<'HTML'
+          <!doctype html>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Shore Fishing</title>
+          <body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#06182a;color:#9cd;font:18px sans-serif">
+          Loading...
+          <script>
+          fetch('version.json?t=' + Date.now(), {cache: 'no-store'})
+            .then(function (r) { return r.json(); })
+            .then(function (v) { location.replace(v.page + '?b=' + v.build); })
+            .catch(function () { document.body.textContent = 'Could not load the game. Check your connection and reload.'; });
+          </script>
+          HTML
+          ls -la build/web
 
       - uses: actions/configure-pages@v5
         with:
