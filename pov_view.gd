@@ -28,7 +28,7 @@ const EDGE_M := {"rocky": 5.0, "beach": 6.0, "harbor": 3.0, "bridge": 4.0}
 ## Sound cues for the shore scene to play: exit, drips, splash, splash_big.
 signal sfx(kind: String, volume: float)
 const G := 9.8
-const WAVE_ROWS := 20
+const WAVE_ROWS := 12
 
 ## Set by ShoreFishing every frame.
 var eye_h := 3.0
@@ -54,6 +54,13 @@ var _flex_phase := 0.0            ## tail-beat phase of a jumping or lifted fish
 var _tired_t := 3.0
 var _prev_x := 0.0
 var _lat_v := 0.0                 ## m/s sideways speed of the fish, for its wake on the surface
+## The sky and the far coast change slowly: they live on their own layers and are redrawn only when
+## the light has changed, and the camera tilt just moves them. Clouds and gulls move every frame.
+var _sky_layer: Control
+var _mid_layer: Control
+var _coast_layer: Control
+var _bg_time := -1.0
+var _bg_light := -1.0
 var _tip := ROD_REST
 var _tip_v := Vector2.ZERO
 var _reel_angle := 0.0
@@ -76,6 +83,12 @@ var _jump: Dictionary = {}
 
 func _ready() -> void:
 	super._ready()
+	_sky_layer = _make_layer(_draw_sky_layer)
+	_mid_layer = _make_layer(_draw_mid_layer)
+	_coast_layer = _make_layer(_draw_coast_layer)
+	move_child(_sky_layer, 0)
+	move_child(_mid_layer, 1)
+	move_child(_coast_layer, 2)
 	var coast_noise := FastNoiseLite.new()
 	coast_noise.noise_type = FastNoiseLite.TYPE_PERLIN
 	coast_noise.seed = 11
@@ -236,9 +249,23 @@ func _process(delta: float) -> void:
 	_alpha = move_toward(_alpha, 1.0 if (_open or _catch_t > 0.0) else 0.0, delta * 4.0)
 	if _alpha <= 0.0:
 		_canvas.visible = false
+		_sky_layer.visible = false
+		_mid_layer.visible = false
+		_coast_layer.visible = false
 		return
 	_canvas.visible = true
 	_canvas.modulate = Color(1.0, 1.0, 1.0, _alpha)
+	for layer in [_sky_layer, _mid_layer, _coast_layer]:
+		var l: Control = layer
+		l.visible = true
+		l.modulate = _canvas.modulate
+		l.position.y = -_pitch
+	if absf(time_of_day - _bg_time) > 0.002 or absf(daylight - _bg_light) > 0.01:
+		_bg_time = time_of_day
+		_bg_light = daylight
+		_sky_layer.queue_redraw()
+		_coast_layer.queue_redraw()
+	_mid_layer.queue_redraw()
 	_time += delta
 	_flex_phase += delta * 22.0
 	if phase == "fly":
@@ -416,29 +443,7 @@ func _draw_view() -> void:
 	var night := 1.0 - day
 	var dusk := clampf(1.0 - absf(day - 0.4) / 0.35, 0.0, 1.0) * 0.8
 	var hy := HY - _pitch
-	c.draw_set_transform(Vector2(0.0, -_pitch), 0.0, Vector2.ONE)
-	var sky_top := Color(0.30, 0.56, 0.88).lerp(Color(0.02, 0.03, 0.10), night).lerp(Color(0.32, 0.30, 0.55), dusk * 0.5)
-	var sky_low := Color(0.80, 0.89, 0.97).lerp(Color(0.08, 0.10, 0.22), night).lerp(Color(1.0, 0.62, 0.40), dusk)
-	c.draw_polygon(PackedVector2Array([Vector2(0, -10.0), Vector2(W, -10.0), Vector2(W, HY), Vector2(0, HY)]),
-		PackedColorArray([sky_top, sky_top, sky_low, sky_low]))
-	if night > 0.3:
-		for i in _stars.size():
-			var tw := 0.5 + 0.5 * sin(_time * 2.0 + float(i))
-			c.draw_rect(Rect2(_stars[i], Vector2(2.0, 2.0)), Color(1.0, 1.0, 0.95, (night - 0.3) * 0.9 * tw))
-	_draw_sun_moon(sky_low)
-	for cl in _clouds:
-		var cp: Vector2 = cl["pos"]
-		var ccol := Color(1.0, 1.0, 1.0, 0.75).lerp(Color(0.25, 0.28, 0.38, 0.7), night).lerp(Color(1.0, 0.78, 0.65, 0.8), dusk * 0.6)
-		for pf: Vector3 in cl["puffs"]:
-			c.draw_circle(cp + Vector2(pf.x, pf.y), pf.z, ccol)
-	_draw_gulls(night)
-
-	# Far coast and town.
-	var haze := sky_low.lerp(Color(0.45, 0.55, 0.62), 0.35)
-	c.draw_colored_polygon(_coast_far, haze.darkened(0.12))
-	c.draw_colored_polygon(_coast_near, haze.darkened(0.28).lerp(Color(0.25, 0.33, 0.28), 0.35 * day))
-	_draw_town(night)
-	c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	var sky_low := _sky_low(night, dusk)
 
 	# Sea.
 	var wcol: Dictionary = spot.get("water", {})
@@ -468,8 +473,61 @@ func _draw_view() -> void:
 		_draw_card()
 
 
-func _draw_sun_moon(sky_low: Color) -> void:
-	var c := _canvas
+func _make_layer(draw_fn: Callable) -> Control:
+	var l := Control.new()
+	l.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.visible = false
+	l.draw.connect(draw_fn)
+	add_child(l)
+	return l
+
+
+func _dusk() -> float:
+	return clampf(1.0 - absf(daylight - 0.4) / 0.35, 0.0, 1.0) * 0.8
+
+
+func _sky_low(night: float, dusk: float) -> Color:
+	return Color(0.80, 0.89, 0.97).lerp(Color(0.08, 0.10, 0.22), night).lerp(Color(1.0, 0.62, 0.40), dusk)
+
+
+## Sky gradient, stars, sun or moon. Redrawn only when the light changes.
+func _draw_sky_layer() -> void:
+	var c := _sky_layer
+	var night := 1.0 - daylight
+	var dusk := _dusk()
+	var sky_top := Color(0.30, 0.56, 0.88).lerp(Color(0.02, 0.03, 0.10), night).lerp(Color(0.32, 0.30, 0.55), dusk * 0.5)
+	var sky_low := _sky_low(night, dusk)
+	c.draw_polygon(PackedVector2Array([Vector2(0, -10.0), Vector2(W, -10.0), Vector2(W, HY + 2.0), Vector2(0, HY + 2.0)]),
+		PackedColorArray([sky_top, sky_top, sky_low, sky_low]))
+	if night > 0.3:
+		for i in _stars.size():
+			c.draw_rect(Rect2(_stars[i], Vector2(2.0, 2.0)), Color(1.0, 1.0, 0.95, (night - 0.3) * (0.5 + 0.4 * fmod(float(i) * 0.37, 1.0))))
+	_draw_sun_moon(c, sky_low)
+
+
+## Clouds and gulls: they move, so this small layer is redrawn every frame.
+func _draw_mid_layer() -> void:
+	var night := 1.0 - daylight
+	var dusk := _dusk()
+	var ccol := Color(1.0, 1.0, 1.0, 0.75).lerp(Color(0.25, 0.28, 0.38, 0.7), night).lerp(Color(1.0, 0.78, 0.65, 0.8), dusk * 0.6)
+	for cl in _clouds:
+		var cp: Vector2 = cl["pos"]
+		for pf: Vector3 in cl["puffs"]:
+			_mid_layer.draw_circle(cp + Vector2(pf.x, pf.y), pf.z, ccol)
+	_draw_gulls(_mid_layer, night)
+
+
+## Far coast, town and mosque. Redrawn only when the light changes.
+func _draw_coast_layer() -> void:
+	var night := 1.0 - daylight
+	var haze := _sky_low(night, _dusk()).lerp(Color(0.45, 0.55, 0.62), 0.35)
+	_coast_layer.draw_colored_polygon(_coast_far, haze.darkened(0.12))
+	_coast_layer.draw_colored_polygon(_coast_near, haze.darkened(0.28).lerp(Color(0.25, 0.33, 0.28), 0.35 * daylight))
+	_draw_town(_coast_layer, night)
+
+
+func _draw_sun_moon(c: CanvasItem, sky_low: Color) -> void:
 	var elev := sin((time_of_day - 0.25) * TAU)
 	var sx := CX + (time_of_day - 0.5) * 2.0 * 820.0
 	if elev > -0.08:
@@ -487,18 +545,17 @@ func _draw_sun_moon(sky_low: Color) -> void:
 		c.draw_circle(mp + Vector2(6.0, -3.0), 13.0, sky_low.lerp(Color(0.05, 0.06, 0.14), 0.6))
 
 
-func _draw_gulls(night: float) -> void:
+func _draw_gulls(ci: CanvasItem, night: float) -> void:
 	var col := Color(1.0, 1.0, 1.0, 0.95).lerp(Color(0.6, 0.62, 0.7, 0.8), night)
 	for gl in _gulls:
 		var s: float = gl.data["size"] * 9.0
 		var fl := sin(_time * 7.0 + float(gl.data["phase"])) * s * 0.6
 		var p: Vector2 = gl.pos
-		_canvas.draw_polyline(PackedVector2Array([p + Vector2(-s * 1.6, -fl), p + Vector2(-s * 0.5, -fl * 0.2 - 2.0), p,
+		ci.draw_polyline(PackedVector2Array([p + Vector2(-s * 1.6, -fl), p + Vector2(-s * 0.5, -fl * 0.2 - 2.0), p,
 			p + Vector2(s * 0.5, -fl * 0.2 - 2.0), p + Vector2(s * 1.6, -fl)]), col, 2.2, true)
 
 
-func _draw_town(night: float) -> void:
-	var c := _canvas
+func _draw_town(c: CanvasItem, night: float) -> void:
 	for hs in _houses:
 		var hx: float = hs["x"]
 		var base := _coast_y(hx) + 3.0
@@ -558,7 +615,7 @@ func _draw_glitter(day: float, night: float, dusk: float) -> void:
 func _draw_waves(night: float) -> void:
 	var z := 3.0
 	for row in WAVE_ROWS:
-		z *= 1.22
+		z *= 1.38
 		var base := _proj(0.0, z, 0.0).y
 		if base < HY - _pitch + 2.0:
 			break
@@ -570,9 +627,9 @@ func _draw_waves(night: float) -> void:
 			var wx := (x - CX) * z / F
 			var y := base + sin(wx * 0.9 + z * 0.8 - _time * 1.6) * amp + sin(wx * 0.37 - _time * 0.9 + float(row)) * amp * 0.7
 			pts.append(Vector2(x, y))
-			x += 40.0
+			x += 64.0
 		var a := (0.10 + 0.25 * near) * (1.0 - 0.6 * night)
-		_canvas.draw_polyline(pts, Color(1.0, 1.0, 1.0, a), 1.0 + 2.5 * near, true)
+		_canvas.draw_polyline(pts, Color(1.0, 1.0, 1.0, a), 1.0 + 2.5 * near)
 		if wave_amp > 1.4 and row > 2 and row % 2 == 0:
 			for j in 4:
 				var cx := fmod(float(j) * 337.0 + _time * 20.0 + float(row) * 91.0, W)
@@ -617,10 +674,10 @@ func _draw_ripples() -> void:
 
 func _ellipse_line(ctr: Vector2, r: Vector2, col: Color, width: float) -> void:
 	var pts := PackedVector2Array()
-	for i in 21:
-		var a := TAU * float(i) / 20.0
+	for i in 15:
+		var a := TAU * float(i) / 14.0
 		pts.append(ctr + Vector2(cos(a) * r.x, sin(a) * r.y))
-	_canvas.draw_polyline(pts, col, width, true)
+	_canvas.draw_polyline(pts, col, width)
 
 
 ## The float (red tip, white body) or the flying bait or, in the fight, the jumping fish.

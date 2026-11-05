@@ -16,6 +16,9 @@ const CATS := 7
 const GULLS := 12
 ## Half the width of the town in px; matches ShoreFishing.HALF_WIDTH.
 const HALF := 4000.0
+const PANTS := [Color(0.20, 0.22, 0.30), Color(0.35, 0.30, 0.25), Color(0.15, 0.15, 0.17), Color(0.45, 0.42, 0.38)]
+const HAIR := [Color(0.15, 0.10, 0.08), Color(0.35, 0.22, 0.12), Color(0.55, 0.50, 0.45), Color(0.08, 0.07, 0.07)]
+const SKIN := [Color(0.92, 0.74, 0.58), Color(0.80, 0.60, 0.45), Color(0.65, 0.47, 0.33)]
 const NIGHT := Color(0.30, 0.36, 0.60)
 const DUSK := Color(1.0, 0.70, 0.52)
 const CLOTHES := [
@@ -178,7 +181,7 @@ func _spawn_life() -> void:
 	var band := _walk_band()
 	for i in WALKERS:
 		var v := Noc.Vehicle.new(Vector2(_rng.randf_range(band.position.x, band.end.x), _rng.randf_range(band.position.y, band.end.y)), _rng.randf_range(20.0, 36.0), 30.0)
-		v.data = {"color": CLOTHES[_rng.randi() % CLOTHES.size()], "pause": 0.0, "step": _rng.randf() * TAU}
+		v.data = {"color": CLOTHES[_rng.randi() % CLOTHES.size()], "pause": 0.0, "step": _rng.randf() * TAU, "k": _rng.randi() % 24}
 		_walkers.append(v)
 	for i in CATS:
 		var c := Noc.Vehicle.new(Vector2(_rng.randf_range(-HALF + 300.0, HALF - 300.0), _town_y0 + _rng.randf_range(20.0, 60.0)), 45.0, 70.0)
@@ -203,6 +206,8 @@ func _process(delta: float) -> void:
 	time_of_day = fmod(time_of_day + delta / day_length_s, 1.0)
 	daylight = clampf(sin((time_of_day - 0.25) * TAU) * 1.6 + 0.45, 0.0, 1.0)
 
+	if not visible:
+		return                      # hidden behind the first-person view: only the clock runs
 	var band := _walk_band()
 	_frame += 1
 	if _frame % 2 == 0:
@@ -272,9 +277,11 @@ func _draw_static() -> void:
 		_draw_building(bd)
 	var trim: Color = _pal["trim"]
 	for l in _lamps:
-		_static.draw_circle(l + Vector2(2.0, 3.0), 5.0, Color(0.0, 0.0, 0.0, 0.25))
-		_static.draw_circle(l, 4.0, trim.darkened(0.3))
-		_static.draw_circle(l, 2.0, Color(1.0, 0.95, 0.75))
+		# Street lamp standing up: shadow, post, lantern.
+		_static.draw_line(l + Vector2(2.0, 0.0), l + Vector2(16.0, 6.0), Color(0.0, 0.0, 0.0, 0.2), 4.0)
+		_static.draw_line(l, l + Vector2(0.0, -38.0), trim.darkened(0.4), 3.0)
+		_static.draw_rect(Rect2(l + Vector2(-5.0, -48.0), Vector2(10.0, 11.0)), trim.darkened(0.3))
+		_static.draw_rect(Rect2(l + Vector2(-3.0, -46.0), Vector2(6.0, 7.0)), Color(1.0, 0.95, 0.75))
 
 
 func _draw_building(bd: Dictionary) -> void:
@@ -320,8 +327,10 @@ func _draw_dyn() -> void:
 		if absf(p.x - view_x) > CULL_RADIUS + rad * 2.0:
 			continue
 		var sway := Vector2(sin(_time * 1.3 + float(t["phase"])) * rad * 0.10, 0.0)
-		_dyn.draw_circle(p + Vector2(rad * 0.5, rad * 0.6), rad, Color(0.0, 0.0, 0.0, 0.18))
-		_dyn.draw_circle(p, rad * 0.18, Color(0.40, 0.27, 0.16))
+		# Three-quarter view: a shadow on the ground, a trunk standing up, the crown above it.
+		_dyn.draw_circle(p + Vector2(rad * 0.4, rad * 0.25), rad * 0.9, Color(0.0, 0.0, 0.0, 0.16))
+		_dyn.draw_line(p, p + Vector2(0.0, -rad * 1.1), Color(0.40, 0.27, 0.16), maxf(4.0, rad * 0.22))
+		p = p + Vector2(0.0, -rad * 1.3)
 		if kind == "palm":
 			for i in 7:
 				var a := TAU * float(i) / 7.0 + float(t["phase"])
@@ -341,21 +350,18 @@ func _draw_dyn() -> void:
 		if absf(c.pos.x - view_x) > CULL_RADIUS:
 			continue
 		var col: Color = c.data["color"]
-		var h: Vector2 = c.heading()
-		var tail: Vector2 = c.pos - h * 9.0 + h.orthogonal() * sin(_time * 5.0 + float(c.data["phase"])) * 4.0
-		_dyn.draw_circle(c.pos + Vector2(2.0, 3.0), 6.0, Color(0.0, 0.0, 0.0, 0.2))
-		_dyn.draw_line(c.pos - h * 5.0, tail - h * 6.0, col.darkened(0.15), 2.0)
-		_dyn.draw_circle(c.pos, 5.0, col)
-		_dyn.draw_circle(c.pos + h * 6.0, 3.5, col)
+		Figure.draw_cat(_dyn, c.pos, 1.0 if c.vel.x >= 0.0 else -1.0, _time + float(c.data["phase"]), col)
 
 	for v in _walkers:
 		if absf(v.pos.x - view_x) > CULL_RADIUS:
 			continue
-		var bob := absf(sin(float(v.data["step"]))) * 1.5
 		var col2: Color = v.data["color"]
-		_dyn.draw_circle(v.pos + Vector2(3.0, 5.0), 8.0, Color(0.0, 0.0, 0.0, 0.22))
-		_dyn.draw_circle(v.pos - Vector2(0.0, bob), 8.0, col2)
-		_dyn.draw_circle(v.pos - Vector2(0.0, 2.0 + bob), 4.5, Color(0.90, 0.74, 0.58))
+		var k := int(v.data.get("k", 0))
+		var look := {"shirt": col2, "pants": PANTS[k % PANTS.size()], "hair": HAIR[k % HAIR.size()],
+			"skin": SKIN[k % SKIN.size()]}
+		if k % 4 == 0:
+			look["hat"] = Color(0.85, 0.80, 0.65)
+		Figure.draw_person(_dyn, v.pos, v.vel.normalized() if v.vel.length() > 1.0 else Vector2.DOWN, float(v.data["step"]), v.vel.length() > 4.0, look, 1.15)
 
 
 func _draw_sky() -> void:
@@ -385,7 +391,7 @@ func _draw_glow() -> void:
 		return
 	for l in _lamps:
 		_glow.draw_circle(l, 90.0, Color(1.0, 0.75, 0.40, 0.10 * n))
-		_glow.draw_circle(l, 34.0, Color(1.0, 0.85, 0.55, 0.30 * n))
+		_glow.draw_circle(l + Vector2(0.0, -42.0), 26.0, Color(1.0, 0.85, 0.55, 0.30 * n))
 	for bd in _buildings:
 		var r: Rect2 = bd["rect"]
 		var wins: Array = bd["lit"]

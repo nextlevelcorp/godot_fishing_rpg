@@ -35,6 +35,36 @@ const LOOKS := {
 	"greater_weever": {"back": Color(0.70, 0.62, 0.42), "belly": Color(0.92, 0.88, 0.78), "fin": Color(0.15, 0.15, 0.15), "depth": 0.18, "tail": "square", "pattern": "oblique", "pcol": Color(0.35, 0.40, 0.55, 0.6)},
 	"ornate_wrasse": {"back": Color(0.20, 0.55, 0.35), "belly": Color(0.95, 0.65, 0.30), "fin": Color(0.30, 0.60, 0.70), "depth": 0.24, "tail": "round", "pattern": "stripes", "pcol": Color(0.95, 0.45, 0.30, 0.7)},
 }
+## Body shape per species. peak: where the body is deepest (0 tail root .. 1 snout). snout: 0 pointed
+## .. 1 blunt, steep forehead. ped: tail-root thickness. arch: how much more the back curves than the
+## belly. dorsal: two (spiny then soft), long (one continuous), back (far back, garfish), low.
+## finlets: small fins before the tail (tunas, mackerels). fork: tail fork depth. eye: size factor.
+## mouth: gape as a fraction of length.
+const SHAPES := {
+	"bluefish": {"peak": 0.55, "snout": 0.30, "ped": 0.12, "arch": 1.05, "dorsal": "two", "fork": 0.75, "eye": 0.9, "mouth": 0.10},
+	"garfish": {"peak": 0.50, "snout": 0.0, "ped": 0.30, "arch": 1.0, "dorsal": "back", "fork": 0.55, "eye": 1.2, "mouth": 0.04},
+	"european_seabass": {"peak": 0.55, "snout": 0.40, "ped": 0.16, "arch": 1.10, "dorsal": "two", "fork": 0.25, "eye": 0.9, "mouth": 0.09},
+	"gilthead_seabream": {"peak": 0.52, "snout": 0.95, "ped": 0.10, "arch": 1.30, "dorsal": "long", "fork": 0.70, "eye": 1.0, "mouth": 0.05},
+	"atlantic_bonito": {"peak": 0.55, "snout": 0.25, "ped": 0.05, "arch": 1.05, "dorsal": "two", "finlets": true, "fork": 1.0, "eye": 0.8, "mouth": 0.08},
+	"atlantic_mackerel": {"peak": 0.55, "snout": 0.25, "ped": 0.06, "arch": 1.0, "dorsal": "two", "finlets": true, "fork": 0.9, "eye": 1.0, "mouth": 0.07},
+	"mediterranean_horse_mackerel": {"peak": 0.55, "snout": 0.45, "ped": 0.08, "arch": 1.05, "dorsal": "two", "fork": 0.9, "eye": 1.5, "mouth": 0.07},
+	"european_anchovy": {"peak": 0.50, "snout": 0.35, "ped": 0.15, "arch": 1.0, "dorsal": "low", "fork": 0.85, "eye": 1.3, "mouth": 0.12},
+	"red_mullet": {"peak": 0.45, "snout": 0.95, "ped": 0.14, "arch": 1.15, "dorsal": "two", "fork": 0.7, "eye": 1.1, "mouth": 0.03},
+	"flathead_grey_mullet": {"peak": 0.50, "snout": 0.70, "ped": 0.16, "arch": 1.0, "dorsal": "two", "fork": 0.5, "eye": 0.9, "mouth": 0.03},
+	"common_dentex": {"peak": 0.50, "snout": 0.85, "ped": 0.10, "arch": 1.25, "dorsal": "long", "fork": 0.7, "eye": 0.9, "mouth": 0.07},
+	"greater_amberjack": {"peak": 0.50, "snout": 0.45, "ped": 0.07, "arch": 1.10, "dorsal": "two", "fork": 0.9, "eye": 0.8, "mouth": 0.08},
+	"leerfish": {"peak": 0.50, "snout": 0.50, "ped": 0.07, "arch": 1.15, "dorsal": "long", "fork": 0.9, "eye": 0.8, "mouth": 0.09},
+	"dusky_grouper": {"peak": 0.45, "snout": 0.50, "ped": 0.20, "arch": 1.10, "dorsal": "long", "fork": 0.0, "eye": 0.8, "mouth": 0.13},
+	"black_scorpionfish": {"peak": 0.40, "snout": 0.65, "ped": 0.20, "arch": 1.20, "dorsal": "long", "fork": 0.0, "eye": 1.1, "mouth": 0.12},
+	"saddled_bream": {"peak": 0.50, "snout": 0.60, "ped": 0.10, "arch": 1.15, "dorsal": "long", "fork": 0.8, "eye": 1.35, "mouth": 0.04},
+	"white_seabream": {"peak": 0.50, "snout": 0.75, "ped": 0.10, "arch": 1.25, "dorsal": "long", "fork": 0.8, "eye": 1.0, "mouth": 0.05},
+	"striped_sea_bream": {"peak": 0.50, "snout": 0.80, "ped": 0.10, "arch": 1.20, "dorsal": "long", "fork": 0.7, "eye": 1.0, "mouth": 0.05},
+	"whiting": {"peak": 0.40, "snout": 0.30, "ped": 0.15, "arch": 1.0, "dorsal": "two", "fork": 0.1, "eye": 1.1, "mouth": 0.08},
+	"greater_weever": {"peak": 0.45, "snout": 0.55, "ped": 0.12, "arch": 1.0, "dorsal": "two", "fork": 0.0, "eye": 1.0, "mouth": 0.09},
+	"ornate_wrasse": {"peak": 0.50, "snout": 0.40, "ped": 0.15, "arch": 1.05, "dorsal": "long", "fork": 0.0, "eye": 0.9, "mouth": 0.05},
+}
+const SHAPE_DEFAULT := {"peak": 0.52, "snout": 0.45, "ped": 0.12, "arch": 1.1, "dorsal": "two", "fork": 0.7, "eye": 1.0, "mouth": 0.07}
+
 const DEFAULT := {"back": Color(0.45, 0.50, 0.55), "belly": Color(0.92, 0.93, 0.94), "fin": Color(0.50, 0.55, 0.60), "depth": 0.25, "tail": "fork", "pattern": "none"}
 const SAMPLES := 16
 
@@ -66,23 +96,33 @@ static func draw(ci: CanvasItem, id: String, center: Vector2, length: float, rot
 		_draw_flatfish(ci, lk, length, back, belly, fin, phase, flex)
 		ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		return
+	var sh: Dictionary = SHAPES.get(id, SHAPE_DEFAULT)
+	var peak: float = sh["peak"]
+	var blunt: float = sh["snout"]
+	var ped: float = sh["ped"]
+	var arch: float = sh["arch"]
 	var top := PackedVector2Array()
 	var bot := PackedVector2Array()
 	var mid := PackedVector2Array()
 	for i in SAMPLES + 1:
 		var u := float(i) / float(SAMPLES)          # 0 peduncle .. 1 snout
 		var x := x0 + u * body_len
-		var h := depth * length * 0.5 * (0.16 + 0.84 * sin(PI * pow(u, 0.8))) * (1.0 - 0.75 * pow(u, 5.0))
+		var f := 0.0
+		if u < peak:
+			f = ped + (1.0 - ped) * pow(sin(PI * 0.5 * u / peak), 0.85)
+		else:
+			f = pow(maxf(0.0, 1.0 - pow((u - peak) / (1.0 - peak), 1.6 + 2.6 * blunt)), 0.55)
+		f = maxf(f, 0.02)
+		var h := depth * length * 0.5 * f
 		var c := _bend(u, length, phase, flex)
-		top.append(Vector2(x, c - h * 1.05))
-		bot.append(Vector2(x, c + h * 0.95))
+		# A blunt head drops the forehead steeply but keeps the jaw line low.
+		var head_k := clampf((u - peak) / (1.0 - peak), 0.0, 1.0)
+		top.append(Vector2(x, c - h * arch))
+		bot.append(Vector2(x, c + h * (0.95 - 0.25 * head_k * (1.0 - blunt))))
 		mid.append(Vector2(x, c))
 	# Fins behind the body.
-	_draw_tail(ci, tail, Vector2(x0, _bend(0.0, length, phase, flex)), length, depth, fin, phase, flex)
-	var dorsal := PackedVector2Array([top[6], top[7] + Vector2(0.0, -depth * length * 0.32), top[11] + Vector2(0.0, -depth * length * 0.18), top[12]])
-	ci.draw_colored_polygon(dorsal, Color(fin.r, fin.g, fin.b, 0.9))
-	var anal := PackedVector2Array([bot[3], bot[4] + Vector2(0.0, depth * length * 0.18), bot[6]])
-	ci.draw_colored_polygon(anal, Color(fin.r, fin.g, fin.b, 0.85))
+	_draw_tail(ci, tail, Vector2(x0, _bend(0.0, length, phase, flex)), length, depth, fin, phase, flex, float(sh["fork"]))
+	_draw_fins(ci, String(sh["dorsal"]), bool(sh.get("finlets", false)), top, bot, length, depth, fin)
 	# Body: shaded from back to belly through the flank.
 	var outline := PackedVector2Array()
 	var cols := PackedColorArray()
@@ -117,12 +157,15 @@ static func draw(ci: CanvasItem, id: String, center: Vector2, length: float, rot
 	ci.draw_colored_polygon(PackedVector2Array([pec_root, pec_root + Vector2(-length * 0.13, length * 0.03 + sin(phase * 1.3) * length * 0.02),
 		pec_root + Vector2(-length * 0.08, length * 0.07)]), Color(fin.r, fin.g, fin.b, 0.6))
 	var eye := top[SAMPLES - 2].lerp(mid[SAMPLES - 2], 0.55)
-	var er := maxf(1.5, length * (0.038 if depth > 0.12 else 0.025))
+	var er := maxf(1.5, length * (0.032 if depth > 0.12 else 0.022) * float(sh["eye"]))
 	ci.draw_circle(eye, er, Color(0.95, 0.93, 0.80))
 	ci.draw_circle(eye, er * 0.62, Color(0.04, 0.04, 0.05))
 	ci.draw_circle(eye + Vector2(er * 0.25, -er * 0.3), er * 0.22, Color(1.0, 1.0, 1.0, 0.9))
-	var snout := mid[SAMPLES]
-	ci.draw_line(snout + Vector2(0.0, length * 0.006), snout + Vector2(-length * 0.05, length * 0.012), Color(0.1, 0.1, 0.1, 0.6), maxf(1.0, length * 0.006))
+	var snout_p := top[SAMPLES].lerp(bot[SAMPLES], 0.6)
+	var gape := float(sh["mouth"]) * length
+	ci.draw_line(snout_p, snout_p + Vector2(-gape, gape * 0.25), Color(0.1, 0.08, 0.08, 0.7), maxf(1.0, length * 0.007))
+	ci.draw_line(snout_p + Vector2(0.0, length * 0.006), snout_p + Vector2(-gape * 0.9, gape * 0.3 + length * 0.004), belly.darkened(0.25), maxf(1.0, length * 0.006))
+	var snout := snout_p
 	match String(lk.get("extra", "")):
 		"beak":
 			ci.draw_line(snout + Vector2(0.0, -1.0), snout + Vector2(length * 0.22, 0.0), back.darkened(0.2), maxf(1.5, length * 0.012))
@@ -131,6 +174,14 @@ static func draw(ci: CanvasItem, id: String, center: Vector2, length: float, rot
 			ci.draw_line(snout + Vector2(-length * 0.03, length * 0.02), snout + Vector2(-length * 0.02, length * 0.08), Color(0.95, 0.85, 0.75), maxf(1.0, length * 0.006))
 		"brow":
 			ci.draw_line(eye + Vector2(er * 0.8, -er * 1.4), eye + Vector2(-er * 0.6, -er * 1.6), Color(0.95, 0.78, 0.25, 0.9), maxf(1.5, er * 0.6))
+	# Scales: rows of small arcs, only when the fish is big on screen (the catch).
+	if length > 160.0:
+		var sc_col := Color(back.r, back.g, back.b, 0.18)
+		var sr := length * 0.016
+		for i in range(2, SAMPLES - 3):
+			for row in 4:
+				var sp := top[i].lerp(bot[i], 0.18 + 0.18 * float(row)) + Vector2(sr * float(row % 2), 0.0)
+				ci.draw_arc(sp, sr, -1.2, 1.2, 5, sc_col, 1.0)
 	# Wet sheen along the back.
 	if wet > 0.0:
 		var sheen := PackedVector2Array()
@@ -145,15 +196,21 @@ static func _bend(u: float, length: float, phase: float, flex: float) -> float:
 	return flex * length * 0.07 * sin(phase - u * 3.2) * pow(1.0 - u, 1.6)
 
 
-static func _draw_tail(ci: CanvasItem, tail: String, root: Vector2, length: float, depth: float, fin: Color, phase: float, flex: float) -> void:
+static func _draw_tail(ci: CanvasItem, tail: String, root: Vector2, length: float, depth: float, fin: Color, phase: float, flex: float, fork: float = 0.7) -> void:
 	var sweep := flex * length * 0.06 * sin(phase + 0.6)
 	var tip := -length * 0.18
 	var span := maxf(depth, 0.14) * length * 0.55
 	var col := Color(fin.r, fin.g, fin.b, 0.95)
+	if fork <= 0.05 and tail != "flat":
+		tail = "round"
 	match tail:
 		"fork":
-			ci.draw_colored_polygon(PackedVector2Array([root + Vector2(4.0, -span * 0.12), root + Vector2(tip, -span + sweep),
-				root + Vector2(tip * 0.55, sweep * 0.6), root + Vector2(tip, span + sweep), root + Vector2(4.0, span * 0.12)]), col)
+			var notch := lerpf(0.95, 0.35, fork)
+			ci.draw_colored_polygon(PackedVector2Array([root + Vector2(4.0, -span * 0.12), root + Vector2(tip * (1.0 + 0.15 * fork), -span * (0.8 + 0.3 * fork) + sweep),
+				root + Vector2(tip * notch, sweep * 0.6), root + Vector2(tip * (1.0 + 0.15 * fork), span * (0.8 + 0.3 * fork) + sweep), root + Vector2(4.0, span * 0.12)]), col)
+			for k in 5:
+				var a := lerpf(-0.8, 0.8, float(k) / 4.0)
+				ci.draw_line(root, root + Vector2(tip * 0.9, span * a * 0.9 + sweep * 0.8), Color(fin.r * 0.8, fin.g * 0.8, fin.b * 0.8, 0.5), 1.0)
 		"round":
 			var pts := PackedVector2Array([root + Vector2(4.0, -span * 0.25)])
 			for i in 9:
@@ -164,6 +221,46 @@ static func _draw_tail(ci: CanvasItem, tail: String, root: Vector2, length: floa
 		_:
 			ci.draw_colored_polygon(PackedVector2Array([root + Vector2(4.0, -span * 0.2), root + Vector2(tip, -span * 0.8 + sweep),
 				root + Vector2(tip * 0.92, sweep), root + Vector2(tip, span * 0.8 + sweep), root + Vector2(4.0, span * 0.2)]), col)
+
+
+## Dorsal, anal and pelvic fins with rays, by fin plan; finlets for tunas and mackerels.
+static func _draw_fins(ci: CanvasItem, plan: String, finlets: bool, top: PackedVector2Array, bot: PackedVector2Array, length: float, depth: float, fin: Color) -> void:
+	var col := Color(fin.r, fin.g, fin.b, 0.85)
+	var ray := Color(fin.r * 0.7, fin.g * 0.7, fin.b * 0.7, 0.7)
+	var hgt := maxf(depth, 0.12) * length
+	match plan:
+		"two":
+			_fin(ci, top, 9, 12, -hgt * 0.42, col, ray, true)
+			_fin(ci, top, 5, 8, -hgt * 0.26, col, ray, false)
+		"long":
+			_fin(ci, top, 4, 12, -hgt * 0.24, col, ray, true)
+		"back":
+			_fin(ci, top, 1, 3, -hgt * 0.9, col, ray, false)
+		_:
+			_fin(ci, top, 7, 10, -hgt * 0.22, col, ray, false)
+	_fin(ci, bot, 3, 6, hgt * (0.22 if plan != "back" else 0.7), col, ray, false)
+	_fin(ci, bot, 10, 11, hgt * 0.18, col, ray, false)          # pelvic
+	if finlets:
+		for i in [1, 2, 3]:
+			var p: Vector2 = top[i]
+			var q: Vector2 = bot[i]
+			ci.draw_colored_polygon(PackedVector2Array([p, p + Vector2(-length * 0.02, -length * 0.025), p + Vector2(length * 0.015, 0.0)]), col)
+			ci.draw_colored_polygon(PackedVector2Array([q, q + Vector2(-length * 0.02, length * 0.025), q + Vector2(length * 0.015, 0.0)]), col)
+
+
+## One fin along the outline from sample a to b, reaching `reach` px out (negative = upward).
+static func _fin(ci: CanvasItem, edge: PackedVector2Array, a: int, b: int, reach: float, col: Color, ray: Color, spiny: bool) -> void:
+	var pts := PackedVector2Array()
+	pts.append(edge[a])
+	var n := b - a
+	for i in n + 1:
+		var k := float(i) / float(maxi(n, 1))
+		var h := reach * (sin(PI * (0.15 + 0.7 * k)) if spiny else (1.0 - k * 0.6)) * (0.6 + 0.4 * sin(PI * k))
+		pts.append(edge[a + i] + Vector2(-reach * 0.15 * signf(reach), h))
+	pts.append(edge[b])
+	ci.draw_colored_polygon(pts, col)
+	for i in range(1, pts.size() - 1):
+		ci.draw_line(edge[a + i - 1], pts[i], ray, 1.0)
 
 
 static func _draw_pattern(ci: CanvasItem, lk: Dictionary, top: PackedVector2Array, mid: PackedVector2Array, bot: PackedVector2Array, length: float) -> void:

@@ -24,6 +24,9 @@ extends Node2D
 ## Night, on the pier: the lamp draws baitfish, so fish activity rises by this fraction (game-design fill).
 const LAMP_PIER_BONUS := 0.15
 
+const ANGLER_LOOK := {"shirt": Color(0.18, 0.36, 0.30), "pants": Color(0.22, 0.24, 0.30), "skin": Color(0.92, 0.74, 0.58),
+	"hair": Color(0.20, 0.14, 0.10), "hat": Color(0.85, 0.30, 0.20)}
+
 enum State { AIM, CHARGE, FLY, WAIT, BITE, FIGHT, RESULT }
 
 const PX_PER_M := 10.0
@@ -188,7 +191,7 @@ func _ready() -> void:
 
 	_cam = Camera2D.new()
 	_cam.position = Vector2(0.0, 40.0)
-	_cam.zoom = Vector2.ONE * 0.72
+	_cam.zoom = Vector2.ONE * 1.1
 	add_child(_cam)
 	_cam.make_current()
 
@@ -1467,14 +1470,14 @@ func _fight_feedback() -> void:
 ## Wide on the town while aiming, follows the throw, closes in on the float, and frames angler
 ## and fish together in the fight, getting closer as the fish comes in.
 func _update_camera(delta: float) -> void:
-	var target_pos := _hand + Vector2(0.0, -90.0)
-	var target_zoom := 0.8
+	var target_pos := _hand + Vector2(0.0, -60.0)
+	var target_zoom := 1.15                    # close in, like a farm-sim view, not a map
 	match _state:
 		State.CHARGE:
 			target_pos = _hand.lerp(_pred_landing, 0.45)
 		State.FLY:
 			target_pos = _hand.lerp(_bobber_pos, 0.6)
-			target_zoom = 0.9
+			target_zoom = 1.0
 		State.WAIT, State.BITE:
 			target_pos = _hand.lerp(_bobber_pos, 0.6)
 			target_zoom = 1.25
@@ -1622,9 +1625,8 @@ func _draw_crowd() -> void:
 		draw_line(Vector2(x, y), tip, Color(0.2, 0.13, 0.08), 3.0)
 		draw_line(tip, end, Color(1.0, 1.0, 1.0, 0.35), 1.0)
 		draw_circle(end, 3.0, Color(0.95, 0.3, 0.2, 0.9))
-		draw_circle(Vector2(x + 4.0, y + 9.0), 12.0, Color(0.0, 0.0, 0.0, 0.2))
-		draw_circle(Vector2(x, y + 6.0), 11.0, Color(0.25 + 0.3 * absf(sin(ph)), 0.25, 0.35))
-		draw_circle(Vector2(x, y + 4.0), 6.0, Color(0.9, 0.75, 0.6))
+		Figure.draw_person(self, Vector2(x, y + 18.0), Vector2.UP, 0.0, false,
+			{"shirt": Color(0.25 + 0.3 * absf(sin(ph)), 0.25, 0.35), "hat": Color(0.80, 0.75, 0.60) if int(x) % 3 == 0 else null}, 1.3)
 
 
 func _draw_foam() -> void:
@@ -1774,15 +1776,9 @@ func _draw_lamp() -> void:
 
 func _draw_angler() -> void:
 	var d := _aim_dir()
-	draw_circle(_hand + Vector2(7.0, 14.0), 21.0, Color(0.0, 0.0, 0.0, 0.25))
-	if _moving and _state == State.AIM:
-		var side := _facing.orthogonal() * 8.0
-		var swing := _facing * sin(_walk_phase) * 7.0
-		draw_circle(_hand + Vector2(0.0, 12.0) + side + swing, 6.0, Color(0.18, 0.16, 0.14))
-		draw_circle(_hand + Vector2(0.0, 12.0) - side - swing, 6.0, Color(0.18, 0.16, 0.14))
-	draw_circle(_hand + Vector2(0.0, 10.0), 18.0, Color(0.15, 0.30, 0.55))
-	draw_circle(_hand + Vector2(0.0, 10.0), 10.0, Color(0.93, 0.75, 0.6))
-	draw_circle(_hand + Vector2(0.0, 7.0), 8.0, Color(0.9, 0.3, 0.2))
+	# Three-quarter view: the angler stands with the rod hand at chest height (see Figure).
+	var look_dir := _facing if _state == State.AIM else d
+	Figure.draw_person(self, _hand + Vector2(0.0, 22.0), look_dir, _walk_phase, _moving and _state == State.AIM, ANGLER_LOOK, 1.5)
 	var ctrl := _hand + d * ROD_LEN * 0.55 + d.orthogonal() * _rod_bend * ROD_BEND_PX * 0.35
 	var rod := PackedVector2Array()
 	var tip := _rod_tip()
