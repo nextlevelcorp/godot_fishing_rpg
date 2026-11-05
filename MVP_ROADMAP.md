@@ -26,19 +26,19 @@ clutch, needs a playtest), time-of-day control (night species need 3.5+ minutes 
 HUD text overlap, object leak at exit (CI warning).
 
 ## M0 — Stabilise and verify (next)
-- [ ] Confirm touch buttons and joystick on the user's phone (build label on screen)
+- [x] Confirm touch buttons and joystick on the user's phone (build label on screen)
 - [ ] Mobile layout: expand aspect, anchored controls, safe areas, portrait screen (#1)
-- [ ] Pause/resume and audio lifecycle (#2)
+- [x] Pause/resume and audio lifecycle (#2)
 - [ ] Gameplay bug batch (#5)
 - [ ] Camera culling and draw-once layers (#3)
 - [ ] Remove legacy boat game from build (#9)
-- [ ] Robust save (#10)
+- [ ] Robust save (#10) (partly: type-checked load, version field)
 
 ## M1 — MVP feature-complete
 - [ ] Title screen with Play, Settings (sound, vibration, language), Credits (Kenney CC0, sources)
 - [ ] Onboarding at the first spot and waiting feedback (#7)
-- [ ] Session summary ("end of outing": catches, coins, records) and return to the map
-- [ ] Score and progression: angler level from catches; spots unlock by level (forgiving spots first)
+- [x] Session summary ("end of outing": catches, coins, records) and return to the map
+- [x] Score and progression: angler level from catches; spots unlock by level (forgiving spots first)
 - [ ] Time-of-day control (start at dawn or dusk, wait until evening)
 - [ ] Pre-rendered audio (#4)
 - [ ] Turkish localisation (#8)
