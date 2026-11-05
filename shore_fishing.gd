@@ -67,6 +67,8 @@ var _goal_labels: Array[Label] = []
 var _summary: PanelContainer
 var _hud_root: Control
 var _weather: WeatherFx
+var _build_label: Label
+var _fps_t := 0.0
 var _lamp_noise := FastNoiseLite.new()
 var _weather_kind := "clear"
 var _tip_pos := Vector2.ZERO
@@ -353,6 +355,7 @@ func _build_hud() -> void:
 	var build := _make_label(ui, 14, Color(1.0, 1.0, 1.0, 0.6))
 	build.position = Vector2(20.0, 694.0)
 	build.text = GameSession.BUILD
+	_build_label = build
 
 	_status = _make_label(ui, 30, Color.WHITE)
 	_status.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
@@ -1351,6 +1354,10 @@ func _on_escaped(_id: String) -> void:
 # ---------------------------------------------------------------- per-frame visuals
 func _process(delta: float) -> void:
 	_kick = maxf(0.0, _kick - delta * 0.6)
+	_fps_t += delta
+	if _fps_t >= 0.5:
+		_fps_t = 0.0
+		_build_label.text = "%s   %d fps" % [GameSession.BUILD, Engine.get_frames_per_second()]
 	if _state == State.WAIT or _state == State.BITE:
 		_rod_bend_target = clampf(_float_x, 0.0, 1.5) * 0.25
 	elif _state != State.FIGHT:
@@ -1362,6 +1369,7 @@ func _process(delta: float) -> void:
 	_ripples.assign(_ripples.filter(func(r: Dictionary) -> bool: return float(r["age"]) < 1.6))
 
 	_world.wind = _wind
+	_world.view_x = _cam.position.x
 	_amb.gull_rate = 0.02 + 0.08 * _world.daylight
 	if _state == State.FIGHT and Input.is_action_pressed(&"reel_in"):
 		_reel_click -= delta

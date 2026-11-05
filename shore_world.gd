@@ -31,6 +31,11 @@ var daylight := 1.0
 var spot: Dictionary = {}
 ## Set by the shore scene each frame: cloud shadows drift with it.
 var wind := Vector2(20.0, 0.0)
+## Camera x, set by the parent every frame. Things farther than CULL_RADIUS from it are not drawn
+## (the world is 8000 px wide, the screen shows at most about 1900 px).
+var view_x := 0.0
+const CULL_RADIUS := 1300.0
+var _frame := 0
 
 var _kind := ""
 var _clouds: Array[Dictionary] = []
@@ -199,7 +204,9 @@ func _process(delta: float) -> void:
 	daylight = clampf(sin((time_of_day - 0.25) * TAU) * 1.6 + 0.45, 0.0, 1.0)
 
 	var band := _walk_band()
-	Noc.flock(_walkers, 20.0, 1.0, 1.4, 0.0, 0.0)
+	_frame += 1
+	if _frame % 2 == 0:
+		Noc.flock(_walkers, 20.0, 1.0, 1.4, 0.0, 0.0)     # O(n^2): every other frame is enough for strolling
 	for v in _walkers:
 		v.data["pause"] = float(v.data["pause"]) - delta
 		if float(v.data["pause"]) > 0.0:
@@ -310,6 +317,8 @@ func _draw_dyn() -> void:
 	for t in _trees:
 		var p: Vector2 = t["pos"]
 		var rad: float = t["r"]
+		if absf(p.x - view_x) > CULL_RADIUS + rad * 2.0:
+			continue
 		var sway := Vector2(sin(_time * 1.3 + float(t["phase"])) * rad * 0.10, 0.0)
 		_dyn.draw_circle(p + Vector2(rad * 0.5, rad * 0.6), rad, Color(0.0, 0.0, 0.0, 0.18))
 		_dyn.draw_circle(p, rad * 0.18, Color(0.40, 0.27, 0.16))
@@ -329,6 +338,8 @@ func _draw_dyn() -> void:
 			_dyn.draw_circle(p + sway + Vector2(-rad * 0.25, -rad * 0.3), rad * 0.55, tree_col.lightened(0.15))
 
 	for c in _cats:
+		if absf(c.pos.x - view_x) > CULL_RADIUS:
+			continue
 		var col: Color = c.data["color"]
 		var h: Vector2 = c.heading()
 		var tail: Vector2 = c.pos - h * 9.0 + h.orthogonal() * sin(_time * 5.0 + float(c.data["phase"])) * 4.0
@@ -338,6 +349,8 @@ func _draw_dyn() -> void:
 		_dyn.draw_circle(c.pos + h * 6.0, 3.5, col)
 
 	for v in _walkers:
+		if absf(v.pos.x - view_x) > CULL_RADIUS:
+			continue
 		var bob := absf(sin(float(v.data["step"]))) * 1.5
 		var col2: Color = v.data["color"]
 		_dyn.draw_circle(v.pos + Vector2(3.0, 5.0), 8.0, Color(0.0, 0.0, 0.0, 0.22))
@@ -350,9 +363,13 @@ func _draw_sky() -> void:
 	if shade > 0.005:
 		for cl in _clouds:
 			var cp: Vector2 = cl["pos"]
+			if absf(cp.x - view_x) > CULL_RADIUS + 600.0:
+				continue
 			for pf: Vector3 in cl["puffs"]:
 				_sky.draw_circle(cp + Vector2(pf.x, pf.y), pf.z, Color(0.0, 0.05, 0.12, shade))
 	for g in _gulls:
+		if absf(g.pos.x - view_x) > CULL_RADIUS:
+			continue
 		var fl := sin(_time * 7.0 + float(g.data["phase"])) * 7.0
 		var h: Vector2 = g.heading()
 		var s := h.orthogonal()

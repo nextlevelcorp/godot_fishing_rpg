@@ -30,7 +30,7 @@ HUD text overlap, object leak at exit (CI warning).
 - [ ] Mobile layout: expand aspect, anchored controls, safe areas, portrait screen (#1)
 - [x] Pause/resume and audio lifecycle (#2)
 - [ ] Gameplay bug batch (#5)
-- [ ] Camera culling and draw-once layers (#3)
+- [ ] Camera culling and draw-once layers (#3): town drawing culled to the camera (build 21); shore and boats still open; no measurement yet
 - [ ] Remove legacy boat game from build (#9)
 - [ ] Robust save (#10) (partly: type-checked load, version field)
 
