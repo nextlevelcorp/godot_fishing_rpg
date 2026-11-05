@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Shown on screen so a player can tell a fresh deploy from a page the browser cached.
 ## Bump it with every build that changes behaviour.
-const BUILD := "build 17"
+const BUILD := "build 18"
 const SAVE_PATH := "user://save.cfg"
 const SAVE_VERSION := 1
 const START_RIG := "shore_spinning_rig"
@@ -35,6 +35,7 @@ static var catches: Array[Dictionary] = []
 static var coins := 0
 static var sound_on := true
 static var vibration_on := true
+static var tutorial_done := false
 static var xp := 0
 static var rig_id := START_RIG
 static var owned_rigs: Array[String] = [START_RIG]
@@ -103,6 +104,7 @@ static func load_once() -> void:
 	rig_id = String(rid) if (rid is String and owned_rigs.has(rid)) else START_RIG
 	sound_on = bool(cfg.get_value("settings", "sound_on", true))
 	vibration_on = bool(cfg.get_value("settings", "vibration_on", true))
+	tutorial_done = bool(cfg.get_value("settings", "tutorial_done", false))
 	best_kg = _clean(cfg.get_value("journal", "best_kg", {}), true)
 	counts = _clean(cfg.get_value("journal", "counts", {}), false)
 	for k: String in counts:
@@ -120,6 +122,7 @@ static func save() -> void:
 	cfg.set_value("player", "owned_rigs", owned_rigs)
 	cfg.set_value("settings", "sound_on", sound_on)
 	cfg.set_value("settings", "vibration_on", vibration_on)
+	cfg.set_value("settings", "tutorial_done", tutorial_done)
 	cfg.set_value("journal", "best_kg", best_kg)
 	cfg.set_value("journal", "counts", counts)
 	var err := cfg.save(SAVE_PATH)
@@ -131,6 +134,11 @@ static func save() -> void:
 static func set_sound(on: bool) -> void:
 	sound_on = on
 	AudioServer.set_bus_mute(0, not on)
+	save()
+
+
+static func set_tutorial_done() -> void:
+	tutorial_done = true
 	save()
 
 

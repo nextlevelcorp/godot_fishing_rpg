@@ -426,6 +426,8 @@ func _build_hud() -> void:
 		gl.position = Vector2(46.0, 194.0 + float(i) * 24.0)
 		_goal_labels.append(gl)
 	_update_progress_ui()
+	if not GameSession.tutorial_done:
+		_show_tutorial()
 
 	_power_bar = ProgressBar.new()
 	_power_bar.min_value = 0.0
@@ -1270,6 +1272,44 @@ func _show_summary() -> void:
 	keep.pressed.connect(func() -> void: _summary.queue_free())
 	row.add_child(keep)
 	_hud_root.add_child(_summary)
+
+
+## First-visit coach card: the loop in five lines. Shown once, saved when dismissed.
+func _show_tutorial() -> void:
+	var card := PanelContainer.new()
+	card.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	card.offset_left = -330.0
+	card.offset_right = 330.0
+	card.offset_top = -220.0
+	card.offset_bottom = 160.0
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.02, 0.10, 0.18, 0.94)
+	style.set_corner_radius_all(18)
+	style.set_content_margin_all(20)
+	card.add_theme_stylebox_override("panel", style)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	card.add_child(box)
+	_plain_label(box, 30, Color(1.0, 0.92, 0.6)).text = "How to fish"
+	var lines := [
+		"1. Walk to the water's edge or out on the pier with the stick.",
+		"2. Hold CAST, aim with the stick, release to throw. Farther is deeper.",
+		"3. Set the bait depth with DEEP / SHAL. Fish feed at different depths and hours.",
+		"4. Wait. A nibble is not a bite. When the float dives (BITE!), tap REEL.",
+		"5. In the fight, hold REEL to pull, ease off when the line is red, use CLUTCH+/-.",
+	]
+	for ln: String in lines:
+		_plain_label(box, 19, Color(0.9, 0.96, 1.0)).text = ln
+	var ok := Button.new()
+	ok.text = "GOT IT"
+	ok.custom_minimum_size = Vector2(260.0, 60.0)
+	ok.add_theme_font_size_override("font_size", 24)
+	ok.focus_mode = Control.FOCUS_NONE
+	ok.pressed.connect(func() -> void:
+		GameSession.set_tutorial_done()
+		card.queue_free())
+	box.add_child(ok)
+	_hud_root.add_child(card)
 
 
 func _plain_label(parent: Control, size: int, color: Color) -> Label:

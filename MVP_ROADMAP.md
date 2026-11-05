@@ -36,7 +36,7 @@ HUD text overlap, object leak at exit (CI warning).
 
 ## M1 — MVP feature-complete
 - [x] Title screen with Play, Settings (sound, vibration), Credits (Kenney CC0, sources); language comes with Turkish localisation
-- [ ] Onboarding at the first spot and waiting feedback (#7)
+- [x] Onboarding at the first spot (coach card, shown once); waiting feedback still open (#7)
 - [x] Session summary ("end of outing": catches, coins, records) and return to the map
 - [x] Score and progression: angler level from catches; spots unlock by level (forgiving spots first)
 - [ ] Time-of-day control (start at dawn or dusk, wait until evening)
