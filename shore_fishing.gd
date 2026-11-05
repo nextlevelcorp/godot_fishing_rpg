@@ -56,7 +56,6 @@ var _bait_depth := 2.0             ## float setting, metres below the surface
 var _tip_text := ""
 var _toast_text := ""
 var _toast_t := 0.0
-var _debug_label: Label
 var _toast_label: Label
 var _quiet_t := 0.0
 var _tip_pos := Vector2.ZERO
@@ -336,8 +335,6 @@ func _build_hud() -> void:
 	var build := _make_label(ui, 14, Color(1.0, 1.0, 1.0, 0.6))
 	build.position = Vector2(20.0, 694.0)
 	build.text = GameSession.BUILD
-	_debug_label = _make_label(ui, 14, Color(1.0, 0.9, 0.5, 0.9))
-	_debug_label.position = Vector2(110.0, 662.0)
 
 	_status = _make_label(ui, 30, Color.WHITE)
 	_status.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
@@ -531,18 +528,6 @@ func _predict() -> void:
 		if z <= 0.0:
 			break
 	_pred_landing = p
-
-
-## Diagnostic line (bottom of the screen): what the game believes is pressed. If a button is held
-## and its name is missing here, the touch never reached the game; if it is listed but nothing
-## happens, the problem is in the game logic. Remove once touch is confirmed on devices.
-func _update_debug() -> void:
-	var down: PackedStringArray = []
-	for a in [&"cast", &"reel_in", &"drag_up", &"drag_down", &"bait_deeper", &"bait_shallower"]:
-		if Input.is_action_pressed(a):
-			down.append(String(a))
-	var mv := Input.get_vector(&"steer_left", &"steer_right", &"boat_forward", &"boat_back", 0.1)
-	_debug_label.text = "[%s]  state %s  fish %s  stick %.1f,%.1f  pressed: %s\ntouch events: raw %d  gui %d   last: %s" % [GameSession.BUILD, State.keys()[_state], ("yes" if _fish_id != "" else "no"), mv.x, mv.y, ", ".join(down) if not down.is_empty() else "-", TouchControls.count_input, TouchControls.count_gui, TouchControls.last_event]
 
 
 # ---------------------------------------------------------------- state machine
@@ -1160,7 +1145,6 @@ func _process(delta: float) -> void:
 	_depth_label.text = "Float %.1f m  |  Water %s  |  Clutch %.0f N" % [_bait_depth, ("%.1f m" % water) if water > 0.0 else "-", _fishing.drag_setting_n]
 	_toast_t = maxf(0.0, _toast_t - delta)
 	_toast_label.text = _toast_text if _toast_t > 0.0 else ""
-	_update_debug()
 
 	_power_bar.visible = _state == State.CHARGE
 	_power_bar.value = _power

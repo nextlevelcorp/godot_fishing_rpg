@@ -78,7 +78,7 @@ func _notification(what: int) -> void:
 func _on_panel_input(event: InputEvent) -> void:
 	if not _away or _portrait:
 		return
-	var tapped := (event is InputEventScreenTouch and event.pressed) or (event is InputEventMouseButton and event.pressed)
+	var tapped: bool = (event is InputEventScreenTouch and event.pressed) or (event is InputEventMouseButton and event.pressed)
 	if tapped:
 		_away = false
 		_apply()

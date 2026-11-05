@@ -39,7 +39,10 @@ for i, line in enumerate(src, 1):
         # Typed arrays indexed by a number (pts[i]) have a known type; Dictionary reads do not.
         chain = r'[A-Za-z_][\w\.]*(\s*\[\s*"[^"]*"\s*\]|\.data\[[^\[\]]*\]|\.get\([^()]*\))(\s*\[[^\[\]]*\])*'
         reads_variant = re.fullmatch(chain + r"\s*", rhs) or re.match(chain + r"\s*[-+*/%]", rhs)
-        if reads_variant and not rhs.startswith(CASTS) and not re.search(r"\bas\s+\w+\s*$", rhs):
+        # A property read on an InputEvent-typed parameter (event.pressed, event.position, ...) has no
+        # static type either: `var t := event is A and event.pressed` fails to load.
+        reads_event = re.search(r"\bevent\.(pressed|position|index|button_index|button_mask|keycode|relative|echo|strength)\b", rhs)
+        if (reads_variant or reads_event) and not rhs.startswith(CASTS) and not re.search(r"\bas\s+\w+\s*$", rhs):
             issues.append(f"{path}:{i}: `:=` infers from a Dictionary/Variant read; give an explicit type "
                           f"(var x: Type = ...) or wrap in a cast, or Godot may refuse to load the script")
 if issues:
