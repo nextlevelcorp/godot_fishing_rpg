@@ -87,6 +87,21 @@ jobs:
             .catch(function () { document.body.textContent = 'Could not load the game. Check your connection and reload.'; });
           </script>
           HTML
+          # A phone that kept an old g<N>.html address (bookmark, home-screen icon, history) would get a
+          # 404 once a newer build replaced it. GitHub Pages serves 404.html for any missing path, so
+          # this sends the player to the project root, whose loader opens the current build.
+          cat > build/web/404.html <<'HTML'
+          <!doctype html>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Shore Fishing</title>
+          <body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#06182a;color:#9cd;font:18px sans-serif">
+          Opening the latest version...
+          <script>
+          var root = '/' + location.pathname.split('/')[1] + '/';
+          location.replace(root + '?r=' + Date.now());
+          </script>
+          HTML
           ls -la build/web
 
       - uses: actions/configure-pages@v5
