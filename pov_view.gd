@@ -18,8 +18,15 @@ extends FightView
 const CX := 640.0
 const HY := 300.0                 ## horizon height on screen
 const F := 900.0                  ## focal length in px
-const ROD_BASE := Vector2(1040.0, 760.0)
-const ROD_REST := Vector2(760.0, 205.0)
+const ROD_BASE := Vector2(1120.0, 735.0)   ## butt of the rod, under your forearm
+const ROD_REST := Vector2(690.0, 175.0)    ## tip when nothing pulls on it
+const REST_PITCH := 110.0                  ## px the view looks down at rest, so the near water shows
+const PITCH_MAX := 430.0
+## Distance from your eyes to where the water starts (m), by spot kind. The fish cannot come closer.
+const EDGE_M := {"rocky": 5.0, "beach": 6.0, "harbor": 3.0, "bridge": 4.0}
+
+## Sound cues for the shore scene to play: exit, drips, splash, splash_big.
+signal sfx(kind: String, volume: float)
 const G := 9.8
 const WAVE_ROWS := 20
 
@@ -41,6 +48,12 @@ var target_h := 0.0               ## m above the water (flying bait)
 var float_dip := 0.0              ## 0 floating, 1 pulled under
 
 var _open := false
+var _pitch := REST_PITCH          ## camera looks down by this many px (tilts as the fish comes close)
+var _fish_id := ""
+var _flex_phase := 0.0            ## tail-beat phase of a jumping or lifted fish
+var _tired_t := 3.0
+var _prev_x := 0.0
+var _lat_v := 0.0                 ## m/s sideways speed of the fish, for its wake on the surface
 var _tip := ROD_REST
 var _tip_v := Vector2.ZERO
 var _reel_angle := 0.0
@@ -123,8 +136,9 @@ func begin_cast() -> void:
 	_ripples.clear()
 	_spray.clear()
 	phase = "fly"
-	_tip = Vector2(980.0, 40.0)
-	_tip_v = Vector2(-1600.0, 900.0)
+	_pitch = REST_PITCH
+	_tip = Vector2(980.0, 20.0)
+	_tip_v = Vector2(-1700.0, 1000.0)
 
 
 func is_open() -> bool:
@@ -134,6 +148,9 @@ func is_open() -> bool:
 ## Hooked fish: keep the view, load the fish look (sprite, length) for jumps and the catch.
 func begin(fish_id: String, weight_kg: float, cast_dist_m: float) -> void:
 	super.begin(fish_id, weight_kg, cast_dist_m)
+	_fish_id = fish_id
+	_tired_t = 3.0
+	_prev_x = target_x
 	_open = true
 	phase = "fight"
 	_jump = {}
@@ -162,12 +179,36 @@ func surface(kind_name: String) -> void:
 		"vh": _rng.randf_range(3.2, 4.6) * (1.0 - 0.4 * big), "vx": _rng.randf_range(-1.5, 1.5)}
 	_spray_at(_proj(target_x, target_z, 0.0), 22, 1.4)
 	_add_ripple(target_x, target_z, 1.4)
+	var vol := _near_volume(target_z)
+	if kind_name == "jump":
+		sfx.emit("exit", vol)
+		sfx.emit("drips", vol * 0.6)
+	else:
+		sfx.emit("splash", vol * 0.8)
 
+
+## Louder when the fish is close.
+func _near_volume(z: float) -> float:
+	return clampf(1.3 - z / 45.0, 0.25, 1.0)
+
+
+## Nearest distance (m) where the line can meet the water: the water's edge, or the closest point
+## the view can still show when looking down from a pier or bridge.
+func _z_min() -> float:
+	var edge: float = EDGE_M.get(kind, 4.0)
+	if on_pier:
+		edge = 2.0
+	var view_min := F * eye_h / (PITCH_MAX + 560.0 - HY)
+	return maxf(edge + 0.4, view_min)
+
+
+func _z_edge() -> float:
+	return 2.0 if on_pier else float(EDGE_M.get(kind, 4.0))
 
 # ---------------------------------------------------------------- projection helpers
 func _proj(x: float, z: float, h: float) -> Vector2:
 	var zz := maxf(z, 0.6)
-	return Vector2(CX + F * x / zz, HY + F * (eye_h - h) / zz)
+	return Vector2(CX + F * x / zz, HY - _pitch + F * (eye_h - h) / zz)
 
 
 func _add_ripple(x: float, z: float, size: float) -> void:
@@ -199,6 +240,20 @@ func _process(delta: float) -> void:
 	_canvas.visible = true
 	_canvas.modulate = Color(1.0, 1.0, 1.0, _alpha)
 	_time += delta
+	_flex_phase += delta * 22.0
+	if phase == "fly":
+		target_z = maxf(target_z, 2.0)
+	elif phase != "off":
+		target_z = maxf(target_z, _z_min())
+	# Look down as the line end comes close, so it stays in view; back to rest for the catch.
+	var want := REST_PITCH
+	if phase == "float" or phase == "fight":
+		var raw := HY + F * eye_h / target_z
+		want = clampf(raw - 520.0, REST_PITCH, PITCH_MAX)
+	_pitch = lerpf(_pitch, want, 1.0 - exp(-2.5 * delta))
+	if phase == "fight":
+		_lat_v = lerpf(_lat_v, (target_x - _prev_x) / maxf(delta, 0.001), 1.0 - exp(-4.0 * delta))
+	_prev_x = target_x
 	if _catch_t > 0.0:
 		_catch_t -= delta
 		_animate_catch(delta)
@@ -246,6 +301,12 @@ func _step_water_life(delta: float) -> void:
 			_add_ripple(target_x, target_z, 0.7)
 			if fishing != null and fishing._burst_mult > 1.0:
 				_spray_at(_proj(target_x, target_z, 0.0), 6, 0.6)
+		# A tired fish near the edge comes up and thrashes or rolls, as real fish do before landing.
+		if fishing != null and fishing.stamina < 0.4 and target_z < _z_min() + 8.0 and _creature == "":
+			_tired_t -= delta
+			if _tired_t <= 0.0:
+				_tired_t = _rng.randf_range(2.0, 4.0)
+				surface("thrash" if _rng.randf() < 0.6 else "roll")
 	_prev_dip = float_dip
 	for c in _clouds:
 		var p: Vector2 = c["pos"]
@@ -291,9 +352,14 @@ func _step_jump(delta: float) -> void:
 		_jump["x"] = float(_jump["x"]) + float(_jump["vx"]) * delta
 		if float(_jump["h"]) <= 0.0 and vh < 0.0:
 			var p := _proj(float(_jump["x"]), float(_jump["z"]), 0.0)
-			_spray_at(p, 26, 1.5)
+			_spray_at(p, 30, 1.6)
 			_add_ripple(float(_jump["x"]), float(_jump["z"]), 1.8)
+			sfx.emit("splash_big", _near_volume(float(_jump["z"])))
 			_jump = {}
+		elif _rng.randf() < delta * 30.0:
+			# water streaming off the fish in the air
+			var pf := _proj(float(_jump["x"]), float(_jump["z"]), float(_jump["h"]))
+			_spray.append(Noc.Particle.new(pf, Vector2(_rng.randf_range(-30.0, 30.0), _rng.randf_range(-20.0, 40.0)), 0.0, 0.0, 0.6, _rng.randf_range(1.0, 2.5), Color(0.9, 0.97, 1.0, 0.9)))
 	else:
 		_jump["h"] = sin(minf(t / 0.8, 1.0) * PI) * (0.18 if k == "thrash" else 0.06)
 		if _rng.randf() < delta * 20.0:
@@ -324,7 +390,7 @@ func _step_particles(delta: float) -> void:
 
 ## Landed: the fish swings up into view on the line, a pendulum on a spring, dripping water.
 func _animate_catch(delta: float) -> void:
-	var target := Vector2(560.0, 360.0)
+	var target := Vector2(540.0, 380.0)
 	var acc := (target - _fish_pos) * 26.0 - _lift_v * 6.0
 	_lift_v += acc * delta
 	_fish_pos += _lift_v * delta
@@ -349,9 +415,11 @@ func _draw_view() -> void:
 	var day := daylight
 	var night := 1.0 - day
 	var dusk := clampf(1.0 - absf(day - 0.4) / 0.35, 0.0, 1.0) * 0.8
+	var hy := HY - _pitch
+	c.draw_set_transform(Vector2(0.0, -_pitch), 0.0, Vector2.ONE)
 	var sky_top := Color(0.30, 0.56, 0.88).lerp(Color(0.02, 0.03, 0.10), night).lerp(Color(0.32, 0.30, 0.55), dusk * 0.5)
 	var sky_low := Color(0.80, 0.89, 0.97).lerp(Color(0.08, 0.10, 0.22), night).lerp(Color(1.0, 0.62, 0.40), dusk)
-	c.draw_polygon(PackedVector2Array([Vector2(0, 0), Vector2(W, 0), Vector2(W, HY), Vector2(0, HY)]),
+	c.draw_polygon(PackedVector2Array([Vector2(0, -10.0), Vector2(W, -10.0), Vector2(W, HY), Vector2(0, HY)]),
 		PackedColorArray([sky_top, sky_top, sky_low, sky_low]))
 	if night > 0.3:
 		for i in _stars.size():
@@ -370,6 +438,7 @@ func _draw_view() -> void:
 	c.draw_colored_polygon(_coast_far, haze.darkened(0.12))
 	c.draw_colored_polygon(_coast_near, haze.darkened(0.28).lerp(Color(0.25, 0.33, 0.28), 0.35 * day))
 	_draw_town(night)
+	c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	# Sea.
 	var wcol: Dictionary = spot.get("water", {})
@@ -377,13 +446,15 @@ func _draw_view() -> void:
 	var deep: Color = wcol.get("deep", Color(0.02, 0.15, 0.32))
 	var far_sea := sky_low.lerp(deep, 0.55).darkened(0.1 * night)
 	var near_sea := deep.lerp(shallow, 0.35).darkened(0.55 * night)
-	c.draw_polygon(PackedVector2Array([Vector2(0, HY), Vector2(W, HY), Vector2(W, H), Vector2(0, H)]),
+	c.draw_polygon(PackedVector2Array([Vector2(0, hy), Vector2(W, hy), Vector2(W, H), Vector2(0, H)]),
 		PackedColorArray([far_sea, far_sea, near_sea, near_sea]))
 	_draw_glitter(day, night, dusk)
 	_draw_waves(night)
 	_draw_boats(night)
 	_draw_ripples()
 	_draw_target()
+	_draw_line_entry()
+	_draw_surfacing()
 	_draw_foreground(night)
 	_draw_neighbours(night)
 	for p in _spray:
@@ -489,7 +560,7 @@ func _draw_waves(night: float) -> void:
 	for row in WAVE_ROWS:
 		z *= 1.22
 		var base := _proj(0.0, z, 0.0).y
-		if base < HY + 2.0:
+		if base < HY - _pitch + 2.0:
 			break
 		var near := clampf(6.0 / z, 0.0, 1.0)
 		var amp := (0.10 + 0.05 * wave_amp) * F / z * 0.12 * wave_amp
@@ -569,30 +640,18 @@ func _draw_target() -> void:
 	elif phase == "fly":
 		var p2 := _proj(target_x, target_z, target_h)
 		c.draw_circle(p2, clampf(F * 0.04 / target_z, 2.0, 8.0), Color(1.0, 0.3, 0.2))
-	elif phase == "fight" and not _jump.is_empty() and _fish_tex != null:
-		var z: float = _jump["z"]
-		var p3 := _proj(float(_jump["x"]), z, float(_jump["h"]))
-		var len_px := F * _fish_len_m() / z
-		var sc := len_px / 100.0
-		var k := String(_jump["kind"])
-		var rot := 0.0
-		if k == "jump":
-			rot = -atan2(float(_jump["vh"]), 3.0) * 0.8
-		else:
-			rot = sin(float(_jump["t"]) * 26.0) * 0.5
-		var dir := 1.0 if float(_jump["vx"]) >= 0.0 else -1.0
-		var col := _fish_tint
-		if k == "roll":
-			col.a = 0.75
-		_draw_sprite(_fish_tex, p3, Vector2(sc * dir, sc), rot * dir, col)
 
 
 func _draw_foreground(night: float) -> void:
 	var c := _canvas
 	var dark := 0.55 * night
+	var edge_y := _proj(0.0, _z_edge(), 0.0).y
+	if edge_y > H + 40.0:
+		return
+	c.draw_set_transform(Vector2(0.0, edge_y - 666.0), 0.0, Vector2.ONE)
 	match kind:
 		"bridge":
-			c.draw_rect(Rect2(0.0, 660.0, W, 60.0), Color(0.42, 0.42, 0.44).darkened(dark))
+			c.draw_rect(Rect2(0.0, 660.0, W, 400.0), Color(0.42, 0.42, 0.44).darkened(dark))
 			c.draw_rect(Rect2(0.0, 640.0, W, 10.0), Color(0.30, 0.32, 0.34).darkened(dark))
 			var x := 20.0
 			while x < W:
@@ -600,27 +659,28 @@ func _draw_foreground(night: float) -> void:
 				x += 90.0
 			c.draw_rect(Rect2(0.0, 596.0, W, 7.0), Color(0.35, 0.37, 0.40).darkened(dark))
 		"harbor":
-			c.draw_rect(Rect2(0.0, 670.0, W, 50.0), Color(0.62, 0.60, 0.56).darkened(dark))
+			c.draw_rect(Rect2(0.0, 670.0, W, 400.0), Color(0.62, 0.60, 0.56).darkened(dark))
 			c.draw_rect(Rect2(0.0, 664.0, W, 8.0), Color(0.75, 0.73, 0.68).darkened(dark))
 			c.draw_circle(Vector2(180.0, 668.0), 16.0, Color(0.2, 0.2, 0.22).darkened(dark))
 			_draw_foam(662.0, night)
 		"beach":
 			var sand := Color(0.86, 0.78, 0.60).darkened(dark)
-			var pts := PackedVector2Array([Vector2(0.0, H)])
+			var pts := PackedVector2Array([Vector2(0.0, H + 400.0)])
 			var x2 := 0.0
 			while x2 <= W:
 				pts.append(Vector2(x2, 668.0 + sin(x2 * 0.01) * 8.0))
 				x2 += 40.0
-			pts.append(Vector2(W, H))
+			pts.append(Vector2(W, H + 400.0))
 			c.draw_colored_polygon(pts, sand)
 			_draw_foam(664.0, night)
 		_:
 			_draw_rocks(night)
 			_draw_foam(670.0, night)
 	if on_pier:
-		c.draw_rect(Rect2(0.0, 690.0, W, 30.0), Color(0.50, 0.37, 0.24).darkened(dark))
-		for i in 5:
-			c.draw_line(Vector2(0.0, 694.0 + float(i) * 6.0), Vector2(W, 694.0 + float(i) * 6.0), Color(0.38, 0.27, 0.17).darkened(dark), 1.5)
+		c.draw_rect(Rect2(0.0, 690.0, W, 300.0), Color(0.50, 0.37, 0.24).darkened(dark))
+		for i in 12:
+			c.draw_line(Vector2(0.0, 694.0 + float(i) * 14.0), Vector2(W, 694.0 + float(i) * 14.0), Color(0.38, 0.27, 0.17).darkened(dark), 2.0)
+	c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## Foam where the water meets the near edge: a line that washes up and back on an oscillator.
@@ -641,6 +701,7 @@ func _draw_rocks(night: float) -> void:
 	c.draw_circle(Vector2(230.0, 760.0), 95.0, col.lightened(0.06))
 	c.draw_circle(Vector2(1220.0, 750.0), 130.0, col.darkened(0.05))
 	c.draw_circle(Vector2(640.0, 800.0), 140.0, col.lightened(0.03))
+	c.draw_rect(Rect2(0.0, 760.0, W, 400.0), col)
 	c.draw_circle(Vector2(40.0, 690.0), 30.0, col.lightened(0.15))
 
 
@@ -657,7 +718,7 @@ func _draw_neighbours(night: float) -> void:
 		var t2 := tip + Vector2(0.0, nod + bend * 50.0)
 		var ctrl := base.lerp(t2, 0.5) + Vector2(-10.0, 0.0) + Vector2(0.0, bend * 30.0)
 		_canvas.draw_polyline(_bezier(base, ctrl, t2, 10), col, 3.0, true)
-		var entry := Vector2(t2.x + 40.0 + bend * 20.0, HY + 70.0 + float(n["phase"]) * 8.0)
+		var entry := Vector2(t2.x + 40.0 + bend * 20.0, HY - _pitch + 70.0 + float(n["phase"]) * 8.0)
 		_canvas.draw_line(t2, entry, Color(1.0, 1.0, 1.0, 0.25), 1.0)
 
 
@@ -669,7 +730,8 @@ func _bezier(a: Vector2, ctrl: Vector2, b: Vector2, n: int) -> PackedVector2Arra
 	return pts
 
 
-## Your rod: tapered blank bending on a curve toward the line, a spinning reel, your hands.
+## Your rod seen from just behind your hands: tapered blank bending toward the line, guides, a
+## spinning reel under it (spool with line, bail arm, handle you turn while reeling), your hands.
 func _draw_rod_and_line(night: float) -> void:
 	var c := _canvas
 	var tip := _tip
@@ -677,45 +739,147 @@ func _draw_rod_and_line(night: float) -> void:
 	var bend := clampf((tip - ROD_REST).length() / 160.0, 0.0, 1.2)
 	var dir := (tip - ROD_BASE).normalized()
 	var ctrl := ROD_BASE.lerp(tip, 0.55) + dir.orthogonal() * (-30.0 - 90.0 * bend)
-	var pts := _bezier(ROD_BASE, ctrl, tip, 16)
+	var pts := _bezier(ROD_BASE, ctrl, tip, 18)
+	var dim := lerpf(1.0, 0.45, night)
 
-	# Line: sags when slack, straight when tight.
+	# Line: sags when slack, straight when tight; from the tip down to the water.
 	if phase != "off" or _catch_t > 0.0:
 		var to := line_end if _catch_t <= 0.0 else _fish_pos + Vector2(-30.0, -10.0)
 		var sag := (1.0 - clampf(tension * 2.0, 0.0, 1.0)) * 50.0
 		if phase == "fly":
 			sag = 15.0
 		var mid := tip.lerp(to, 0.5) + Vector2(0.0, sag)
-		c.draw_polyline(_bezier(tip, mid, to, 14), Color(1.0, 1.0, 1.0, 0.75 - 0.3 * night), 1.4, true)
+		c.draw_polyline(_bezier(tip, mid, to, 16), Color(1.0, 1.0, 1.0, 0.8 - 0.3 * night), 1.5, true)
+		# The line also runs back along the rod through the guides to the spool.
+		c.draw_polyline(PackedVector2Array([pts[18], pts[15], pts[11], pts[7], pts[4]]), Color(1.0, 1.0, 1.0, 0.45), 1.0, true)
 
-	var blank := Color(0.10, 0.12, 0.16)
+	# Blank: carbon, tapering, with a highlight; cork grip at the butt.
 	for i in pts.size() - 1:
-		var w := lerpf(15.0, 3.0, float(i) / float(pts.size() - 1))
-		c.draw_line(pts[i], pts[i + 1], blank, w)
-		c.draw_line(pts[i] + Vector2(-1.5, -1.5), pts[i + 1] + Vector2(-1.5, -1.5), Color(0.5, 0.55, 0.65, 0.5), w * 0.25)
-	# Guides along the blank.
-	for gi in [5, 9, 12, 15]:
-		c.draw_circle(pts[gi], lerpf(6.0, 3.0, float(gi) / 16.0), Color(0.75, 0.75, 0.78))
-	# Reel under the rod.
-	var rp := pts[2] + Vector2(10.0, 38.0)
-	c.draw_line(pts[2], rp, Color(0.25, 0.25, 0.28), 6.0)
-	c.draw_circle(rp, 30.0, Color(0.20, 0.22, 0.26))
-	c.draw_circle(rp, 20.0, Color(0.55, 0.58, 0.62))
-	var hd := Vector2.from_angle(_reel_angle) * 30.0
-	c.draw_line(rp, rp + hd, Color(0.15, 0.15, 0.17), 5.0)
-	c.draw_circle(rp + hd, 7.0, Color(0.85, 0.75, 0.40))
-	# Hands and sleeves.
-	var skin := Color(0.92, 0.74, 0.58).darkened(0.4 * night)
-	var sleeve := Color(0.18, 0.32, 0.55).darkened(0.4 * night)
-	c.draw_line(Vector2(1180.0, H + 40.0), pts[1] + Vector2(10.0, 12.0), sleeve, 46.0)
-	c.draw_circle(pts[1] + Vector2(4.0, 6.0), 21.0, skin)
-	c.draw_line(Vector2(930.0, H + 60.0), rp + hd + Vector2(0.0, 22.0), sleeve, 40.0)
-	c.draw_circle(rp + hd + Vector2(2.0, 6.0), 17.0, skin)
+		var w := lerpf(16.0, 3.0, float(i) / float(pts.size() - 1))
+		var col := Color(0.10, 0.12, 0.16) if i > 3 else Color(0.62, 0.48, 0.32) * Color(dim, dim, dim)
+		c.draw_line(pts[i], pts[i + 1], col, w)
+		if i > 3:
+			c.draw_line(pts[i] + Vector2(-1.5, -1.5), pts[i + 1] + Vector2(-1.5, -1.5), Color(0.55, 0.60, 0.70, 0.5 * dim), w * 0.25)
+	for gi in [7, 11, 15, 17]:
+		var gp: Vector2 = pts[gi]
+		var gr := lerpf(9.0, 3.0, float(gi) / 18.0)
+		c.draw_arc(gp + Vector2(0.0, gr * 0.8), gr, 0.0, TAU, 12, Color(0.78, 0.78, 0.82), 2.0)
+		c.draw_line(gp, gp + Vector2(0.0, gr * 0.4), Color(0.6, 0.6, 0.65), 2.0)
+
+	# Spinning reel hanging under the reel seat.
+	var seat := pts[4]
+	var body := seat + Vector2(8.0, 58.0)
+	var steel := Color(0.30, 0.32, 0.36) * Color(dim, dim, dim)
+	var bright := Color(0.70, 0.72, 0.76) * Color(dim, dim, dim)
+	c.draw_line(seat, body + Vector2(0.0, -20.0), steel, 9.0)                      # foot and stem
+	c.draw_circle(body, 30.0, steel)                                                # gear housing
+	c.draw_circle(body + Vector2(-6.0, -4.0), 22.0, steel.lightened(0.12))
+	var spool_c := body + Vector2(-44.0, -18.0)
+	c.draw_set_transform(spool_c, dir.angle() + PI, Vector2.ONE)
+	c.draw_rect(Rect2(-20.0, -17.0, 40.0, 34.0), bright)                            # spool
+	for k in 7:
+		var y := -13.0 + float(k) * 4.3
+		c.draw_line(Vector2(-18.0, y), Vector2(18.0, y + 1.0), Color(0.92, 0.92, 0.88, 0.8), 1.2)   # line wraps
+	c.draw_rect(Rect2(-24.0, -20.0, 6.0, 40.0), steel.lightened(0.2))
+	c.draw_arc(Vector2(10.0, 0.0), 24.0, -1.6, 1.6, 12, Color(0.85, 0.85, 0.88), 2.5) # bail arm
+	c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# Handle: the arm turns in a circle while you reel; seen at an angle it traces an ellipse.
+	var hd := Vector2(cos(_reel_angle) * 34.0, sin(_reel_angle) * 14.0)
+	var knob := body + Vector2(26.0, 6.0) + hd
+	c.draw_line(body + Vector2(26.0, 6.0), knob, steel.darkened(0.2), 6.0)
+	c.draw_circle(knob, 9.0, Color(0.15, 0.15, 0.17))
+
+	# Hands and forearms: right hand round the seat, left hand on the reel knob.
+	var skin := Color(0.92, 0.74, 0.58) * Color(dim, dim, dim)
+	var sleeve := Color(0.18, 0.32, 0.55) * Color(dim, dim, dim)
+	c.draw_line(Vector2(1250.0, H + 60.0), seat + Vector2(26.0, 10.0), sleeve, 54.0)
+	c.draw_circle(seat + Vector2(10.0, 4.0), 24.0, skin)
+	c.draw_circle(seat + Vector2(-8.0, 10.0), 10.0, skin.darkened(0.08))
+	c.draw_line(Vector2(880.0, H + 80.0), knob + Vector2(6.0, 24.0), sleeve.darkened(0.08), 46.0)
+	c.draw_circle(knob + Vector2(4.0, 10.0), 19.0, skin)
+
+
+## In the fight the line cuts the water: a V wake trails the entry point when the fish swims across.
+func _draw_line_entry() -> void:
+	if phase != "fight" or not _jump.is_empty():
+		return
+	var p := _proj(target_x, target_z, 0.0)
+	var speed := clampf(absf(_lat_v) / 3.0, 0.0, 1.0)
+	var back := -signf(_lat_v)
+	var arm := (8.0 + 40.0 * speed) * F / 900.0 * clampf(12.0 / target_z, 0.3, 2.0)
+	var ry := clampf(eye_h / target_z, 0.08, 0.5)
+	var col := Color(1.0, 1.0, 1.0, 0.25 + 0.5 * speed)
+	_canvas.draw_line(p, p + Vector2(back * arm, -arm * ry), col, 1.5)
+	_canvas.draw_line(p, p + Vector2(back * arm, arm * ry), col, 1.5)
+	_ellipse_line(p, Vector2(4.0 + 6.0 * tension, 1.5 + 2.0 * tension), Color(1.0, 1.0, 1.0, 0.6), 1.5)
+
+
+## The fish when it shows itself: leaping clear, thrashing half out with its head shaking, or
+## rolling so only its back and dorsal fin break the surface.
+func _draw_surfacing() -> void:
+	if phase != "fight" or _jump.is_empty() or _creature != "":
+		return
+	var z: float = _jump["z"]
+	var hgt: float = _jump["h"]
+	var p := _proj(float(_jump["x"]), z, hgt)
+	var len_px := F * _fish_len_m() / z
+	var k := String(_jump["kind"])
+	var t: float = _jump["t"]
+	var dir := 1.0 if float(_jump["vx"]) >= 0.0 else -1.0
+	var water := _proj(float(_jump["x"]), z, 0.0)
+	match k:
+		"jump":
+			var vh: float = _jump["vh"]
+			var rot := -atan2(vh, 3.5) * 0.9 + sin(t * 32.0) * 0.18 * clampf(1.0 - absf(vh) / 3.0, 0.0, 1.0)
+			RealFish.draw(_canvas, _fish_id, p, len_px, rot * dir, dir, _flex_phase, 0.9, daylight, 1.0)
+			# a sheet of water torn up behind it in the first moments
+			if t < 0.25:
+				_ellipse_line(water, Vector2(len_px * 0.5, len_px * 0.12), Color(1.0, 1.0, 1.0, 0.8 - t * 3.0), 3.0)
+		"thrash":
+			var rot2 := sin(t * 28.0) * 0.45 - 0.25
+			RealFish.draw(_canvas, _fish_id, water + Vector2(0.0, -len_px * 0.08), len_px, rot2 * dir, dir, _flex_phase * 1.3, 1.0, daylight, 1.0)
+			_cover_with_water(water, len_px, 0.55)
+			for i in 3:
+				_ellipse_line(water, Vector2(len_px * (0.5 + 0.15 * float(i)), len_px * (0.10 + 0.03 * float(i))), Color(1.0, 1.0, 1.0, 0.7 - 0.2 * float(i)), 2.5)
+		_:
+			var arc := sin(clampf(t / 0.8, 0.0, 1.0) * PI)
+			var back_c: Color = RealFish.look(_fish_id)["back"]
+			var pts := PackedVector2Array()
+			for i in 13:
+				var u := float(i) / 12.0
+				pts.append(water + Vector2((u - 0.5) * len_px * 0.8 * dir, -sin(u * PI) * len_px * 0.12 * arc))
+			_canvas.draw_polyline(pts, back_c.darkened(0.2), maxf(3.0, len_px * 0.06), true)
+			var fin_at := water + Vector2(len_px * 0.05 * dir, -len_px * 0.12 * arc)
+			_canvas.draw_colored_polygon(PackedVector2Array([fin_at + Vector2(-len_px * 0.08 * dir, 0.0), fin_at + Vector2(0.0, -len_px * 0.14 * arc), fin_at + Vector2(len_px * 0.06 * dir, 0.0)]), back_c.darkened(0.35))
+			_ellipse_line(water, Vector2(len_px * 0.55, len_px * 0.1), Color(1.0, 1.0, 1.0, 0.5), 2.0)
+
+
+## Hides the lower part of a fish at the surface under a band of water with a foam edge.
+func _cover_with_water(at: Vector2, len_px: float, depth_frac: float) -> void:
+	var wcol: Dictionary = spot.get("water", {})
+	var deep: Color = wcol.get("deep", Color(0.02, 0.15, 0.32))
+	var shallow: Color = wcol.get("shallow", Color(0.12, 0.70, 0.78))
+	var sea := deep.lerp(shallow, 0.3).darkened(0.5 * (1.0 - daylight))
+	var w := len_px * 0.75
+	var top := at.y + len_px * 0.02
+	_canvas.draw_rect(Rect2(at.x - w, top, w * 2.0, len_px * depth_frac), Color(sea.r, sea.g, sea.b, 0.92))
+	_canvas.draw_line(Vector2(at.x - w, top), Vector2(at.x + w, top), Color(1.0, 1.0, 1.0, 0.8), 3.0)
 
 
 func _draw_caught_fish() -> void:
-	var sc := clampf(_fish_len_m(), 0.2, 1.2) * 220.0 / 100.0
+	var len_px := clampf(_fish_len_m(), 0.18, 1.3) * 300.0
 	if _creature != "":
-		_draw_creature(_creature, _fish_pos, _facing, _tilt, sc * 0.9, Color.WHITE)
-	elif _fish_tex != null:
-		_draw_sprite(_fish_tex, _fish_pos, Vector2(sc * _facing, sc), _tilt + PI * 0.5 * 0.2, _fish_tint)
+		_draw_creature(_creature, _fish_pos, _facing, _tilt, len_px / 160.0, Color.WHITE)
+	else:
+		RealFish.draw(_canvas, _fish_id, _fish_pos, len_px, _tilt - 0.15, _facing, _flex_phase * 0.6, 0.5 + 0.5 * clampf(_catch_t / 3.4, 0.0, 1.0), daylight, 1.0)
+
+
+## Catch card, with the species drawn as it looks (not a sprite).
+func _draw_card() -> void:
+	var appear := clampf((3.4 - _catch_t) * 4.0, 0.0, 1.0)
+	var rect := Rect2(Vector2(40.0, 120.0 + (1.0 - appear) * 40.0), Vector2(520.0, 300.0))
+	_card.draw(_canvas.get_canvas_item(), rect)
+	var font := ThemeDB.fallback_font
+	_canvas.draw_string(font, rect.position + Vector2(24.0, 50.0), _catch_title, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 48.0, 30, Color(1.0, 0.92, 0.6))
+	for i in _catch_lines.size():
+		_canvas.draw_string(font, rect.position + Vector2(24.0, 94.0 + float(i) * 32.0), _catch_lines[i], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 48.0, 22, Color.WHITE)

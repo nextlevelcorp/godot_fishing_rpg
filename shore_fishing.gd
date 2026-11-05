@@ -227,6 +227,7 @@ func _ready() -> void:
 	_fight_view.fishing = _fishing
 	_fight_view.spot = _spot
 	_fight_view.kind = String(_spot["kind"])
+	_fight_view.sfx.connect(func(k: String, v: float) -> void: _amb.play(k, v))
 	add_child(_fight_view)
 	_build_vignette()
 	_build_hud()
@@ -975,7 +976,7 @@ func _hook_fish() -> void:
 	_fight_hint = ""
 	_buzz(120)
 	_amb.play("strike", 1.0)
-	_amb.play("splash", 0.8)
+	_amb.play("splash_big", 0.6)
 	_splash(_bobber_pos, 1.2)
 	_show_fight_ui(true)
 	_fight_view.begin(_fish_id, _weight_kg, _cast_dist_m)
@@ -1211,6 +1212,7 @@ func _on_caught(id: String, weight_kg: float) -> void:
 	_result_label.text = ""
 	_set_status("Nice one")
 	_amb.play("splash", 0.7)
+	_amb.play("drips", 0.8)
 	_end_fight(true)
 
 
@@ -1421,11 +1423,8 @@ func _process(delta: float) -> void:
 	_world.wind = _wind
 	_world.view_x = _cam.position.x
 	_amb.gull_rate = 0.02 + 0.08 * _world.daylight
-	if _state == State.FIGHT and Input.is_action_pressed(&"reel_in"):
-		_reel_click -= delta
-		if _reel_click <= 0.0:
-			_reel_click = 0.06
-			_amb.play("click", 0.5)
+	var cranking := Input.is_action_pressed(&"reel_in") and (_state == State.FIGHT or _state == State.WAIT)
+	_amb.set_loop("reel", cranking, 0.45 + 0.4 * clampf(_tension_ratio, 0.0, 1.0) if _state == State.FIGHT else 0.35)
 	_tint.color = _world.tint(_region_tint())
 	_fight_view.tint = _tint.color
 	_fight_view.daylight = _world.daylight
