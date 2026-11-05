@@ -92,6 +92,9 @@ var _small_fish: Array = []
 var _bed_items: Array[Dictionary] = []
 # catch presentation: the fish is lifted from the water on a spring, flapping, dripping water
 var _catch_t := 0.0
+## Surfacing event: the fish is hidden underwater and only seen when it jumps, thrashes or rolls.
+## {kind, t, vel, pos, rot}. The jump is a projectile (gravity), the others are oscillations.
+var _surf: Dictionary = {}
 var _catch_title := ""
 var _catch_lines := PackedStringArray()
 var _lift_v := Vector2.ZERO
@@ -171,13 +174,78 @@ func begin(fish_id: String, weight_kg: float, cast_dist_m: float) -> void:
 		var names := ["fish_grey", "fish_blue", "fish_green", "fish_pink"]
 		v.data = {"tex": names[i % names.size()], "scale": _rng.randf_range(0.28, 0.42)}
 		_small_fish.append(v)
+	_surf = {}
 	_active = true
 	_canvas.visible = true
+
+
+## The fish breaks the surface: kind is "jump", "thrash" or "roll" (see BiomeDB.FIGHT_STYLES).
+func surface(kind: String) -> void:
+	if _creature != "" or not _surf.is_empty():
+		return
+	var big := clampf(_fish_len / 220.0, 0.0, 1.0)
+	_surf = {"kind": kind, "t": 0.0, "pos": Vector2(_fish_pos.x, SURFACE_Y + 6.0),
+		"vel": Vector2(-_facing * _rng.randf_range(40.0, 140.0), -_rng.randf_range(520.0, 760.0) * (1.0 - 0.45 * big)),
+		"rot": 0.0}
+	for i in 5:
+		_spawn_bubble(Vector2(_fish_pos.x + _rng.randf_range(-20.0, 20.0), SURFACE_Y + 4.0), 1.2)
+
+
+func _update_surface(delta: float) -> void:
+	if _surf.is_empty():
+		return
+	var t: float = float(_surf["t"]) + delta
+	_surf["t"] = t
+	var pos: Vector2 = _surf["pos"]
+	var kind: String = _surf["kind"]
+	if kind == "jump":
+		var vel: Vector2 = _surf["vel"]
+		vel.y += 1500.0 * delta
+		pos += vel * delta
+		_surf["vel"] = vel
+		_surf["pos"] = pos
+		_surf["rot"] = atan2(vel.y, maxf(absf(vel.x), 60.0)) * 0.6 * signf(vel.x if absf(vel.x) > 1.0 else 1.0)
+		if pos.y > SURFACE_Y + 6.0 and vel.y > 0.0:
+			_splash_at(pos.x)
+			_surf = {}
+	else:
+		_surf["rot"] = sin(t * 26.0) * 0.5
+		pos.y = SURFACE_Y + 4.0 - sin(minf(t / 0.7, 1.0) * PI) * (14.0 if kind == "thrash" else 6.0)
+		_surf["pos"] = pos
+		if t >= 0.7:
+			_splash_at(pos.x)
+			_surf = {}
+
+
+func _update_drips(delta: float) -> void:
+	var keep: Array = []
+	for d in _drips:
+		d.vel += Vector2(0.0, 900.0) * delta
+		d.pos += d.vel * delta
+		d.age += delta
+		if not d.dead() and not (d.pos.y > SURFACE_Y and d.vel.y > 0.0):
+			keep.append(d)
+	_drips = keep
+
+
+func _make_drip(pos: Vector2) -> Noc.Particle:
+	return Noc.Particle.new(pos, Vector2(_rng.randf_range(-90.0, 90.0), -_rng.randf_range(80.0, 260.0)), 0.0, 0.0, 1.0, _rng.randf_range(2.0, 4.5), Color(0.85, 0.96, 1.0, 0.9))
+
+
+func _splash_at(x: float) -> void:
+	for i in 8:
+		_drips.append(_make_drip(Vector2(x, SURFACE_Y)))
+
+
+## True while the fish may be drawn: caught and lifted, or showing itself at the surface.
+func _fish_visible() -> bool:
+	return _catch_t > 0.0 or not _surf.is_empty()
 
 
 ## Fades the side view out (the top-down scene shows the result).
 func end() -> void:
 	_active = false
+	_surf = {}
 	_catch_t = 0.0
 
 
@@ -217,6 +285,8 @@ func _process(delta: float) -> void:
 			_active = false
 	elif fishing != null and _active:
 		_simulate(delta)
+		_update_surface(delta)
+		_update_drips(delta)
 	_update_bubbles(delta)
 	_update_ambient(delta)
 	_canvas.queue_redraw()
@@ -257,7 +327,7 @@ func _simulate(delta: float) -> void:
 	var target := lerpf(_depth_range.x, _depth_range.y, drift)
 	var running := fishing._burst_mult > 1.0
 	if running:
-		target += 4.0
+		target += fishing.style_dive_m
 	target = lerpf(1.0, target, clampf(fishing.stamina * 1.4, 0.0, 1.0))
 	if dist < 4.0:
 		target = lerpf(0.3, target, dist / 4.0)
@@ -400,10 +470,15 @@ func _draw_view() -> void:
 	_draw_shore()
 	c.draw_polyline(_rope.pts, Color(1.0, 1.0, 1.0, 0.9), 2.0, true)
 	var sc := _fish_len / 110.0
-	if _creature != "":
-		_draw_creature(_creature, _fish_pos, _facing, _tilt * _facing, sc, Color.WHITE)
-	elif _fish_tex != null:
-		_draw_sprite(_fish_tex, _fish_pos, Vector2(sc * _facing, sc), _tilt * _facing, _fish_tint)
+	if _catch_t > 0.0:
+		if _creature != "":
+			_draw_creature(_creature, _fish_pos, _facing, _tilt * _facing, sc, Color.WHITE)
+		elif _fish_tex != null:
+			_draw_sprite(_fish_tex, _fish_pos, Vector2(sc * _facing, sc), _tilt * _facing, _fish_tint)
+	elif not _surf.is_empty() and _fish_tex != null:
+		var sp: Vector2 = _surf["pos"]
+		var sd := -signf(float(_surf["vel"].x)) if absf(float(_surf["vel"].x)) > 1.0 else _facing
+		_draw_sprite(_fish_tex, sp, Vector2(sc * sd, sc), float(_surf["rot"]) * sd, _fish_tint)
 	for b in _bubbles:
 		var bt: Texture2D = _tex.get("bubble_a", null)
 		if bt != null:

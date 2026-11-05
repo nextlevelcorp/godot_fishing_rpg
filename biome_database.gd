@@ -30,6 +30,38 @@ const BAITS := {
 	"sinking_stickbait": {"name": "Sinking Stickbait", "kind": "lure", "bite_bonus": 0.95},
 }
 
+# ---------------------------------------------------------------- FIGHT STYLES
+# How a hooked fish fights, by family of behaviour (game-design fill from general angling knowledge).
+#   run_len / run_gap / run_pull   multipliers on the species burst length, gap between runs and run strength
+#   surface                        what the angler sees when a run ends: "jump" (clears the water),
+#                                  "thrash" (head and tail break the surface), "roll" (back or flank turns
+#                                  at the surface), "" (never shows itself)
+#   surface_chance                 chance per run, for the smallest fish of the species; big fish show less
+#   dive                           extra metres the fish dives during a run
+const FIGHT_STYLES := {
+	"puller": {"run_len": 1.0, "run_gap": 1.0, "run_pull": 1.0, "surface": "roll", "surface_chance": 0.25, "dive": 3.0},
+	"jumper": {"run_len": 0.8, "run_gap": 0.8, "run_pull": 1.1, "surface": "jump", "surface_chance": 0.75, "dive": 2.0},
+	"thrasher": {"run_len": 0.7, "run_gap": 0.6, "run_pull": 1.0, "surface": "thrash", "surface_chance": 0.7, "dive": 2.0},
+	"runner": {"run_len": 1.8, "run_gap": 1.2, "run_pull": 1.15, "surface": "roll", "surface_chance": 0.3, "dive": 4.0},
+	"diver": {"run_len": 1.3, "run_gap": 1.0, "run_pull": 1.05, "surface": "", "surface_chance": 0.0, "dive": 7.0},
+	"bulldog": {"run_len": 2.2, "run_gap": 1.6, "run_pull": 0.85, "surface": "", "surface_chance": 0.0, "dive": 8.0},
+	"gentle": {"run_len": 0.6, "run_gap": 1.3, "run_pull": 0.8, "surface": "thrash", "surface_chance": 0.35, "dive": 1.0},
+	"clinger": {"run_len": 0.5, "run_gap": 2.0, "run_pull": 0.7, "surface": "", "surface_chance": 0.0, "dive": 0.5},
+}
+const FISH_STYLE := {
+	"bluefish": "thrasher", "garfish": "jumper", "european_seabass": "jumper", "japanese_seabass": "jumper",
+	"flathead_grey_mullet": "jumper", "peacock_bass": "jumper", "swordfish": "jumper", "spanish_mackerel": "jumper",
+	"atlantic_mackerel": "jumper", "ember_barracuda": "jumper", "atlantic_bonito": "runner",
+	"greater_amberjack": "runner", "giant_trevally": "runner", "leerfish": "runner",
+	"mediterranean_horse_mackerel": "gentle", "japanese_horse_mackerel": "gentle", "european_anchovy": "gentle",
+	"whiting": "gentle", "red_mullet": "gentle", "saddled_bream": "puller", "gilthead_seabream": "puller",
+	"white_seabream": "puller", "striped_sea_bream": "puller", "red_seabream": "diver", "common_dentex": "diver",
+	"black_scorpionfish": "diver", "atlantic_cod": "diver", "haddock": "diver", "dusky_grouper": "bulldog",
+	"lagoon_grouper": "bulldog", "coral_trout": "bulldog", "turbot": "bulldog", "atlantic_halibut": "bulldog",
+	"greater_weever": "diver", "ornate_wrasse": "diver", "common_octopus": "clinger", "common_cuttlefish": "clinger",
+	"european_squid": "clinger", "blue_crab": "clinger",
+}
+
 # ---------------------------------------------------------------- BITE PROFILES
 # How a species takes bait (used by FishInteractionAI). Missing keys fall back to BITE_DEFAULT.
 #   caution          0..1   hesitation before swallowing; high = many light nibbles, slow commit
@@ -295,6 +327,11 @@ func get_bait(id: String) -> Dictionary:
 	return BAITS.get(id, {})
 
 
+## Fight style parameters of a species (see FIGHT_STYLES); "puller" when the species has none listed.
+func get_fight_style(species_id: String) -> Dictionary:
+	return FIGHT_STYLES[FISH_STYLE.get(species_id, "puller")]
+
+
 ## Weather reactions of a species (storm_dive_m, gate_states, open_depth_m), {} if it has none.
 func get_weather_traits(species_id: String) -> Dictionary:
 	return WEATHER_TRAITS.get(species_id, {})
@@ -368,6 +405,11 @@ func validate() -> bool:
 	for sid: String in fish:
 		if not BITE_PROFILES.has(sid):
 			push_warning("[BiomeDB] species '%s' has no bite profile, using BITE_DEFAULT" % sid)
+	for sid: String in FISH_STYLE:
+		if not fish.has(sid):
+			push_error("[BiomeDB] fight style for unknown species '%s'" % sid); ok = false
+		if not FIGHT_STYLES.has(FISH_STYLE[sid]):
+			push_error("[BiomeDB] species '%s' uses unknown fight style '%s'" % [sid, FISH_STYLE[sid]]); ok = false
 	for sid: String in WEATHER_TRAITS:
 		if not fish.has(sid):
 			push_error("[BiomeDB] weather traits for unknown species '%s'" % sid); ok = false

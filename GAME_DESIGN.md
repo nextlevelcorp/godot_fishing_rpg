@@ -50,6 +50,9 @@ Each outing rolls one weather (`weather_fx.gd`, `KINDS`): clear 45%, overcast 25
 ## Night lamp (build 20)
 After dark the angler carries a lamp: a warm, flickering pool of light (two oscillators plus Perlin noise). Standing on the pier at night raises fish activity by 15% (`LAMP_PIER_BONUS`, game-design fill; real pier anglers use lights to draw baitfish). Test: set the clock to night with "+1 hour"; the glow appears, and the quiet-water hint is rarer on the pier than on the beach.
 
+## Fight styles (build 22)
+A hooked fish is no longer drawn during the fight. The angler sees the line, bubbles and the rod bend, and the fish only when it shows itself. `BiomeDB.FIGHT_STYLES` / `FISH_STYLE` give each species a family of behaviour: jumper (clears the water: garfish, seabass, mullet, mackerel), thrasher (bluefish), runner (long fast runs: bonito, amberjack, trevally, leerfish), diver (dives, no surface show: dentex, red seabream), bulldog (dogged heavy pull, never shows: groupers, turbot, halibut), puller (default), gentle (small, light), clinger (cephalopods, crab). Style scales run length, gap, strength and dive depth; bigger fish for their species jump less (surface chance x0.4 at max size) and run 1.5x longer. When a run ends the fish may break the surface (`fish_surfaced`): a jump is a projectile under gravity, a thrash or roll is an oscillation. The catch is still shown when landed. Style assignment is game-design fill from general angling knowledge. Test: hook a bluefish (thrash), a garfish (jump), a dusky grouper (never visible, long pulls); the side view shows no fish between events.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

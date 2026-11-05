@@ -18,6 +18,8 @@ signal tension_updated(tension_n: float, ratio: float, rod_bend: float)
 signal line_snapped(fish_id: String)
 signal fish_caught(fish_id: String, weight_kg: float)
 signal fish_escaped(fish_id: String)
+## The fish shows itself at the surface: kind is "jump", "thrash" or "roll"; dive_m is how deep it ran.
+signal fish_surfaced(kind: String)
 signal telemetry(frame: Dictionary)
 
 @export_group("Rod and Line")
@@ -68,6 +70,9 @@ var _burst_every := Vector2(3.0, 6.0)
 var _burst_mult_range := Vector2(1.5, 2.1)
 var _burst_len := Vector2(0.5, 1.4)
 var _burst_left := 0.0
+var style_dive_m := 3.0           ## metres the fish dives during a run (read by the side view)
+var _style_surface := ""
+var _style_surface_chance := 0.0
 var _burst_cooldown := 2.0
 var _burst_mult := 1.0
 var _rng := RandomNumberGenerator.new()
@@ -104,6 +109,14 @@ func hook_fish(id: String, species: Dictionary, weight_kg: float, start_distance
 	_burst_every = fight["burst_every_s"]
 	_burst_mult_range = fight["burst_mult"]
 	_burst_len = fight["burst_len_s"]
+	# Fight style: families of behaviour, scaled by how big this fish is for its species.
+	var style := BiomeDB.get_fight_style(id)
+	_style_surface = String(style["surface"])
+	style_dive_m = float(style["dive"])
+	_style_surface_chance = float(style["surface_chance"]) * lerpf(1.0, 0.4, size01)   # big fish jump less
+	_burst_len = _burst_len * float(style["run_len"]) * lerpf(1.0, 1.5, size01)        # and run longer
+	_burst_every = _burst_every * float(style["run_gap"])
+	_burst_mult_range = _burst_mult_range * float(style["run_pull"])
 
 	stamina = 1.0
 	tension_n = 0.0
@@ -140,6 +153,8 @@ func _update_fish_behaviour(h: float) -> void:
 		_burst_left -= h
 		if _burst_left <= 0.0:
 			_burst_mult = 1.0
+			if _style_surface != "" and _rng.randf() < _style_surface_chance:
+				fish_surfaced.emit(_style_surface)
 			_burst_cooldown = _rng.randf_range(_burst_every.x, _burst_every.y)
 	else:
 		_burst_cooldown -= h

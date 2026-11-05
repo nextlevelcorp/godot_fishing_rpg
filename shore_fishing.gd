@@ -210,6 +210,7 @@ func _ready() -> void:
 	_fishing.apply_rig(BiomeDB.get_rig(GameSession.rig_id))
 	_fishing.reel_speed_m_s = 3.2             # shore spinning reel: faster retrieve than the boat rig
 	_fishing.fish_caught.connect(_on_caught)
+	_fishing.fish_surfaced.connect(func(kind: String) -> void: _fight_view.surface(kind))
 	_fishing.line_snapped.connect(_on_snapped)
 	_fishing.fish_escaped.connect(_on_escaped)
 	_fishing.tension_updated.connect(_on_tension)
