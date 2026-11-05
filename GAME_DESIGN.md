@@ -47,6 +47,9 @@ Map: pick a spot -> walk the shore or pier -> read the water (rings, shoals) -> 
 ## Weather (build 19)
 Each outing rolls one weather (`weather_fx.gd`, `KINDS`): clear 45%, overcast 25%, light rain 15%, windy 15%. It multiplies fish activity (overcast 1.15, light rain 1.25, windy 0.9) and the wind on the cast (windy x2.2). Rain is drawn as particles pushed by Perlin gusts, with a grey tint. The label sits next to the clock. Values are game-design fill, loosely based on common angling lore. Test: enter a spot several times; the label changes, rain falls in "Light rain", casts drift more in "Windy".
 
+## Night lamp (build 20)
+After dark the angler carries a lamp: a warm, flickering pool of light (two oscillators plus Perlin noise). Standing on the pier at night raises fish activity by 15% (`LAMP_PIER_BONUS`, game-design fill; real pier anglers use lights to draw baitfish). Test: set the clock to night with "+1 hour"; the glow appears, and the quiet-water hint is rarer on the pier than on the beach.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

@@ -21,6 +21,9 @@
 class_name ShoreFishing
 extends Node2D
 
+## Night, on the pier: the lamp draws baitfish, so fish activity rises by this fraction (game-design fill).
+const LAMP_PIER_BONUS := 0.15
+
 enum State { AIM, CHARGE, FLY, WAIT, BITE, FIGHT, RESULT }
 
 const PX_PER_M := 10.0
@@ -64,6 +67,7 @@ var _goal_labels: Array[Label] = []
 var _summary: PanelContainer
 var _hud_root: Control
 var _weather: WeatherFx
+var _lamp_noise := FastNoiseLite.new()
 var _weather_kind := "clear"
 var _tip_pos := Vector2.ZERO
 var _time := 0.0
@@ -163,6 +167,7 @@ var _depth_label: Label
 
 func _ready() -> void:
 	_rng.randomize()
+	_lamp_noise.noise_type = FastNoiseLite.TYPE_PERLIN
 	InputDefaults.ensure_all()
 	GameSession.load_once()
 	if FishingSpots.get_spot(GameSession.spot_id).is_empty():
@@ -766,7 +771,8 @@ func _activity() -> float:
 	for id: String in _spot["species"]:
 		base += 1.0 / sqrt(float(BiomeDB.get_species(id)["base_price"]))
 		now += _species_weight(id)
-	return clampf(now / maxf(base, 0.0001) * float(WeatherFx.KINDS[_weather_kind]["activity"]), 0.15, 2.0)
+	var lamp := 1.0 + LAMP_PIER_BONUS * (1.0 - _world.daylight) if _on_pier() else 1.0
+	return clampf(now / maxf(base, 0.0001) * float(WeatherFx.KINDS[_weather_kind]["activity"]) * lamp, 0.15, 2.0)
 
 
 func _crowd_pos(a: Dictionary) -> Vector2:
@@ -1437,6 +1443,7 @@ func _draw() -> void:
 	_draw_ripples()
 	_draw_line_and_float()
 	_draw_particles()
+	_draw_lamp()
 	_draw_angler()
 	_draw_tip()
 
@@ -1692,6 +1699,19 @@ func _draw_float(pos: Vector2, sink: float) -> void:
 	var radius := 8.0 * (1.0 - under * 0.5)
 	draw_circle(p, radius, Color(0.95, 0.95, 0.95, 1.0 - under))
 	draw_circle(p + Vector2(0.0, -3.0), radius * 0.75, Color(0.95, 0.25, 0.2, 1.0 - under))
+
+
+## At night the angler carries a lamp: a warm pool of light that flickers (two out-of-phase
+## oscillators plus Perlin noise). On the pier it also draws baitfish, see LAMP_PIER_BONUS in _activity().
+func _draw_lamp() -> void:
+	var night := 1.0 - _world.daylight
+	if night < 0.05:
+		return
+	var flicker := 1.0 + 0.04 * sin(_time * 9.0) + 0.03 * sin(_time * 5.3 + 1.0) + 0.05 * _lamp_noise.get_noise_1d(_time * 3.0)
+	for i in 6:
+		var k := float(i) / 5.0
+		var rad := (150.0 - 110.0 * k) * flicker
+		draw_circle(_hand + Vector2(0.0, 10.0), rad, Color(1.0, 0.82, 0.45, 0.05 * night))
 
 
 func _draw_angler() -> void:
