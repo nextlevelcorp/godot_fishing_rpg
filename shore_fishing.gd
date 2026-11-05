@@ -501,7 +501,8 @@ func _set_status(text: String) -> void:
 
 ## Short vibration on phones that support it (Android browsers). iOS Safari ignores it.
 func _buzz(ms: int) -> void:
-	Input.vibrate_handheld(ms)
+	if GameSession.vibration_on:
+		Input.vibrate_handheld(ms)
 
 
 ## Daytime colour grade per sea: grey-blue Black Sea, bright Aegean, warm Mediterranean.

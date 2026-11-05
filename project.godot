@@ -7,7 +7,7 @@ config_version=5
 [application]
 
 config/name="Global Fishing RPG"
-run/main_scene="res://turkey_map.tscn"
+run/main_scene="res://title_screen.tscn"
 config/features=PackedStringArray("4.4", "GL Compatibility")
 
 [autoload]

@@ -52,7 +52,7 @@ jobs:
         run: |
           G=$HOME/godot/Godot_v4.4-stable_linux.x86_64
           status=0
-          for scene in res://turkey_map.tscn res://shore_fishing.tscn; do
+          for scene in res://title_screen.tscn res://turkey_map.tscn res://shore_fishing.tscn; do
             echo "== smoke: $scene"
             timeout 120 $G --headless --path . "$scene" --quit-after 600 > smoke.log 2>&1 || echo "(exit code $?)"
             cat smoke.log

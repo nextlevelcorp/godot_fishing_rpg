@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Shown on screen so a player can tell a fresh deploy from a page the browser cached.
 ## Bump it with every build that changes behaviour.
-const BUILD := "build 16"
+const BUILD := "build 17"
 const SAVE_PATH := "user://save.cfg"
 const SAVE_VERSION := 1
 const START_RIG := "shore_spinning_rig"
@@ -33,6 +33,8 @@ static var spot_id := ""
 static var catches: Array[Dictionary] = []
 
 static var coins := 0
+static var sound_on := true
+static var vibration_on := true
 static var xp := 0
 static var rig_id := START_RIG
 static var owned_rigs: Array[String] = [START_RIG]
@@ -99,11 +101,14 @@ static func load_once() -> void:
 		owned_rigs.append(START_RIG)
 	var rid: Variant = cfg.get_value("player", "rig_id", START_RIG)
 	rig_id = String(rid) if (rid is String and owned_rigs.has(rid)) else START_RIG
+	sound_on = bool(cfg.get_value("settings", "sound_on", true))
+	vibration_on = bool(cfg.get_value("settings", "vibration_on", true))
 	best_kg = _clean(cfg.get_value("journal", "best_kg", {}), true)
 	counts = _clean(cfg.get_value("journal", "counts", {}), false)
 	for k: String in counts:
 		if not best_kg.has(k):
 			best_kg[k] = 0.0        # the journal reads best_kg for every logged species
+	AudioServer.set_bus_mute(0, not sound_on)
 
 
 static func save() -> void:
@@ -113,11 +118,25 @@ static func save() -> void:
 	cfg.set_value("player", "xp", xp)
 	cfg.set_value("player", "rig_id", rig_id)
 	cfg.set_value("player", "owned_rigs", owned_rigs)
+	cfg.set_value("settings", "sound_on", sound_on)
+	cfg.set_value("settings", "vibration_on", vibration_on)
 	cfg.set_value("journal", "best_kg", best_kg)
 	cfg.set_value("journal", "counts", counts)
 	var err := cfg.save(SAVE_PATH)
 	if err != OK:
 		push_warning("[GameSession] save failed with error %d" % err)
+
+
+## Turns all game sound on or off and saves the choice.
+static func set_sound(on: bool) -> void:
+	sound_on = on
+	AudioServer.set_bus_mute(0, not on)
+	save()
+
+
+static func set_vibration(on: bool) -> void:
+	vibration_on = on
+	save()
 
 
 static func _to_int(v: Variant) -> int:

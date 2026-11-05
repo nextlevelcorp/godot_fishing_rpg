@@ -87,7 +87,7 @@ func _on_panel_input(event: InputEvent) -> void:
 func _apply() -> void:
 	var stop := _portrait or _away
 	get_tree().paused = stop
-	AudioServer.set_bus_mute(0, stop)
+	AudioServer.set_bus_mute(0, stop or not GameSession.sound_on)
 	_panel.visible = stop
 	if _portrait:
 		_title.text = "Telefonu yatay çevir\nRotate your phone"
