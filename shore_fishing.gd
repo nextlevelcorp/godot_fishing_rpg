@@ -75,6 +75,7 @@ var _bait_on := true               ## false once small fish have stripped the ho
 var _empty_t := 0.0
 var _escape_reason := ""
 var _overhook_t := 0.0
+var _was_shaking := false
 var _tackle_panel: PanelContainer
 var _build_label: Label
 var _fps_t := 0.0
@@ -220,6 +221,10 @@ func _ready() -> void:
 	_fishing.reel_speed_m_s = 3.2             # shore spinning reel: faster retrieve than the boat rig
 	_fishing.fish_caught.connect(_on_caught)
 	_fishing.fish_surfaced.connect(func(kind: String) -> void: _fight_view.surface(kind))
+	_fishing.fish_surged.connect(func() -> void:
+		_flash("Not tired yet! It saw you and ran. Tire it out before you land it")
+		_amb.play("drag", 0.8)
+		_buzz(80))
 	_fishing.line_snapped.connect(_on_snapped)
 	_fishing.fish_escaped.connect(_on_escaped)
 	_fishing.tension_updated.connect(_on_tension)
@@ -1041,6 +1046,11 @@ func _hook_fish() -> void:
 func _tick_fight(delta: float) -> void:
 	if _fight_agent == null:
 		return
+	var shaking := _fishing.head_shake > 0.0
+	if shaking and not _was_shaking:
+		_flash("Head shakes! Keep the line tight")
+		_buzz(60)
+	_was_shaking = shaking
 	# A hook pulled harder than its wire can take opens up and the fish is gone.
 	if _fishing.tension_n > Tackle.hook_strength(GameSession.hook_id, GameSession.bait_id):
 		_overhook_t += delta
@@ -1588,7 +1598,8 @@ func _on_snapped(_id: String) -> void:
 
 func _on_escaped(_id: String) -> void:
 	_result_label.text = "It got away"
-	_set_status(_escape_reason if _escape_reason != "" else "The line went slack for too long")
+	var why := _escape_reason if _escape_reason != "" else _fishing.escape_reason
+	_set_status(why if why != "" else "The line went slack for too long")
 	_escape_reason = ""
 	_end_fight()
 

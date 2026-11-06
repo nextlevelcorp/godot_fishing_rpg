@@ -301,6 +301,9 @@ func _step_rod(delta: float) -> void:
 	if phase == "float":
 		pull = maxf(pull, 0.06 + 0.25 * clampf(float_dip, 0.0, 1.3))
 	var target := ROD_REST + to_line * 70.0 * pull + Vector2(0.0, 150.0 * pull)
+	if fishing != null and phase == "fight" and fishing.head_shake > 0.0:
+		# head shakes come up the line as a fast knock on the rod tip
+		target += Vector2(sin(_time * 50.0) * 10.0, sin(_time * 47.0) * 14.0) * fishing.head_shake
 	if _catch_t > 0.0:
 		target = ROD_REST + Vector2(-40.0, 40.0)
 	var acc := (target - _tip) * 90.0 - _tip_v * 11.0

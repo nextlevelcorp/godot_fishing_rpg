@@ -71,6 +71,12 @@ Bait choices follow common Turkish shore-angling practice; all numbers are game-
 - **Live bait is a resource.** Live baitfish sit in a bucket (max 12, saved). Small istavrit, hamsi or uskumru (under 0.4 kg) caught go into the bucket, as Turkish shore anglers do before fishing for bluefish; the map's tackle shop sells 5 for 30 coins. A fish that takes it, or small fish stripping it, uses one; you cannot cast live bait with an empty bucket.
 - **Journal** shows each species with its picture (painted sprite or drawing; a dark silhouette until caught). Caught: best weight, count, depth range, feeding time, two best baits and the hook range. Not caught: "Locals say: try ..." with the best baits and feeding time, so the hidden rules are learnable.
 
+## Fight realism (build 30)
+- **Head shakes:** jumpers and thrashers (bluefish, seabass, garfish, mullet, mackerels) shake their heads between runs (about every 4-5 s while stamina > 0.2): for 0.5-1 s the pull pulses at 8 Hz (+-70 %), the rod tip knocks in the first-person view and the phone buzzes. If the line is slack for more than 0.15 s during a shake, 35 % chance the hook is thrown.
+- **Jumps:** a jumping fish pulls nothing for 0.9 s. If the line is slack for more than 0.3 s of that, 45 % chance it throws the hook. Keep reeling through the jump.
+- **Landing:** a fish over 1.5 kg with stamina above 30 % will not be landed: at the edge it runs 4 m out again at full strength. Tire it first.
+All numbers are game-design fill. Test: hook a bluefish, stop reeling during a jump; it often throws the hook. Reel a fresh 3 kg fish straight in; it runs at the edge.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

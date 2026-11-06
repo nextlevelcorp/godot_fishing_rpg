@@ -20,6 +20,8 @@ signal fish_caught(fish_id: String, weight_kg: float)
 signal fish_escaped(fish_id: String)
 ## The fish shows itself at the surface: kind is "jump", "thrash" or "roll"; dive_m is how deep it ran.
 signal fish_surfaced(kind: String)
+## A fish that is not tired yet saw the angler at the edge and ran again.
+signal fish_surged()
 signal telemetry(frame: Dictionary)
 
 @export_group("Rod and Line")
@@ -72,6 +74,16 @@ var _burst_len := Vector2(0.5, 1.4)
 var _burst_left := 0.0
 var style_dive_m := 3.0           ## metres the fish dives during a run (read by the side view)
 var _style_surface := ""
+## 0..1 while the fish shakes its head (bluefish, seabass, garfish...): the pull pulses fast.
+var head_shake := 0.0
+## Why the fish got away, when it was not a slack line (thrown hook on a jump or a head shake).
+var escape_reason := ""
+var _shaker := false
+var _shake_left := 0.0
+var _shake_clock := 0.0
+var _shake_slack := 0.0
+var _air_left := 0.0
+var _air_slack := 0.0
 var _style_surface_chance := 0.0
 var _burst_cooldown := 2.0
 var _burst_mult := 1.0
@@ -113,6 +125,11 @@ func hook_fish(id: String, species: Dictionary, weight_kg: float, start_distance
 	var style := BiomeDB.get_fight_style(id)
 	_style_surface = String(style["surface"])
 	style_dive_m = float(style["dive"])
+	_shaker = _style_surface == "jump" or _style_surface == "thrash"
+	_shake_left = 0.0
+	_air_left = 0.0
+	head_shake = 0.0
+	escape_reason = ""
 	_style_surface_chance = float(style["surface_chance"]) * lerpf(1.0, 0.4, size01)   # big fish jump less
 	_burst_len = _burst_len * float(style["run_len"]) * lerpf(1.0, 1.5, size01)        # and run longer
 	_burst_every = _burst_every * float(style["run_gap"])
@@ -155,6 +172,9 @@ func _update_fish_behaviour(h: float) -> void:
 			_burst_mult = 1.0
 			if _style_surface != "" and _rng.randf() < _style_surface_chance:
 				fish_surfaced.emit(_style_surface)
+				if _style_surface == "jump":
+					_air_left = 0.9              # in the air it does not pull; a slack line now lets it throw the hook
+					_air_slack = 0.0
 			_burst_cooldown = _rng.randf_range(_burst_every.x, _burst_every.y)
 	else:
 		_burst_cooldown -= h
@@ -163,9 +183,30 @@ func _update_fish_behaviour(h: float) -> void:
 			_burst_mult = _rng.randf_range(_burst_mult_range.x, _burst_mult_range.y)
 		elif _burst_cooldown <= 0.0:
 			_burst_cooldown = 1.0                  # too tired to run
+	# Head shakes: short bursts of fast pulses, between runs, while the fish has strength.
+	if _shake_left > 0.0:
+		_shake_left -= h
+		_shake_clock += h
+		head_shake = 1.0
+		if _shake_left <= 0.0:
+			head_shake = 0.0
+			if _shake_slack > 0.15 and _rng.randf() < 0.35:
+				escape_reason = "It shook its head on a slack line and threw the hook"
+				_finish(State.ESCAPED)
+	elif _shaker and _burst_left <= 0.0 and stamina > 0.2 and _rng.randf() < h * 0.22:
+		_shake_left = _rng.randf_range(0.5, 1.0)
+		_shake_clock = 0.0
+		_shake_slack = 0.0
+	if _air_left > 0.0:
+		_air_left -= h
+		if _air_left <= 0.0 and _air_slack > 0.3 and _rng.randf() < 0.45:
+			escape_reason = "It jumped and threw the hook. Keep the line tight when it jumps"
+			_finish(State.ESCAPED)
 
 
 func _integrate(h: float) -> void:
+	if state != State.HOOKED:
+		return                                      # a head shake or a jump may have just freed the fish
 	var k_eff := (rod_stiffness_n_per_m * line_stiffness_n_per_m) / (rod_stiffness_n_per_m + line_stiffness_n_per_m)
 
 	# 1. line tension from the spring + damper
@@ -183,6 +224,10 @@ func _integrate(h: float) -> void:
 
 	# 3. fish dynamics (semi-implicit Euler)
 	var pull := _fish_pull_n * lerpf(0.35, 1.0, stamina) * _burst_mult
+	if _shake_left > 0.0:
+		pull *= 1.0 + 0.7 * sin(TAU * 8.0 * _shake_clock)
+	if _air_left > 0.0:
+		pull = 0.0                                  # out of the water: nothing to pull against
 	var acc := (pull - t - _fish_water_drag * fish_vel_m_s) / _fish_mass
 	fish_vel_m_s += acc * h
 	fish_pos_m += fish_vel_m_s * h
@@ -197,6 +242,10 @@ func _integrate(h: float) -> void:
 		stamina += _rest_recovery * h
 	stamina = clampf(stamina, 0.0, 1.0)
 	tension_n = t
+	if _shake_left > 0.0 and ratio < slack_tension_ratio * 2.0:
+		_shake_slack += h
+	if _air_left > 0.0 and ratio < slack_tension_ratio * 2.0:
+		_air_slack += h
 
 	# 5. outcomes
 	if ratio > overload_ratio:
@@ -216,7 +265,15 @@ func _integrate(h: float) -> void:
 		return
 
 	if fish_pos_m <= landing_distance_m:
-		_finish(State.LANDED)
+		# A fish over 1.5 kg that still has strength will not be netted or lifted: it sees you and runs.
+		if fish_weight_kg > 1.5 and stamina > 0.3:
+			fish_pos_m = landing_distance_m + 4.0
+			fish_vel_m_s = 3.0
+			_burst_left = 1.2
+			_burst_mult = _burst_mult_range.y
+			fish_surged.emit()
+		else:
+			_finish(State.LANDED)
 
 
 func _finish(new_state: State) -> void:
