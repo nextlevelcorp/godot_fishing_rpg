@@ -67,6 +67,10 @@ The BAIT / HOOK button (shore HUD, only with the line in) chooses one of nine ba
 - **Lures** (spoon, çapari) fish only while you reel: waiting time runs 1.6x while reeling and 0.08x when still; predators hit them without nibbling. The çapari carries its own No. 8 hooks.
 Bait choices follow common Turkish shore-angling practice; all numbers are game-design fill. Test: bread dough at a harbour catches mostly mullet; a 3/0 hook gets no horse mackerel; a No. 12 hook loses a big bluefish when the clutch is set high.
 
+## Live bait and journal (build 29)
+- **Live bait is a resource.** Live baitfish sit in a bucket (max 12, saved). Small istavrit, hamsi or uskumru (under 0.4 kg) caught go into the bucket, as Turkish shore anglers do before fishing for bluefish; the map's tackle shop sells 5 for 30 coins. A fish that takes it, or small fish stripping it, uses one; you cannot cast live bait with an empty bucket.
+- **Journal** shows each species with its picture (painted sprite or drawing; a dark silhouette until caught). Caught: best weight, count, depth range, feeding time, two best baits and the hook range. Not caught: "Locals say: try ..." with the best baits and feeding time, so the hidden rules are learnable.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

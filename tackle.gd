@@ -79,6 +79,24 @@ const MOUTH := {
 const CAPARI_HOOK := 1
 
 
+## The n baits this species likes best, as display names.
+static func best_baits(species: String, n: int = 2) -> PackedStringArray:
+	var pref: Dictionary = PREF.get(species, {})
+	var ids := pref.keys()
+	ids.sort_custom(func(a: Variant, b: Variant) -> bool: return float(pref[a]) > float(pref[b]))
+	var out := PackedStringArray()
+	for i in mini(n, ids.size()):
+		out.append(String(BAITS[ids[i]]["name"]).to_lower())
+	return out
+
+
+## Hook sizes that fit this species' mouth, for example "No. 8 to No. 1".
+static func hook_range(species: String) -> String:
+	var m: Vector2i = MOUTH.get(species, Vector2i(1, 3))
+	var a := hook_name(HOOK_ORDER[m.x])
+	return a if m.x == m.y else "%s to %s" % [a, hook_name(HOOK_ORDER[m.y])]
+
+
 static func bait_name(id: String) -> String:
 	var b: Dictionary = BAITS.get(id, {})
 	return "%s (%s)" % [b.get("name", id), b.get("tr", "")]

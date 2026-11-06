@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Shown on screen so a player can tell a fresh deploy from a page the browser cached.
 ## Bump it with every build that changes behaviour.
-const BUILD := "build 28"
+const BUILD := "build 29"
 const SAVE_PATH := "user://save.cfg"
 const SAVE_VERSION := 1
 const START_RIG := "shore_spinning_rig"
@@ -39,6 +39,11 @@ static var tutorial_done := false
 ## Bait and hook on the line (see Tackle). Saved.
 static var bait_id := "sea_worm"
 static var hook_id := "h4"
+## Live baitfish kept in the bucket: caught small fish (istavrit, hamsi) or bought. Used up when a
+## fish takes it or small fish strip it.
+static var live_bait := 0
+const LIVE_BAIT_MAX := 12
+const LIVE_BAIT_SPECIES: Array[String] = ["mediterranean_horse_mackerel", "european_anchovy", "atlantic_mackerel"]
 static var xp := 0
 static var rig_id := START_RIG
 static var owned_rigs: Array[String] = [START_RIG]
@@ -112,6 +117,7 @@ static func load_once() -> void:
 	bait_id = String(b) if (b is String and Tackle.BAITS.has(b)) else "sea_worm"
 	var hk: Variant = cfg.get_value("tackle", "hook", "h4")
 	hook_id = String(hk) if (hk is String and Tackle.HOOKS.has(hk)) else "h4"
+	live_bait = clampi(_to_int(cfg.get_value("tackle", "live", 0)), 0, LIVE_BAIT_MAX)
 	best_kg = _clean(cfg.get_value("journal", "best_kg", {}), true)
 	counts = _clean(cfg.get_value("journal", "counts", {}), false)
 	for k: String in counts:
@@ -132,6 +138,7 @@ static func save() -> void:
 	cfg.set_value("settings", "tutorial_done", tutorial_done)
 	cfg.set_value("tackle", "bait", bait_id)
 	cfg.set_value("tackle", "hook", hook_id)
+	cfg.set_value("tackle", "live", live_bait)
 	cfg.set_value("journal", "best_kg", best_kg)
 	cfg.set_value("journal", "counts", counts)
 	var err := cfg.save(SAVE_PATH)
@@ -259,6 +266,22 @@ static func _progress_goals(weight_kg: float, first: bool) -> Array[Dictionary]:
 static func goal_line(g: Dictionary) -> String:
 	var need := 1 if String(g["kind"]) == "weight" else int(g["target"])
 	return "%s  %d/%d%s" % [g["text"], mini(int(g["progress"]), need), need, "  DONE" if bool(g["done"]) else ""]
+
+
+## Adds (or with a negative n, uses) live baitfish. Returns the new count.
+static func add_live_bait(n: int) -> int:
+	live_bait = clampi(live_bait + n, 0, LIVE_BAIT_MAX)
+	save()
+	return live_bait
+
+
+## Buys live baitfish from the bait shop. Returns false if not enough coins or the bucket is full.
+static func buy_live_bait(n: int, price: int) -> bool:
+	if coins < price or live_bait >= LIVE_BAIT_MAX:
+		return false
+	coins -= price
+	add_live_bait(n)
+	return true
 
 
 ## Buys and equips a rig. Returns false if already owned or not enough coins.

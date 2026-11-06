@@ -4,6 +4,8 @@
 class_name TurkeyMap
 extends Control
 
+const LIVE_BAIT_PRICE := 30
+
 const LAT_MIN := 35.6
 const LAT_MAX := 42.4
 const LON_MIN := 25.5
@@ -392,6 +394,17 @@ func _open_tackle() -> void:
 				_open_tackle())
 			b.disabled = GameSession.coins < price
 		row.add_child(b)
+	var bait_row := HBoxContainer.new()
+	bait_row.add_theme_constant_override("separation", 12)
+	_overlay_list.add_child(bait_row)
+	var bait_info := _make_label(bait_row, 18, Color.WHITE)
+	bait_info.text = "Live baitfish (canli yem), 5 in a bucket\nIn the bucket: %d / %d. Bluefish, seabass, dentex and amberjack love it." % [GameSession.live_bait, GameSession.LIVE_BAIT_MAX]
+	var bb := _make_button("BUY 5  %d" % LIVE_BAIT_PRICE, 190.0, func() -> void:
+		GameSession.buy_live_bait(5, LIVE_BAIT_PRICE)
+		_update_coins()
+		_open_tackle())
+	bb.disabled = GameSession.coins < LIVE_BAIT_PRICE or GameSession.live_bait >= GameSession.LIVE_BAIT_MAX
+	bait_row.add_child(bb)
 	var tip := _make_label(_overlay_list, 15, Color(0.7, 0.8, 0.9))
 	tip.text = "A stronger rig lets you hold big fish without snapping the line. The biggest fish here can still out-pull it: use the clutch."
 	_overlay.visible = true
@@ -405,15 +418,32 @@ func _open_journal() -> void:
 		var ids: Array = s["species"]
 		var head := _make_label(_overlay_list, 20, Color(1.0, 0.9, 0.6))
 		head.text = "%s  -  %d / %d species" % [s["name"], _caught_count(ids), ids.size()]
-		var lines: Array[String] = []
 		for fid: String in ids:
-			if GameSession.counts.has(fid):
-				lines.append("   %s: best %.2f kg, landed %d" % [BiomeDB.get_species(fid)["name"], float(GameSession.best_kg[fid]), int(GameSession.counts[fid])])
+			var known := GameSession.counts.has(fid)
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 12)
+			_overlay_list.add_child(row)
+			row.add_child(FishIcon.new(fid, known))
+			var info := _make_label(row, 15, Color(0.85, 0.9, 1.0))
+			var sp := BiomeDB.get_species(fid)
+			var baits := ", ".join(Tackle.best_baits(fid))
+			if known:
+				var dr: Vector2 = sp["depth_m"]
+				info.text = "%s  (%s)\nBest %.2f kg, landed %d.  %.0f-%.0f m deep, feeds %s.\nBait: %s.  Hook %s." % [sp["name"], sp["scientific"],
+					float(GameSession.best_kg[fid]), int(GameSession.counts[fid]), dr.x, dr.y, _feeds_text(fid), baits, Tackle.hook_range(fid)]
 			else:
-				lines.append("   ???  not caught yet")
-		var body := _make_label(_overlay_list, 16, Color(0.85, 0.9, 1.0))
-		body.text = "\n".join(lines)
+				info.text = "???  Not caught yet.\nLocals say: try %s, %s." % [baits if baits != "" else "different baits", _feeds_text(fid)]
 	_overlay.visible = true
+
+
+## When a species feeds, in words (see BiomeDB.ACTIVITY).
+func _feeds_text(fid: String) -> String:
+	match BiomeDB.activity_kind(fid):
+		"night":
+			return "at night"
+		"day":
+			return "by day"
+	return "at dawn and dusk"
 
 
 func _on_go_pressed() -> void:
