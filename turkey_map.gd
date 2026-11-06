@@ -107,7 +107,7 @@ func _process(delta: float) -> void:
 func _build_header() -> void:
 	var header := Label.new()
 	header.name = "Header"
-	header.text = "Choose your fishing spot  -  Türkiye      [%s]" % GameSession.BUILD
+	header.text = "Pick a spot      [%s]" % GameSession.BUILD
 	header.position = Vector2(20, 14)
 	header.add_theme_font_size_override("font_size", 28)
 	header.add_theme_color_override("font_color", Color.WHITE)
@@ -117,7 +117,7 @@ func _build_header() -> void:
 
 	var bar := HBoxContainer.new()
 	bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	bar.offset_left = -560.0
+	bar.offset_left = -740.0
 	bar.offset_right = -16.0
 	bar.offset_top = 6.0
 	bar.offset_bottom = 60.0
@@ -128,6 +128,7 @@ func _build_header() -> void:
 	_coins_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_coins_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_coins_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bar.add_child(_make_button("TODAY", 130.0, _open_daily))
 	bar.add_child(_make_button("TACKLE", 150.0, _open_tackle))
 	bar.add_child(_make_button("JOURNAL", 160.0, _open_journal))
 	_update_coins()
@@ -423,6 +424,22 @@ func _open_tackle() -> void:
 	net_row.add_child(nb)
 	var tip := _make_label(_overlay_list, 15, Color(0.7, 0.8, 0.9))
 	tip.text = "A stronger rig lets you hold big fish without snapping the line. The biggest fish here can still out-pull it: use the clutch."
+	_overlay.visible = true
+
+
+func _open_daily() -> void:
+	_clear_list()
+	_overlay_title.text = "Today's challenge"
+	var l := _make_label(_overlay_list, 22, Color.WHITE)
+	l.text = Daily.text()
+	var c := Daily.challenge()
+	if not c.is_empty():
+		var hint := _make_label(_overlay_list, 16, Color(0.75, 0.85, 0.95))
+		hint.text = "Locals say: try %s, %s. Hook %s." % [", ".join(Tackle.best_baits(String(c["species"]))), _feeds_text(String(c["species"])), Tackle.hook_range(String(c["species"]))]
+		var go := _make_button("GO TO " + String(c["spot_name"]).to_upper(), 360.0, func() -> void:
+			_overlay.visible = false
+			_select(String(c["spot"])))
+		_overlay_list.add_child(go)
 	_overlay.visible = true
 
 

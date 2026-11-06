@@ -89,6 +89,9 @@ The BAIT / HOOK panel also chooses the rig: FLOAT (samandıra, bait at the float
 ## Landing net (build 35)
 From a pier, harbour quay or bridge a landed fish must be lifted through the air. Without a landing net (kepçe), a fish whose weight times about twice g (the jerk of the lift) exceeds the line's breaking force is lost at the last moment (with the starter rig, 55 N: about 2.8 kg). The tackle shop sells a net for 250 coins (saved). Rocks and beaches need no net. Game-design fill for the factor 2. Test: on the Galata bridge with no net, a 3 kg bluefish is lost at the end; after buying the net it is landed.
 
+## Daily challenge (build 36)
+`daily.gd`: one challenge per calendar day, the same for every player on that date (seeded by the date): a species at one of your unlocked spots, weighted toward species in season, of at least the median weight that species bites at. Reward once per day: 120 coins plus the species' base price, and 40 XP. The map's TODAY button shows it with the locals' bait and hook advice and a button that selects the spot; the catch card says when it is done.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

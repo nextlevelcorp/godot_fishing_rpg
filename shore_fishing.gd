@@ -1383,6 +1383,10 @@ func _on_caught(id: String, weight_kg: float) -> void:
 		"On %s, hook %s" % [String(Tackle.BAITS[GameSession.bait_id]["name"]).to_lower(), Tackle.hook_name(GameSession.hook_id)]])
 	if GameSession.LIVE_BAIT_SPECIES.has(id) and weight_kg < 0.4 and GameSession.live_bait < GameSession.LIVE_BAIT_MAX:
 		lines.append("Into the bucket as live bait  (%d)" % GameSession.add_live_bait(1))
+	var daily := Daily.try_complete(GameSession.spot_id, id, weight_kg)
+	if daily > 0:
+		lines.append("DAILY CHALLENGE DONE!  +%d coins, +%d XP" % [daily, Daily.XP])
+		_buzz(150)
 	var done: Array = res["goals_done"]
 	for g: Dictionary in done:
 		lines.append("Goal done: %s  (+%d coins)" % [g["text"], int(g["coins"])])
