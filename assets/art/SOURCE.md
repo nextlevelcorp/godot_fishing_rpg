@@ -8,4 +8,4 @@ object procedurally (for fish: `real_fish.gd`).
 
 | Files | Tool | Date | Notes |
 |---|---|---|---|
-| `fish/bluefish.png`, `fish/garfish.png` | ChatGPT image generation (made by the project owner) | 2026-11-05 | Trimmed and scaled to 1024 px wide. The garfish came with a checkerboard painted into the image (not real transparency); the background was cut out by flood fill from the edges. Plan/terms allowing commercial use: to be confirmed by the owner. |
+| `fish/bluefish.png`, `fish/garfish.png` | ChatGPT image generation (made by the project owner) | 2026-11-05 | Trimmed and scaled to 1024 px wide. The garfish came with a checkerboard painted into the image (not real transparency); the background was cut out by flood fill from the edges. Made on the ChatGPT free plan. OpenAI's terms of use assign ownership of outputs to the user; re-check the current terms before a commercial release. |
