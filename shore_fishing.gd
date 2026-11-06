@@ -736,6 +736,9 @@ func _walk(delta: float) -> void:
 
 func _adjust_bait_depth(delta: float) -> void:
 	var ax := Input.get_axis(&"bait_shallower", &"bait_deeper")
+	if absf(ax) > 0.0 and _bottom_rig():
+		_flash("Bottom rig: the bait lies on the bottom")
+		return
 	if absf(ax) > 0.0:
 		_bait_depth = clampf(_bait_depth + ax * 3.0 * delta, 0.5, 30.0)
 		_flash("Float depth %.1f m" % _bait_depth)
@@ -784,7 +787,14 @@ func _water_depth(p: Vector2) -> float:
 
 ## Where the bait actually hangs: the float setting, or just off the bottom in shallow water.
 func _eff_depth() -> float:
+	if _bottom_rig():
+		return maxf(_water_depth(_bobber_pos) - 0.1, 0.3)       # the sinker holds it on the bottom
 	return clampf(_bait_depth, 0.3, maxf(_water_depth(_bobber_pos) - 0.2, 0.3))
+
+
+## A bottom rig only matters for natural baits; lures are always worked through the water.
+func _bottom_rig() -> bool:
+	return GameSession.rig_mode == "bottom" and not Tackle.is_lure(GameSession.bait_id)
 
 
 ## How likely a species is to take the bait right now: rarity, depth match, feeding time.
@@ -834,7 +844,7 @@ func _check_tip() -> void:
 
 func _do_cast() -> void:
 	_bobber_pos = _rod_tip()
-	_b_vel = _aim_dir() * lerpf(170.0, 560.0, _power)
+	_b_vel = _aim_dir() * lerpf(170.0, 560.0, _power) * (1.15 if _bottom_rig() else 1.0)   # a lead sinker flies farther
 	_b_z = ROD_TIP_HEIGHT
 	_b_vz = lerpf(150.0, 330.0, _power)
 	_fish_id = ""
@@ -954,7 +964,7 @@ func _fish_event() -> void:
 		_nib_left -= 1
 		_float_v += 6.0
 		_buzz(35)
-		_amb.play("plop", 0.35)
+		_amb.play("bell" if _bottom_rig() else "plop", 0.3 if _bottom_rig() else 0.35)
 		_add_ripple(_bobber_pos)
 		if _fish_agent != null:
 			_fish_agent.vel += (_bobber_pos - _fish_agent.pos).normalized() * 60.0
@@ -974,7 +984,7 @@ func _fish_event() -> void:
 		_float_pull = 1.3
 		_float_v += 10.0
 		_buzz(90)
-		_amb.play("plop", 0.9)
+		_amb.play("bell" if _bottom_rig() else "plop", 0.9)
 		_add_ripple(_bobber_pos, true)
 		_set_status("BITE!  Press REEL now")
 
@@ -1103,6 +1113,7 @@ func _update_pov() -> void:
 			v.target_h = 0.0
 	v.tension = _tension_ratio if _state == State.FIGHT else 0.0
 	v.lure = Tackle.is_lure(GameSession.bait_id)
+	v.bottom = _bottom_rig()
 	v.reeling = Input.is_action_pressed(&"reel_in")
 	v.time_of_day = _world.time_of_day
 	v.wind_x = _wind.x
@@ -1536,6 +1547,17 @@ func _open_tackle_panel() -> void:
 			GameSession.set_tackle(id, GameSession.hook_id)
 			_open_tackle_panel())
 		grid.add_child(b)
+	_plain_label(box, 26, Color(1.0, 0.92, 0.6)).text = "Rig"
+	var rig_row := HBoxContainer.new()
+	rig_row.add_theme_constant_override("separation", 8)
+	box.add_child(rig_row)
+	for mode: String in ["float", "bottom"]:
+		var rb := _tackle_button("FLOAT (samandira)" if mode == "float" else "BOTTOM (dip, bell)", mode == GameSession.rig_mode, Vector2(290.0, 50.0))
+		rb.pressed.connect(func() -> void:
+			GameSession.rig_mode = mode
+			GameSession.save()
+			_open_tackle_panel())
+		rig_row.add_child(rb)
 	_plain_label(box, 26, Color(1.0, 0.92, 0.6)).text = "Hook size"
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
@@ -1547,7 +1569,7 @@ func _open_tackle_panel() -> void:
 			_open_tackle_panel())
 		row.add_child(hb)
 	var hint := _plain_label(box, 16, Color(0.8, 0.9, 1.0))
-	hint.text = "Bream like mussel and worm, mullet bread, bluefish and seabass live bait or a spoon, horse mackerel the çapari. Small hooks for small mouths; a big hook scares them off. A small hook can open up on a big fish. Lures catch only while you reel. Soft baits get picked off by small fish."
+	hint.text = "Bottom rig: a sinker lays the bait on the bottom for bream, whiting, scorpionfish and turbot; watch the rod tip and listen for the bell. Float rig: set the depth with DEEP/SHAL. Bream like mussel and worm, mullet bread, bluefish and seabass live bait or a spoon, horse mackerel the çapari. Small hooks for small mouths; a big hook scares them off. A small hook can open up on a big fish. Lures catch only while you reel. Soft baits get picked off by small fish."
 	var done := _tackle_button("DONE", false, Vector2(200.0, 56.0))
 	done.pressed.connect(func() -> void: panel.queue_free())
 	box.add_child(done)
@@ -1660,7 +1682,7 @@ func _process(delta: float) -> void:
 	_clock_label.text = "%s %s   |   %s" % [Season.month_name(), _world.clock_text(), _weather.label()]
 	var probe := _bobber_pos if (_state == State.WAIT or _state == State.BITE) else (_pred_landing if _state == State.CHARGE else _hand + _facing * 60.0)
 	var water := _water_depth(probe)
-	_depth_label.text = "Float %.1f m  |  Water %s  |  Clutch %.0f N  |  %s, hook %s" % [_bait_depth, ("%.1f m" % water) if water > 0.0 else "-",
+	_depth_label.text = ("Bottom rig" if _bottom_rig() else "Float %.1f m" % _bait_depth) + "  |  Water %s  |  Clutch %.0f N  |  %s, hook %s" % [("%.1f m" % water) if water > 0.0 else "-",
 		_fishing.drag_setting_n, String(Tackle.BAITS[GameSession.bait_id]["name"]), Tackle.hook_name(GameSession.hook_id)]
 	_toast_t = maxf(0.0, _toast_t - delta)
 	_toast_label.text = _toast_text if _toast_t > 0.0 else ""

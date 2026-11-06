@@ -251,6 +251,17 @@ def drag_loop(dur=0.6, rate=42.0):
     return buf + whine
 
 
+def bell():
+    """Small brass bite bell clipped to the rod tip: a few inharmonic partials, a short ring."""
+    dur = 1.2
+    t = t_axis(dur)
+    s = np.zeros_like(t)
+    for ratio, a, dec in ((1.0, 1.0, 5.0), (2.76, 0.5, 8.0), (5.40, 0.25, 12.0), (8.93, 0.12, 18.0)):
+        s += a * np.sin(2 * math.pi * 2350 * ratio * t) * np.exp(-dec * t)
+    s *= 1 - np.exp(-t * 3000)
+    return fade(reverb(s, 0.1))
+
+
 def snap():
     dur = 0.9
     t = t_axis(dur)
@@ -325,6 +336,7 @@ def main():
     save("reel_loop", reel_loop(), 0.6)
     save("drag_loop", drag_loop(), 0.75)
     save("snap", snap())
+    save("bell", bell(), 0.6)
     for i in range(3):
         save(f"gull_{i}", gull(40 + i), 0.7)
     save("surf_loop", surf_loop(), 0.7)

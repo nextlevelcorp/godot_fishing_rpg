@@ -47,6 +47,7 @@ var target_z := 20.0              ## m ahead
 var target_h := 0.0               ## m above the water (flying bait)
 var float_dip := 0.0              ## 0 floating, 1 pulled under
 var lure := false                 ## a lure has no float: only the line entering the water shows
+var bottom := false               ## bottom rig: no float; the rod tip nods and its bell swings
 
 var _open := false
 var _pitch := REST_PITCH          ## camera looks down by this many px (tilts as the fish comes close)
@@ -687,7 +688,10 @@ func _ellipse_line(ctr: Vector2, r: Vector2, col: Color, width: float) -> void:
 ## The float (red tip, white body) or the flying bait or, in the fight, the jumping fish.
 func _draw_target() -> void:
 	var c := _canvas
-	if phase == "float" and lure:
+	if phase == "float" and bottom:
+		var pb := _proj(target_x, target_z, 0.0)
+		_ellipse_line(pb, Vector2(4.0, 1.5), Color(1.0, 1.0, 1.0, 0.5), 1.2)
+	elif phase == "float" and lure:
 		var pl := _proj(target_x, target_z, 0.0)
 		_ellipse_line(pl, Vector2(5.0, 1.8), Color(1.0, 1.0, 1.0, 0.6), 1.2)
 	elif phase == "float":
@@ -830,6 +834,13 @@ func _draw_rod_and_line(night: float) -> void:
 		c.draw_arc(gp + Vector2(0.0, gr * 0.8), gr, 0.0, TAU, 12, Color(0.78, 0.78, 0.82), 2.0)
 		c.draw_line(gp, gp + Vector2(0.0, gr * 0.4), Color(0.6, 0.6, 0.65), 2.0)
 
+	# Bite bell clipped to the tip on a bottom rig: a pendulum kicked by every pull on the line.
+	if bottom and phase == "float":
+		var swing := sin(_time * 18.0) * clampf(float_dip, 0.0, 1.2) * 0.9
+		var bell_at := tip + Vector2(0.0, 6.0) + Vector2(sin(swing), cos(swing)) * 14.0
+		c.draw_line(tip, bell_at, Color(0.6, 0.6, 0.6), 1.5)
+		c.draw_circle(bell_at, 7.0, Color(0.85, 0.68, 0.25) * Color(dim, dim, dim))
+		c.draw_circle(bell_at + Vector2(-2.0, -2.0), 2.5, Color(1.0, 0.92, 0.6, 0.8))
 	# Spinning reel hanging under the reel seat.
 	var seat := pts[4]
 	var body := seat + Vector2(8.0, 58.0)

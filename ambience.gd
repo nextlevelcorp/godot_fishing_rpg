@@ -28,7 +28,7 @@ var _loop_hold: Dictionary = {}        ## name -> seconds left (for timed loops 
 
 func _ready() -> void:
 	for n in ["splash_small", "splash_big", "splash_exit", "drips", "bloop", "nibble", "cast", "strike",
-			"reel_loop", "drag_loop", "snap", "gull_0", "gull_1", "gull_2", "surf_loop"]:
+			"reel_loop", "drag_loop", "snap", "bell", "gull_0", "gull_1", "gull_2", "surf_loop"]:
 		var s := load(DIR + n + ".wav") as AudioStreamWAV
 		if s != null:
 			_streams[n] = s
@@ -80,6 +80,8 @@ func play(kind: String, volume: float = 1.0) -> void:
 			snd = "strike"
 		"snap":
 			snd = "snap"
+		"bell":
+			snd = "bell"
 		"gull":
 			snd = "gull_%d" % randi_range(0, 2)
 		"drag":

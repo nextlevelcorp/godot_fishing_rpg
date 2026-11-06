@@ -83,6 +83,9 @@ The game uses the real month from the device (`season.gd`). Each species has pea
 ## Legal sizes and limits (build 32)
 Turkish amateur rules from Tebliğ 2024/21 (6/2, valid 2024-2028), via search results, the official PDF was not reachable from the build environment (`regulations.gd` has the citation): minimum sizes seabass 25 cm, gilthead seabream 20 cm, horse mackerel 13 cm, bluefish 18 cm, turbot 45 cm and one per day; a 5 kg daily total. Length comes from weight with W = a L^3, a set by body depth (game-design fill). A fish that breaks a rule is released at the catch: +3 XP, no coins, no journal entry, and the card says why. The journal shows the legal size. Other species have no size rule in the game until their values are confirmed.
 
+## Bottom rig (build 33)
+The BAIT / HOOK panel also chooses the rig: FLOAT (samandıra, bait at the float depth) or BOTTOM (dip takımı: a lead sinker holds the bait on the bottom). With a bottom rig the bait depth is the water depth at the landing point, DEEP/SHAL do nothing, the cast flies 15 % farther, there is no float: bites show as the rod tip nodding and a brass bell at the tip ringing (soft on nibbles, hard on the bite). Bottom feeders (bream, whiting, scorpionfish, turbot, weever) come through the existing depth match. Lures ignore the rig. Test: on a 10 m bottom at Çeşme, a bottom rig with sea worm brings bream; a float set at 2 m brings mostly mid-water fish.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

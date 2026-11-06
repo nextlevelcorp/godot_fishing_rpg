@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Shown on screen so a player can tell a fresh deploy from a page the browser cached.
 ## Bump it with every build that changes behaviour.
-const BUILD := "build 32"
+const BUILD := "build 33"
 const SAVE_PATH := "user://save.cfg"
 const SAVE_VERSION := 1
 const START_RIG := "shore_spinning_rig"
@@ -42,6 +42,9 @@ static var hook_id := "h4"
 ## Live baitfish kept in the bucket: caught small fish (istavrit, hamsi) or bought. Used up when a
 ## fish takes it or small fish strip it.
 static var live_bait := 0
+## Float rig (bait hangs at the float depth, bites show on the float) or bottom rig (dip takımı:
+## a sinker holds the bait on the bottom, bites show on the rod tip and its bell). Saved.
+static var rig_mode := "float"
 const LIVE_BAIT_MAX := 12
 const LIVE_BAIT_SPECIES: Array[String] = ["mediterranean_horse_mackerel", "european_anchovy", "atlantic_mackerel"]
 static var xp := 0
@@ -118,6 +121,7 @@ static func load_once() -> void:
 	var hk: Variant = cfg.get_value("tackle", "hook", "h4")
 	hook_id = String(hk) if (hk is String and Tackle.HOOKS.has(hk)) else "h4"
 	live_bait = clampi(_to_int(cfg.get_value("tackle", "live", 0)), 0, LIVE_BAIT_MAX)
+	rig_mode = "bottom" if cfg.get_value("tackle", "rig", "float") == "bottom" else "float"
 	best_kg = _clean(cfg.get_value("journal", "best_kg", {}), true)
 	counts = _clean(cfg.get_value("journal", "counts", {}), false)
 	for k: String in counts:
@@ -139,6 +143,7 @@ static func save() -> void:
 	cfg.set_value("tackle", "bait", bait_id)
 	cfg.set_value("tackle", "hook", hook_id)
 	cfg.set_value("tackle", "live", live_bait)
+	cfg.set_value("tackle", "rig", rig_mode)
 	cfg.set_value("journal", "best_kg", best_kg)
 	cfg.set_value("journal", "counts", counts)
 	var err := cfg.save(SAVE_PATH)
