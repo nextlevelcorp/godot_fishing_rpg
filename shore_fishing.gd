@@ -1326,12 +1326,38 @@ func _end_fight(keep_view: bool = false) -> void:
 
 func _on_caught(id: String, weight_kg: float) -> void:
 	var sp := BiomeDB.get_species(id)
+	# Turkish amateur rules (Regulations): under-size fish, a second turbot, or fish past the daily
+	# 5 kg go back into the sea. You still learn from it: a few XP, no coins, no journal entry.
+	var cm := Regulations.length_cm(id, weight_kg)
+	var why_release := ""
+	var legal := Regulations.min_cm(id)
+	var kept: Dictionary = GameSession.outing.get("kept", {})
+	if legal > 0.0 and cm < legal:
+		why_release = "Under the legal size: %.0f cm, minimum %.0f cm" % [cm, legal]
+	elif Regulations.COUNT_LIMIT.has(id) and int(kept.get(id, 0)) >= int(Regulations.COUNT_LIMIT[id]):
+		why_release = "Limit is %d per day for this species" % int(Regulations.COUNT_LIMIT[id])
+	elif float(GameSession.outing.get("kept_kg", 0.0)) + weight_kg > Regulations.DAILY_KG:
+		why_release = "Daily limit of %.0f kg reached" % Regulations.DAILY_KG
+	if why_release != "":
+		GameSession.xp += 3
+		GameSession.save()
+		_update_progress_ui()
+		_fight_view.show_catch("Released: " + String(sp["name"]), PackedStringArray(["%.2f kg, %.0f cm" % [weight_kg, cm], why_release, "+3 XP for doing it right"]))
+		_result_label.text = ""
+		_set_status("Released. Good practice keeps the fish coming")
+		_amb.play("splash", 0.5)
+		_end_fight(true)
+		return
+	if not GameSession.outing.is_empty():
+		kept[id] = int(kept.get(id, 0)) + 1
+		GameSession.outing["kept"] = kept
+		GameSession.outing["kept_kg"] = float(GameSession.outing.get("kept_kg", 0.0)) + weight_kg
 	var value := int(round(float(sp["base_price"]) * pow(maxf(weight_kg, 0.05), 0.8)))
 	var res := GameSession.record_catch(id, String(sp["name"]), weight_kg, value, int(sp["base_price"]))
 	_update_coins()
 	_update_progress_ui()
 	var badge := "NEW SPECIES!  " if bool(res["first"]) else ("NEW RECORD!  " if bool(res["record"]) else "")
-	var lines := PackedStringArray(["%.2f kg   +%d coins   +%d XP" % [weight_kg, value, int(res["xp"])], String(sp["scientific"]),
+	var lines := PackedStringArray(["%.2f kg, %.0f cm   +%d coins   +%d XP" % [weight_kg, cm, value, int(res["xp"])], String(sp["scientific"]),
 		"On %s, hook %s" % [String(Tackle.BAITS[GameSession.bait_id]["name"]).to_lower(), Tackle.hook_name(GameSession.hook_id)]])
 	if GameSession.LIVE_BAIT_SPECIES.has(id) and weight_kg < 0.4 and GameSession.live_bait < GameSession.LIVE_BAIT_MAX:
 		lines.append("Into the bucket as live bait  (%d)" % GameSession.add_live_bait(1))

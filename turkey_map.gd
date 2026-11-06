@@ -428,6 +428,8 @@ func _open_journal() -> void:
 			var sp := BiomeDB.get_species(fid)
 			var season := Season.label(fid)
 			var season_txt := ("  [%s in %s]" % [season, Season.month_name()]) if season != "" else ""
+			if Regulations.min_cm(fid) > 0.0:
+				season_txt += "  [legal size %.0f cm]" % Regulations.min_cm(fid)
 			var baits := ", ".join(Tackle.best_baits(fid))
 			if known:
 				var dr: Vector2 = sp["depth_m"]

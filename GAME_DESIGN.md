@@ -80,6 +80,9 @@ All numbers are game-design fill. Test: hook a bluefish, stop reeling during a j
 ## Seasons (build 31)
 The game uses the real month from the device (`season.gd`). Each species has peak and low months from the common Turkish angling calendar: bluefish Sep-Dec, bonito Aug-Nov, anchovy Nov-Feb, mackerel Oct-Jan, red mullet Jul-Oct, seabass Oct-Feb, squid Nov-Mar, octopus May-Sep and others. Peak months multiply the bite weight by 1.7, low months by 0.35 (game-design fill). The month shows next to the clock, and the journal marks each species "in season" or "out of season". Test: in November, bluefish and bonito come far more often at Galata than in May.
 
+## Legal sizes and limits (build 32)
+Turkish amateur rules from Tebliğ 2024/21 (6/2, valid 2024-2028), via search results, the official PDF was not reachable from the build environment (`regulations.gd` has the citation): minimum sizes seabass 25 cm, gilthead seabream 20 cm, horse mackerel 13 cm, bluefish 18 cm, turbot 45 cm and one per day; a 5 kg daily total. Length comes from weight with W = a L^3, a set by body depth (game-design fill). A fish that breaks a rule is released at the catch: +3 XP, no coins, no journal entry, and the card says why. The journal shows the legal size. Other species have no size rule in the game until their values are confirmed.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).
