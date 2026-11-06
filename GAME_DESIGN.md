@@ -77,6 +77,9 @@ Bait choices follow common Turkish shore-angling practice; all numbers are game-
 - **Landing:** a fish over 1.5 kg with stamina above 30 % will not be landed: at the edge it runs 4 m out again at full strength. Tire it first.
 All numbers are game-design fill. Test: hook a bluefish, stop reeling during a jump; it often throws the hook. Reel a fresh 3 kg fish straight in; it runs at the edge.
 
+## Seasons (build 31)
+The game uses the real month from the device (`season.gd`). Each species has peak and low months from the common Turkish angling calendar: bluefish Sep-Dec, bonito Aug-Nov, anchovy Nov-Feb, mackerel Oct-Jan, red mullet Jul-Oct, seabass Oct-Feb, squid Nov-Mar, octopus May-Sep and others. Peak months multiply the bite weight by 1.7, low months by 0.35 (game-design fill). The month shows next to the clock, and the journal marks each species "in season" or "out of season". Test: in November, bluefish and bonito come far more often at Galata than in May.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

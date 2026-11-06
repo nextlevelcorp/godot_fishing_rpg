@@ -797,6 +797,7 @@ func _species_weight(id: String) -> float:
 	w *= exp(-miss / 2.5)
 	w *= BiomeDB.activity_factor(id, _world.time_of_day)
 	w *= Tackle.bite_factor(id, GameSession.bait_id, GameSession.hook_id)
+	w *= Season.factor(id)
 	return w
 
 
@@ -1630,7 +1631,7 @@ func _process(delta: float) -> void:
 	_fight_view.tint = _tint.color
 	_fight_view.daylight = _world.daylight
 	_water.set_daylight(_world.daylight)
-	_clock_label.text = "%s   |   %s" % [_world.clock_text(), _weather.label()]
+	_clock_label.text = "%s %s   |   %s" % [Season.month_name(), _world.clock_text(), _weather.label()]
 	var probe := _bobber_pos if (_state == State.WAIT or _state == State.BITE) else (_pred_landing if _state == State.CHARGE else _hand + _facing * 60.0)
 	var water := _water_depth(probe)
 	_depth_label.text = "Float %.1f m  |  Water %s  |  Clutch %.0f N  |  %s, hook %s" % [_bait_depth, ("%.1f m" % water) if water > 0.0 else "-",

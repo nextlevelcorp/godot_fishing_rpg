@@ -426,13 +426,15 @@ func _open_journal() -> void:
 			row.add_child(FishIcon.new(fid, known))
 			var info := _make_label(row, 15, Color(0.85, 0.9, 1.0))
 			var sp := BiomeDB.get_species(fid)
+			var season := Season.label(fid)
+			var season_txt := ("  [%s in %s]" % [season, Season.month_name()]) if season != "" else ""
 			var baits := ", ".join(Tackle.best_baits(fid))
 			if known:
 				var dr: Vector2 = sp["depth_m"]
-				info.text = "%s  (%s)\nBest %.2f kg, landed %d.  %.0f-%.0f m deep, feeds %s.\nBait: %s.  Hook %s." % [sp["name"], sp["scientific"],
+				info.text = "%s  (%s)%s\nBest %.2f kg, landed %d.  %.0f-%.0f m deep, feeds %s.\nBait: %s.  Hook %s." % [sp["name"], sp["scientific"], season_txt,
 					float(GameSession.best_kg[fid]), int(GameSession.counts[fid]), dr.x, dr.y, _feeds_text(fid), baits, Tackle.hook_range(fid)]
 			else:
-				info.text = "???  Not caught yet.\nLocals say: try %s, %s." % [baits if baits != "" else "different baits", _feeds_text(fid)]
+				info.text = "???  Not caught yet.%s\nLocals say: try %s, %s." % [season_txt, baits if baits != "" else "different baits", _feeds_text(fid)]
 	_overlay.visible = true
 
 
