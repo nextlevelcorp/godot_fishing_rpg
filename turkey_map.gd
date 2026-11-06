@@ -76,6 +76,7 @@ var _sub: Label
 var _fish_label: Label
 var _note_label: Label
 var _go_button: Button
+var _boat_button: Button
 var _coins_label: Label
 var _overlay: PanelContainer
 var _overlay_title: Label
@@ -197,12 +198,13 @@ func _build_panel() -> void:
 	_go_button.pressed.connect(_on_go_pressed)
 	row.add_child(_go_button)
 
-	var sandbox := Button.new()
-	sandbox.text = "Boat sandbox"
-	sandbox.custom_minimum_size = Vector2(200, 60)
-	sandbox.add_theme_font_size_override("font_size", 20)
-	sandbox.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://main_sandbox.tscn"))
-	row.add_child(sandbox)
+	_boat_button = Button.new()
+	_boat_button.text = "BOAT"
+	_boat_button.custom_minimum_size = Vector2(300, 60)
+	_boat_button.add_theme_font_size_override("font_size", 20)
+	_boat_button.disabled = true
+	_boat_button.pressed.connect(_on_boat_pressed)
+	row.add_child(_boat_button)
 
 
 func _make_label(parent: Control, size: int, color: Color) -> Label:
@@ -292,9 +294,15 @@ func _select(id: String) -> void:
 	_fish_label.text = "Fish here (%d/%d caught): %s" % [_caught_count(ids), ids.size(), ", ".join(names)]
 	_note_label.text = "Evidence: %s (%d sources). %s Pin is town-level, not the exact mark." % [s["evidence"], s["sources"].size(), s["species_note"]]
 	var need := int(s.get("unlock_level", 1))
+	if GameSession.level() < GameSession.BOAT_LEVEL:
+		_boat_button.disabled = true
+		_boat_button.text = "BOAT from level %d" % GameSession.BOAT_LEVEL
+	else:
+		_boat_button.disabled = not GameSession.is_unlocked(s) or GameSession.coins < GameSession.BOAT_RENT
+		_boat_button.text = "RENT A BOAT  %d" % GameSession.BOAT_RENT
 	if GameSession.is_unlocked(s):
 		_go_button.disabled = false
-		_go_button.text = "FISH HERE"
+		_go_button.text = "FROM SHORE"
 	else:
 		_go_button.disabled = true
 		_go_button.text = "LOCKED - LEVEL %d" % need
@@ -487,4 +495,18 @@ func _on_go_pressed() -> void:
 	if _selected == "" or not GameSession.is_unlocked(FishingSpots.get_spot(_selected)):
 		return
 	GameSession.spot_id = _selected
+	GameSession.mode = "shore"
+	get_tree().change_scene_to_file("res://shore_fishing.tscn")
+
+
+## Rents a rowing boat for one outing: deeper water, fish all around, no lifting from height.
+func _on_boat_pressed() -> void:
+	if _selected == "" or not GameSession.is_unlocked(FishingSpots.get_spot(_selected)):
+		return
+	if GameSession.level() < GameSession.BOAT_LEVEL or GameSession.coins < GameSession.BOAT_RENT:
+		return
+	GameSession.coins -= GameSession.BOAT_RENT
+	GameSession.save()
+	GameSession.spot_id = _selected
+	GameSession.mode = "boat"
 	get_tree().change_scene_to_file("res://shore_fishing.tscn")

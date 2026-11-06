@@ -23,7 +23,7 @@ const ROD_REST := Vector2(690.0, 175.0)    ## tip when nothing pulls on it
 const REST_PITCH := 110.0                  ## px the view looks down at rest, so the near water shows
 const PITCH_MAX := 430.0
 ## Distance from your eyes to where the water starts (m), by spot kind. The fish cannot come closer.
-const EDGE_M := {"rocky": 5.0, "beach": 6.0, "harbor": 3.0, "bridge": 4.0}
+const EDGE_M := {"rocky": 5.0, "beach": 6.0, "harbor": 3.0, "bridge": 4.0, "boat": 1.2}
 
 ## Sound cues for the shore scene to play: exit, drips, splash, splash_big.
 signal sfx(kind: String, volume: float)
@@ -711,7 +711,25 @@ func _draw_target() -> void:
 		c.draw_circle(p2, clampf(F * 0.04 / target_z, 2.0, 8.0), Color(1.0, 0.3, 0.2))
 
 
+## The bow of the kayık in front of you, rocking on the swell (an oscillator on height and roll).
+func _draw_bow(night: float) -> void:
+	var c := _canvas
+	var dark := 0.55 * night
+	# the bow of the kayık in front of you, rocking on the swell
+	c.draw_set_transform(Vector2(0.0, sin(_time * 1.3) * 6.0), sin(_time * 0.9) * 0.02, Vector2.ONE)
+	c.draw_colored_polygon(PackedVector2Array([Vector2(250.0, H + 300.0), Vector2(560.0, 640.0), Vector2(640.0, 600.0),
+		Vector2(720.0, 640.0), Vector2(1030.0, H + 300.0)]), Color(0.93, 0.93, 0.90).darkened(dark))
+	c.draw_colored_polygon(PackedVector2Array([Vector2(330.0, H + 300.0), Vector2(580.0, 670.0), Vector2(640.0, 640.0),
+		Vector2(700.0, 670.0), Vector2(950.0, H + 300.0)]), Color(0.55, 0.38, 0.22).darkened(dark))
+	c.draw_polyline(PackedVector2Array([Vector2(250.0, H + 300.0), Vector2(560.0, 640.0), Vector2(640.0, 600.0),
+		Vector2(720.0, 640.0), Vector2(1030.0, H + 300.0)]), Color(0.15, 0.35, 0.65).darkened(dark), 6.0)
+	c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
 func _draw_foreground(night: float) -> void:
+	if kind == "boat":
+		_draw_bow(night)
+		return
 	var c := _canvas
 	var dark := 0.55 * night
 	var edge_y := _proj(0.0, _z_edge(), 0.0).y
@@ -776,7 +794,7 @@ func _draw_rocks(night: float) -> void:
 
 ## Other anglers' rods to the left: thin lines that nod in the swell; now and then one bends on a fish.
 func _draw_neighbours(night: float) -> void:
-	if kind == "beach":
+	if kind == "beach" or kind == "boat":
 		return
 	var col := Color(0.12, 0.12, 0.14).lerp(Color(0.05, 0.05, 0.07), night)
 	for n in _neighbours:

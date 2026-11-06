@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Shown on screen so a player can tell a fresh deploy from a page the browser cached.
 ## Bump it with every build that changes behaviour.
-const BUILD := "build 36"
+const BUILD := "build 37"
 const SAVE_PATH := "user://save.cfg"
 const SAVE_VERSION := 1
 const START_RIG := "shore_spinning_rig"
@@ -28,6 +28,10 @@ const MAX_LEVEL := 30
 
 ## Id of the FishingSpots entry the player picked on the map.
 static var spot_id := ""
+## "shore" or "boat" for the current outing (chosen on the map, not saved).
+static var mode := "shore"
+const BOAT_RENT := 60          ## coins to rent a rowing boat (kayık) for one outing
+const BOAT_LEVEL := 3
 
 ## Fish landed during this visit: {fish_id, name, weight_kg, value, spot_id}. Not saved.
 static var catches: Array[Dictionary] = []

@@ -92,6 +92,9 @@ From a pier, harbour quay or bridge a landed fish must be lifted through the air
 ## Daily challenge (build 36)
 `daily.gd`: one challenge per calendar day, the same for every player on that date (seeded by the date): a species at one of your unlocked spots, weighted toward species in season, of at least the median weight that species bites at. Reward once per day: 120 coins plus the species' base price, and 40 XP. The map's TODAY button shows it with the locals' bait and hook advice and a button that selects the spot; the catch card says when it is done.
 
+## Boat fishing (build 37)
+From level 3 the map offers RENT A BOAT (60 coins per outing) beside FROM SHORE. In a boat outing you sit in a rowing kayık about 65 m out: the joystick rows (oar force, water drag, Nature of Code forces), and while not anchored the current and wind drift the boat, in every state, so the line and float move with you. ANCH drops or lifts the anchor; rowing lifts it. You can cast in any direction; the water is deeper, so deeper species come through the depth match. In the first-person view the eye is 1.4 m above the water, the bow of the kayık rocks in front of you, and fish can come right alongside (1.2 m). No lifting from height, so no net is needed. Game-design fill for the numbers. Test: rent a boat at Çeşme, row out, anchor, fish a bottom rig: dentex and scorpionfish show up more than from the shore.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

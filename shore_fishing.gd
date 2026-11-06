@@ -71,11 +71,19 @@ var _summary: PanelContainer
 var _hud_root: Control
 var _weather: WeatherFx
 var _pov_on := false
+## Boat outing: the angler sits in a rowing boat out on the water instead of walking the shore.
+var _boat_mode := false
+var _boat_vel := Vector2.ZERO
+var _anchored := false
+const ROW_FORCE := 120.0          ## px/s^2 from the oars
+const BOAT_DRAG := 0.9            ## 1/s water drag on the hull
+const BOAT_START_Y := -650.0      ## about 65 m out
 var _bait_on := true               ## false once small fish have stripped the hook
 var _empty_t := 0.0
 var _escape_reason := ""
 var _overhook_t := 0.0
 var _was_shaking := false
+var _anchor_seen := 0
 var _tackle_panel: PanelContainer
 var _build_label: Label
 var _fps_t := 0.0
@@ -186,6 +194,9 @@ func _ready() -> void:
 		GameSession.spot_id = "galata_bridge"       # opened directly, not from the map
 	_spot = FishingSpots.get_spot(GameSession.spot_id)
 	GameSession.start_outing(_make_goals())
+	_boat_mode = GameSession.mode == "boat"
+	if _boat_mode:
+		_hand = Vector2(0.0, BOAT_START_Y)
 	_has_pier = _spot["kind"] != "bridge"
 	_pier_x = 900.0 if hash(GameSession.spot_id) % 2 == 0 else -900.0
 	_build_walkable()
@@ -194,6 +205,7 @@ func _ready() -> void:
 	_current = Vector2(_rng.randf_range(-14.0, 14.0), _rng.randf_range(-4.0, 4.0))
 	_cast_seen = int(TouchControls.presses.get(&"cast", 0))
 	_reel_seen = int(TouchControls.presses.get(&"reel_in", 0))
+	_anchor_seen = int(TouchControls.presses.get(&"anchor", 0))
 
 	_cam = Camera2D.new()
 	_cam.position = Vector2(0.0, 40.0)
@@ -246,6 +258,8 @@ func _ready() -> void:
 	_build_hud()
 	var touch := TouchControls.new()
 	touch.enabled_actions.assign([&"cast", &"reel_in", &"drag_up", &"drag_down", &"bait_deeper", &"bait_shallower"])
+	if _boat_mode:
+		touch.enabled_actions.append(&"anchor")
 	touch.joystick = true
 	add_child(touch)
 	add_child(DeviceGuard.new())
@@ -664,6 +678,7 @@ func _physics_process(delta: float) -> void:
 				_state = State.AIM
 				_fight_view.end()
 				_set_status("Walk with the stick. At the water's edge, hold CAST to throw")
+	_update_boat(delta)
 	_update_float(delta)
 	_update_fish_agent(delta)
 	_update_pov()
@@ -697,6 +712,8 @@ func _steer(delta: float) -> void:
 
 ## On the pier you can throw to the sides as well; from the bank only out to sea.
 func _aim_limit() -> float:
+	if _boat_mode:
+		return PI
 	return 1.45 if _on_pier() else 0.9
 
 
@@ -717,6 +734,8 @@ func _walkable(p: Vector2) -> bool:
 
 ## The stick walks the angler; each axis is tried on its own so you slide along edges.
 func _walk(delta: float) -> void:
+	if _boat_mode:
+		return                            # rowing is handled every frame in _update_boat
 	var mv := Input.get_vector(&"steer_left", &"steer_right", &"boat_forward", &"boat_back", 0.1)
 	_moving = mv.length() > 0.05
 	if not _moving:
@@ -769,7 +788,40 @@ func _on_pier() -> bool:
 
 
 func _can_cast() -> bool:
-	return _hand.y < 48.0 or _on_pier()
+	return _boat_mode or _hand.y < 48.0 or _on_pier()
+
+
+## The boat: oars push it while you are not fishing; wind and current drift it unless anchored.
+## A body with forces and drag, as in Nature of Code chapter 2.
+func _update_boat(delta: float) -> void:
+	if not _boat_mode:
+		return
+	if Input.is_action_just_pressed(&"anchor") or int(TouchControls.presses.get(&"anchor", 0)) != _anchor_seen:
+		_anchor_seen = int(TouchControls.presses.get(&"anchor", 0))
+		_anchored = not _anchored
+		_flash("Anchor down" if _anchored else "Anchor up: the boat drifts")
+	var force := Vector2.ZERO
+	var mv := Vector2.ZERO
+	if _state == State.AIM:
+		mv = Input.get_vector(&"steer_left", &"steer_right", &"boat_forward", &"boat_back", 0.1)
+		force += mv * ROW_FORCE
+		if mv.length() > 0.05:
+			_anchored = false
+			_facing = mv.normalized()
+			_aim = atan2(_facing.x, -_facing.y)
+	if not _anchored:
+		force += _current * 0.6 + _wind * 0.05
+	_boat_vel += force * delta
+	_boat_vel *= maxf(0.0, 1.0 - BOAT_DRAG * delta)
+	if _anchored:
+		_boat_vel *= maxf(0.0, 1.0 - 6.0 * delta)
+	var nxt := _hand + _boat_vel * delta
+	nxt.x = clampf(nxt.x, -HALF_WIDTH + 200.0, HALF_WIDTH - 200.0)
+	nxt.y = clampf(nxt.y, -1500.0, -160.0)          # stay off the rocks and in sight of the town
+	_hand = nxt
+	_moving = mv.length() > 0.05
+	if _moving:
+		_walk_phase += delta * 4.0
 
 
 func _is_land(p: Vector2) -> bool:
@@ -1120,6 +1172,10 @@ func _update_pov() -> void:
 	v.wave_amp = float(WeatherFx.KINDS[_weather_kind]["wind"])
 	v.on_pier = _on_pier()
 	v.eye_h = 8.0 if v.kind == "bridge" else (4.5 if v.on_pier else 2.6)
+	if _boat_mode:
+		v.kind = "boat"
+		v.on_pier = false
+		v.eye_h = 1.4
 	var pov := v.is_open()
 	_world.visible = not pov
 	_water.visible = not pov
@@ -1339,7 +1395,7 @@ func _on_caught(id: String, weight_kg: float) -> void:
 	var sp := BiomeDB.get_species(id)
 	# From a pier, quay or bridge the fish has to come up through the air. Lifted on the line, its
 	# weight plus the jerk of the lift (about twice its weight) can part the line; a net takes it.
-	var high := _on_pier() or String(_spot["kind"]) == "bridge" or String(_spot["kind"]) == "harbor"
+	var high := not _boat_mode and (_on_pier() or String(_spot["kind"]) == "bridge" or String(_spot["kind"]) == "harbor")
 	if high and not GameSession.has_net and weight_kg * 9.81 * 2.0 > _fishing.line_break_force_n:
 		_buzz(250)
 		_amb.play("snap", 0.8)
@@ -2044,6 +2100,38 @@ func _draw_float(pos: Vector2, sink: float) -> void:
 	draw_circle(p + Vector2(0.0, -3.0), radius * 0.75, Color(0.95, 0.25, 0.2, 1.0 - under))
 
 
+## The rented kayık: a white and blue wooden rowing boat with oars that dip as you row.
+func _draw_rowing_boat(dir: Vector2) -> void:
+	var f := dir.normalized() if dir.length() > 0.1 else Vector2.UP
+	var s := f.orthogonal()
+	var c := _hand + Vector2(0.0, 30.0)
+	var l := 95.0
+	var w := 26.0
+	var hull := PackedVector2Array([c + f * l * 0.55, c + f * l * 0.25 + s * w, c - f * l * 0.45 + s * w * 0.8,
+		c - f * l * 0.5, c - f * l * 0.45 - s * w * 0.8, c + f * l * 0.25 - s * w])
+	var shadow := PackedVector2Array()
+	for q in hull:
+		shadow.append(q + Vector2(6.0, 10.0))
+	draw_colored_polygon(shadow, Color(0.0, 0.05, 0.1, 0.25))
+	draw_colored_polygon(hull, Color(0.93, 0.93, 0.90))
+	var inner := PackedVector2Array()
+	for q in hull:
+		inner.append(c + (q - c) * 0.82)
+	draw_colored_polygon(inner, Color(0.55, 0.38, 0.22))
+	draw_polyline(hull + PackedVector2Array([hull[0]]), Color(0.15, 0.35, 0.65), 4.0)
+	for k in [-0.15, 0.2]:
+		draw_line(c + f * l * k - s * w * 0.8, c + f * l * k + s * w * 0.8, Color(0.42, 0.29, 0.17), 5.0)
+	var dip := sin(_walk_phase) * 10.0 if _moving else 0.0
+	for side in [-1.0, 1.0]:
+		var lock := c + s * w * side * 0.9 + f * 6.0
+		draw_line(lock, lock + s * side * 55.0 - f * dip, Color(0.50, 0.36, 0.22), 3.0)
+	# wake while moving
+	if _boat_vel.length() > 8.0:
+		var back := c - _boat_vel.normalized() * l * 0.5
+		draw_line(back, back - _boat_vel.normalized() * 50.0 + s * 18.0, Color(1, 1, 1, 0.4), 2.0)
+		draw_line(back, back - _boat_vel.normalized() * 50.0 - s * 18.0, Color(1, 1, 1, 0.4), 2.0)
+
+
 ## At night the angler carries a lamp: a warm pool of light that flickers (two out-of-phase
 ## oscillators plus Perlin noise). On the pier it also draws baitfish, see LAMP_PIER_BONUS in _activity().
 func _draw_lamp() -> void:
@@ -2061,6 +2149,8 @@ func _draw_angler() -> void:
 	var d := _aim_dir()
 	# Three-quarter view: the angler stands with the rod hand at chest height (see Figure).
 	var look_dir := _facing if _state == State.AIM else d
+	if _boat_mode:
+		_draw_rowing_boat(look_dir)
 	# Feet sit behind and below the rod hand, so both hands grip the rod in front of the chest.
 	var feet := _hand - look_dir.normalized() * 10.0 + Vector2(0.0, 40.0)
 	Figure.draw_person(self, feet, look_dir, _walk_phase, _moving and _state == State.AIM, ANGLER_LOOK, 1.5, _hand)
