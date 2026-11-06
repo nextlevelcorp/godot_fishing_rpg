@@ -1337,6 +1337,17 @@ func _end_fight(keep_view: bool = false) -> void:
 
 func _on_caught(id: String, weight_kg: float) -> void:
 	var sp := BiomeDB.get_species(id)
+	# From a pier, quay or bridge the fish has to come up through the air. Lifted on the line, its
+	# weight plus the jerk of the lift (about twice its weight) can part the line; a net takes it.
+	var high := _on_pier() or String(_spot["kind"]) == "bridge" or String(_spot["kind"]) == "harbor"
+	if high and not GameSession.has_net and weight_kg * 9.81 * 2.0 > _fishing.line_break_force_n:
+		_buzz(250)
+		_amb.play("snap", 0.8)
+		_amb.play("splash", 1.0)
+		_result_label.text = "Lost it at the last moment!"
+		_set_status("Too heavy to lift on the line from up here. A landing net (kepce) would have saved it")
+		_end_fight()
+		return
 	# Turkish amateur rules (Regulations): under-size fish, a second turbot, or fish past the daily
 	# 5 kg go back into the sea. You still learn from it: a few XP, no coins, no journal entry.
 	var cm := Regulations.length_cm(id, weight_kg)

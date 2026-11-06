@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Shown on screen so a player can tell a fresh deploy from a page the browser cached.
 ## Bump it with every build that changes behaviour.
-const BUILD := "build 34"
+const BUILD := "build 35"
 const SAVE_PATH := "user://save.cfg"
 const SAVE_VERSION := 1
 const START_RIG := "shore_spinning_rig"
@@ -45,6 +45,9 @@ static var live_bait := 0
 ## Float rig (bait hangs at the float depth, bites show on the float) or bottom rig (dip takımı:
 ## a sinker holds the bait on the bottom, bites show on the rod tip and its bell). Saved.
 static var rig_mode := "float"
+## A landing net (kepçe): needed to land a heavy fish from a pier, quay or bridge. Saved.
+static var has_net := false
+const NET_PRICE := 250
 const LIVE_BAIT_MAX := 12
 const LIVE_BAIT_SPECIES: Array[String] = ["mediterranean_horse_mackerel", "european_anchovy", "atlantic_mackerel"]
 static var xp := 0
@@ -122,6 +125,7 @@ static func load_once() -> void:
 	hook_id = String(hk) if (hk is String and Tackle.HOOKS.has(hk)) else "h4"
 	live_bait = clampi(_to_int(cfg.get_value("tackle", "live", 0)), 0, LIVE_BAIT_MAX)
 	rig_mode = "bottom" if cfg.get_value("tackle", "rig", "float") == "bottom" else "float"
+	has_net = cfg.get_value("tackle", "net", false) == true
 	best_kg = _clean(cfg.get_value("journal", "best_kg", {}), true)
 	counts = _clean(cfg.get_value("journal", "counts", {}), false)
 	for k: String in counts:
@@ -144,6 +148,7 @@ static func save() -> void:
 	cfg.set_value("tackle", "hook", hook_id)
 	cfg.set_value("tackle", "live", live_bait)
 	cfg.set_value("tackle", "rig", rig_mode)
+	cfg.set_value("tackle", "net", has_net)
 	cfg.set_value("journal", "best_kg", best_kg)
 	cfg.set_value("journal", "counts", counts)
 	var err := cfg.save(SAVE_PATH)
@@ -286,6 +291,15 @@ static func buy_live_bait(n: int, price: int) -> bool:
 		return false
 	coins -= price
 	add_live_bait(n)
+	return true
+
+
+static func buy_net() -> bool:
+	if has_net or coins < NET_PRICE:
+		return false
+	coins -= NET_PRICE
+	has_net = true
+	save()
 	return true
 
 

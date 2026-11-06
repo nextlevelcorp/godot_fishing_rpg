@@ -86,6 +86,9 @@ Turkish amateur rules from Tebliğ 2024/21 (6/2, valid 2024-2028), via search re
 ## Bottom rig (build 33)
 The BAIT / HOOK panel also chooses the rig: FLOAT (samandıra, bait at the float depth) or BOTTOM (dip takımı: a lead sinker holds the bait on the bottom). With a bottom rig the bait depth is the water depth at the landing point, DEEP/SHAL do nothing, the cast flies 15 % farther, there is no float: bites show as the rod tip nodding and a brass bell at the tip ringing (soft on nibbles, hard on the bite). Bottom feeders (bream, whiting, scorpionfish, turbot, weever) come through the existing depth match. Lures ignore the rig. Test: on a 10 m bottom at Çeşme, a bottom rig with sea worm brings bream; a float set at 2 m brings mostly mid-water fish.
 
+## Landing net (build 35)
+From a pier, harbour quay or bridge a landed fish must be lifted through the air. Without a landing net (kepçe), a fish whose weight times about twice g (the jerk of the lift) exceeds the line's breaking force is lost at the last moment (with the starter rig, 55 N: about 2.8 kg). The tackle shop sells a net for 250 coins (saved). Rocks and beaches need no net. Game-design fill for the factor 2. Test: on the Galata bridge with no net, a 3 kg bluefish is lost at the end; after buying the net it is landed.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

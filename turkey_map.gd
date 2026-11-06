@@ -405,6 +405,22 @@ func _open_tackle() -> void:
 		_open_tackle())
 	bb.disabled = GameSession.coins < LIVE_BAIT_PRICE or GameSession.live_bait >= GameSession.LIVE_BAIT_MAX
 	bait_row.add_child(bb)
+	var net_row := HBoxContainer.new()
+	net_row.add_theme_constant_override("separation", 12)
+	_overlay_list.add_child(net_row)
+	var net_info := _make_label(net_row, 18, Color.WHITE)
+	net_info.text = "Landing net (kepce)\nLands heavy fish from piers, quays and bridges, where lifting on the line can part it."
+	var nb: Button
+	if GameSession.has_net:
+		nb = _make_button("OWNED", 190.0, func() -> void: pass)
+		nb.disabled = true
+	else:
+		nb = _make_button("BUY  %d" % GameSession.NET_PRICE, 190.0, func() -> void:
+			GameSession.buy_net()
+			_update_coins()
+			_open_tackle())
+		nb.disabled = GameSession.coins < GameSession.NET_PRICE
+	net_row.add_child(nb)
 	var tip := _make_label(_overlay_list, 15, Color(0.7, 0.8, 0.9))
 	tip.text = "A stronger rig lets you hold big fish without snapping the line. The biggest fish here can still out-pull it: use the clutch."
 	_overlay.visible = true
