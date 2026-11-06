@@ -19,8 +19,9 @@ const BAITS := {
 	"live_fish": {"name": "Live baitfish", "tr": "Canlı yem", "kind": "live", "steal": 0.05},
 	"spoon": {"name": "Spoon lure", "tr": "Kaşık", "kind": "lure", "steal": 0.0},
 	"capari": {"name": "Çapari string", "tr": "Çapari", "kind": "lure", "steal": 0.0},
+	"squid_jig": {"name": "Squid jig", "tr": "Kalamar zokası", "kind": "lure", "steal": 0.0},
 }
-const BAIT_ORDER: Array[String] = ["mussel", "sea_worm", "shrimp", "squid_strip", "sardine", "bread", "live_fish", "spoon", "capari"]
+const BAIT_ORDER: Array[String] = ["mussel", "sea_worm", "shrimp", "squid_strip", "sardine", "bread", "live_fish", "spoon", "capari", "squid_jig"]
 
 ## Hook sizes, smallest first. strength_n: pull at which the wire opens up and the fish is lost.
 const HOOKS := {
@@ -57,9 +58,9 @@ const PREF := {
 	"greater_weever": {"sea_worm": 1.0, "shrimp": 1.0, "sardine": 0.8},
 	"ornate_wrasse": {"sea_worm": 1.2, "shrimp": 1.0, "mussel": 0.9},
 	"turbot": {"live_fish": 1.1, "sardine": 1.0, "squid_strip": 0.8},
-	"common_octopus": {"sardine": 1.0, "squid_strip": 0.8},
-	"common_cuttlefish": {"shrimp": 1.0, "live_fish": 0.8},
-	"european_squid": {"sardine": 0.9, "shrimp": 0.9},
+	"common_octopus": {"squid_jig": 1.2, "sardine": 1.0, "squid_strip": 0.8},
+	"common_cuttlefish": {"squid_jig": 1.4, "shrimp": 1.0, "live_fish": 0.8},
+	"european_squid": {"squid_jig": 1.6, "sardine": 0.6, "shrimp": 0.6},
 	"blue_crab": {"sardine": 1.1, "mussel": 0.9},
 }
 const PREF_OTHER := 0.15
@@ -120,6 +121,8 @@ static func hook_strength(hook: String, bait: String) -> float:
 
 
 static func _hook_index(hook: String, bait: String) -> int:
+	if bait == "squid_jig":
+		return 2                     # a jig carries its own crown of pins, sized for squid
 	return CAPARI_HOOK if bait == "capari" else maxi(0, HOOK_ORDER.find(hook))
 
 

@@ -1522,8 +1522,8 @@ func _open_tackle_panel() -> void:
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	panel.offset_left = -470.0
 	panel.offset_right = 470.0
-	panel.offset_top = -300.0
-	panel.offset_bottom = 300.0
+	panel.offset_top = -340.0
+	panel.offset_bottom = 340.0
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.02, 0.10, 0.18, 0.95)
 	style.set_corner_radius_all(18)
@@ -1569,7 +1569,7 @@ func _open_tackle_panel() -> void:
 			_open_tackle_panel())
 		row.add_child(hb)
 	var hint := _plain_label(box, 16, Color(0.8, 0.9, 1.0))
-	hint.text = "Bottom rig: a sinker lays the bait on the bottom for bream, whiting, scorpionfish and turbot; watch the rod tip and listen for the bell. Float rig: set the depth with DEEP/SHAL. Bream like mussel and worm, mullet bread, bluefish and seabass live bait or a spoon, horse mackerel the çapari. Small hooks for small mouths; a big hook scares them off. A small hook can open up on a big fish. Lures catch only while you reel. Soft baits get picked off by small fish."
+	hint.text = "Bottom rig: a sinker lays the bait on the bottom for bream, whiting, scorpionfish and turbot; watch the rod tip and listen for the bell. Float rig: set the depth with DEEP/SHAL. Bream like mussel and worm, mullet bread, bluefish and seabass live bait or a spoon, horse mackerel the çapari, squid and cuttlefish a squid jig at night. Small hooks for small mouths; a big hook scares them off. A small hook can open up on a big fish. Lures catch only while you reel. Soft baits get picked off by small fish."
 	var done := _tackle_button("DONE", false, Vector2(200.0, 56.0))
 	done.pressed.connect(func() -> void: panel.queue_free())
 	box.add_child(done)

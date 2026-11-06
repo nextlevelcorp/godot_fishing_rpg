@@ -28,6 +28,7 @@ const EDGE_M := {"rocky": 5.0, "beach": 6.0, "harbor": 3.0, "bridge": 4.0}
 ## Sound cues for the shore scene to play: exit, drips, splash, splash_big.
 signal sfx(kind: String, volume: float)
 const G := 9.8
+const CATCH_AT := Vector2(470.0, 430.0)      ## where the landed fish is held up to look at
 const WAVE_ROWS := 12
 
 ## Set by ShoreFishing every frame.
@@ -422,7 +423,7 @@ func _step_particles(delta: float) -> void:
 
 ## Landed: the fish swings up into view on the line, a pendulum on a spring, dripping water.
 func _animate_catch(delta: float) -> void:
-	var target := Vector2(540.0, 380.0)
+	var target := CATCH_AT
 	var acc := (target - _fish_pos) * 26.0 - _lift_v * 6.0
 	_lift_v += acc * delta
 	_fish_pos += _lift_v * delta
@@ -942,7 +943,7 @@ func _cover_with_water(at: Vector2, len_px: float, depth_frac: float) -> void:
 
 
 func _draw_caught_fish() -> void:
-	var len_px := clampf(_fish_len_m(), 0.18, 1.3) * 300.0
+	var len_px := clampf(_fish_len_m() * 280.0, 150.0, 330.0)
 	if _creature != "":
 		_draw_creature(_creature, _fish_pos, _facing, _tilt, len_px / 160.0, Color.WHITE)
 	else:
@@ -951,10 +952,13 @@ func _draw_caught_fish() -> void:
 
 ## Catch card, with the species drawn as it looks (not a sprite).
 func _draw_card() -> void:
+	# Compact, upper right, clear of the HUD text, the touch buttons and the fish held up on the left.
 	var appear := clampf((3.4 - _catch_t) * 4.0, 0.0, 1.0)
-	var rect := Rect2(Vector2(40.0, 120.0 + (1.0 - appear) * 40.0), Vector2(520.0, 300.0))
+	var h := 60.0 + float(_catch_lines.size()) * 24.0
+	var rect := Rect2(Vector2(700.0, 76.0 - (1.0 - appear) * 30.0), Vector2(540.0, h))
+	_card.bg_color = Color(0.02, 0.10, 0.18, 0.82)
 	_card.draw(_canvas.get_canvas_item(), rect)
 	var font := ThemeDB.fallback_font
-	_canvas.draw_string(font, rect.position + Vector2(24.0, 50.0), _catch_title, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 48.0, 30, Color(1.0, 0.92, 0.6))
+	_canvas.draw_string(font, rect.position + Vector2(18.0, 38.0), _catch_title, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 36.0, 24, Color(1.0, 0.92, 0.6))
 	for i in _catch_lines.size():
-		_canvas.draw_string(font, rect.position + Vector2(24.0, 94.0 + float(i) * 32.0), _catch_lines[i], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 48.0, 22, Color.WHITE)
+		_canvas.draw_string(font, rect.position + Vector2(18.0, 66.0 + float(i) * 24.0), _catch_lines[i], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 36.0, 17, Color.WHITE)
