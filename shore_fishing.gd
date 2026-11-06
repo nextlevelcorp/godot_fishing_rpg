@@ -2119,10 +2119,10 @@ func _draw_rowing_boat(dir: Vector2) -> void:
 		inner.append(c + (q - c) * 0.82)
 	draw_colored_polygon(inner, Color(0.55, 0.38, 0.22))
 	draw_polyline(hull + PackedVector2Array([hull[0]]), Color(0.15, 0.35, 0.65), 4.0)
-	for k in [-0.15, 0.2]:
+	for k: float in [-0.15, 0.2]:
 		draw_line(c + f * l * k - s * w * 0.8, c + f * l * k + s * w * 0.8, Color(0.42, 0.29, 0.17), 5.0)
 	var dip := sin(_walk_phase) * 10.0 if _moving else 0.0
-	for side in [-1.0, 1.0]:
+	for side: float in [-1.0, 1.0]:
 		var lock := c + s * w * side * 0.9 + f * 6.0
 		draw_line(lock, lock + s * side * 55.0 - f * dip, Color(0.50, 0.36, 0.22), 3.0)
 	# wake while moving

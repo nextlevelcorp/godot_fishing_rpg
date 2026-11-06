@@ -45,6 +45,27 @@ for i, line in enumerate(src, 1):
         if (reads_variant or reads_event) and not rhs.startswith(CASTS) and not re.search(r"\bas\s+\w+\s*$", rhs):
             issues.append(f"{path}:{i}: `:=` infers from a Dictionary/Variant read; give an explicit type "
                           f"(var x: Type = ...) or wrap in a cast, or Godot may refuse to load the script")
+# 3. `for v in [ ... ]:` gives v no static type, so `var x := <expression using v>` inside the loop
+#    cannot be inferred either ("Cannot infer the type of ... variable"). Type the loop variable.
+loop = None
+for i, line in enumerate(src, 1):
+    m = re.match(r"(\s*)for\s+(\w+)\s+in\s+\[", line)
+    if m:
+        loop = (len(m.group(1)), m.group(2))
+        continue
+    if loop:
+        ind = len(re.match(r"\s*", line).group(0))
+        if line.strip() and ind <= loop[0]:
+            loop = None
+            continue
+        mv = re.match(r"\s*var\s+\w+\s*:=\s*(.+)$", line)
+        rhs3 = mv.group(1).split("#")[0].strip() if mv else ""
+        # typed results: a cast or a typed builtin (lerpf, clampf, sin...) around the whole value
+        typed = re.match(r"(float|int|String|bool|Vector2|Color|lerpf|clampf|minf|maxf|absf|sqrt|pow|sin|cos|snappedf)\(", rhs3)
+        bare = re.sub(r"\b(float|int|String|bool)\(\s*%s\s*\)" % loop[1], "", rhs3) if loop else rhs3
+        if mv and not typed and re.search(r"\b%s\b" % loop[1], bare):
+            issues.append(f"{path}:{i}: `:=` uses loop variable `{loop[1]}` from an untyped array literal; "
+                          f"write `for {loop[1]}: float in [...]` (or the right type)")
 if issues:
     msg = "gd_lint (static, Godot not run):\n" + "\n".join(issues[:15])
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": msg}}))
