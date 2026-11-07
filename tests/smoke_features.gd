@@ -5,6 +5,12 @@
 ## cannot see the screen: it proves the code paths run without errors, nothing more.
 extends SceneTree
 
+# ShoreFishing.State, as numbers. Do not write `ShoreFishing.State.FIGHT` here: a script run with -s
+# is compiled before the autoloads exist, and shore_fishing.gd needs BiomeDB, so naming the class in
+# this file stops the whole scene from compiling ("Identifier not found: BiomeDB", build 45 CI).
+const STATE_AIM := 0
+const STATE_FIGHT := 5
+
 var _frame := 0
 var _scene: Node
 var _fails := 0
@@ -85,7 +91,7 @@ func _process(_delta: float) -> bool:
 			_check(panels >= 1, "the TEST panel lists species (Whiting found)")
 			_scene.call("_test_hook", "whiting", 0.4)
 		40:
-			_check(int(_scene.get("_state")) == ShoreFishing.State.FIGHT, "a TEST fish is on the line")
+			_check(int(_scene.get("_state")) == STATE_FIGHT, "a TEST fish is on the line")
 			_scene.call("_test_action", "jump")
 		80:
 			_scene.call("_test_action", "thrash")
@@ -93,9 +99,9 @@ func _process(_delta: float) -> bool:
 			_scene.call("_test_action", "land")
 		160:
 			_check(GameSession.coins == _coins_before and GameSession.xp == _xp_before, "a test catch gives no coins or XP")
-			_check(int(_scene.get("_state")) != ShoreFishing.State.FIGHT, "the test fish was landed")
+			_check(int(_scene.get("_state")) != STATE_FIGHT, "the test fish was landed")
 			# Hook a cephalopod and a crab, which have painted pictures but procedural fallbacks.
-			_scene.set("_state", ShoreFishing.State.AIM)
+			_scene.set("_state", STATE_AIM)
 			_scene.call("_test_hook", "european_squid", 0.5)
 		200:
 			_scene.call("_test_action", "land")
