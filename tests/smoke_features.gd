@@ -89,6 +89,20 @@ func _process(_delta: float) -> bool:
 			_check(tp != null and is_instance_valid(tp), "the TALK panel opens")
 			if tp != null and is_instance_valid(tp):
 				(tp as Node).queue_free()
+			# Weekly tournament: entering picks rivals; at the horn with no fish you place last, no prize.
+			var coins_before := GameSession.coins
+			GameSession.coins = 100
+			_scene.call("_start_tourney")
+			var tr: Dictionary = _scene.get("_tourney")
+			_check(not tr.is_empty() and (tr["rivals"] as Array).size() >= 1, "a tournament starts with rivals")
+			tr["t"] = 0.0
+			_scene.call("_tick_tourney", 0.1)
+			_check(bool((_scene.get("_tourney") as Dictionary).get("over", false)), "the tournament ends at the horn")
+			_check(GameSession.coins == 100 - 30, "entry was paid and no prize was given for no fish")
+			var tp2: Variant = _scene.get("_talk_panel")
+			if tp2 != null and is_instance_valid(tp2):
+				(tp2 as Node).queue_free()
+			GameSession.coins = coins_before
 			_scene.call("_open_test_panel")
 		16:
 			var panels := 0

@@ -73,6 +73,10 @@ var _hud_root: Control
 var _local_idx := -1                 ## index in _crowd of the spot's named local angler (locals.gd), -1 none
 var _talk_btn: Button
 var _talk_panel: PanelContainer
+## Weekly tournament while it runs: {t: seconds left, me: kg, rivals: [{idx, name, best}], over: bool}.
+var _tourney: Dictionary = {}
+var _tourney_btn: Button
+var _tourney_label: Label
 var _weather: WeatherFx
 var _pov_on := false
 ## Boat outing: the angler sits in a rowing boat out on the water instead of walking the shore.
@@ -414,6 +418,166 @@ func _open_talk_panel() -> void:
 	_hud_root.add_child(panel)
 
 
+# ---------------------------------------------------------------- weekly tournament
+func _open_tourney_panel() -> void:
+	if _talk_panel != null and is_instance_valid(_talk_panel):
+		_talk_panel.queue_free()
+	var panel := _tourney_card("Weekly shore tournament")
+	var box: VBoxContainer = panel.get_child(0)
+	if not _tourney.is_empty() and not bool(_tourney.get("over", false)):
+		_plain_label(box, 19, Color.WHITE).text = "Running.  %s" % _tourney_text()
+	else:
+		_plain_label(box, 19, Color.WHITE).text = "Five minutes. The heaviest single fish wins, and it must be of legal size. You fish against the three anglers nearest you."
+		_plain_label(box, 18, Color(0.8, 0.9, 1.0)).text = "Entry %d coins.  Prizes %d / %d / %d coins.%s" % [Tournament.ENTRY, Tournament.PRIZES[0], Tournament.PRIZES[1], Tournament.PRIZES[2],
+			"" if Tournament.prize_open() else "  This week's prize is already yours: this one is for fun."]
+		if _state != State.AIM:
+			_plain_label(box, 18, Color(1.0, 0.6, 0.5)).text = "Reel in first."
+		else:
+			var enter := _tackle_button("ENTER  (-%d coins)" % Tournament.ENTRY, false, Vector2(300.0, 60.0))
+			enter.disabled = GameSession.coins < Tournament.ENTRY
+			enter.pressed.connect(func() -> void:
+				panel.queue_free()
+				_start_tourney())
+			box.add_child(enter)
+	var close := _tackle_button("CLOSE", false, Vector2(160.0, 60.0))
+	close.pressed.connect(func() -> void: panel.queue_free())
+	box.add_child(close)
+	_talk_panel = panel
+	_hud_root.add_child(panel)
+
+
+func _tourney_card(title: String) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.offset_left = -440.0
+	panel.offset_right = 440.0
+	panel.offset_top = -240.0
+	panel.offset_bottom = 240.0
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.02, 0.10, 0.18, 0.95)
+	style.set_corner_radius_all(18)
+	style.set_content_margin_all(20)
+	panel.add_theme_stylebox_override("panel", style)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	panel.add_child(box)
+	_plain_label(box, 28, Color(1.0, 0.92, 0.6)).text = title
+	return panel
+
+
+## Pays the entry and picks the three anglers nearest you (the local counts) as rivals.
+func _start_tourney() -> void:
+	if GameSession.coins < Tournament.ENTRY:
+		return
+	GameSession.coins -= Tournament.ENTRY
+	GameSession.save()
+	_update_coins()
+	var order: Array[int] = []
+	for i in _crowd.size():
+		order.append(i)
+	order.sort_custom(func(a: int, b: int) -> bool:
+		return absf(float(_crowd[a]["x"]) - _hand.x) < absf(float(_crowd[b]["x"]) - _hand.x))
+	var rivals: Array[Dictionary] = []
+	var names := Tournament.NAMES.duplicate()
+	for k in mini(Tournament.RIVALS, order.size()):
+		var idx := order[k]
+		var nm := String(Locals.person(GameSession.spot_id)["name"]) if idx == _local_idx else String(names.pop_at(_rng.randi() % names.size()))
+		rivals.append({"idx": idx, "name": nm, "best": 0.0})
+	_tourney = {"t": Tournament.DURATION_S, "me": 0.0, "rivals": rivals, "over": false}
+	_tourney_label.visible = true
+	_amb.play("horn", 0.7)
+	_flash("Tournament on! Five minutes, heaviest legal fish wins")
+
+
+func _tourney_running() -> bool:
+	return not _tourney.is_empty() and not bool(_tourney.get("over", false))
+
+
+func _tourney_rival_landed(a: Dictionary) -> void:
+	if not _tourney_running():
+		return
+	var sp := String(a["sp"])
+	if sp == "":
+		return
+	var legal := Regulations.min_cm(sp)
+	if legal > 0.0 and Regulations.length_cm(sp, float(a["kg"])) < legal:
+		return                                    # they put it back, like you would
+	for r: Dictionary in _tourney["rivals"]:
+		if int(r["idx"]) == _crowd.find(a):
+			r["best"] = maxf(float(r["best"]), float(a["kg"]))
+
+
+## A kept fish of yours. Returns a line for the catch card, or "" when no tournament runs.
+func _tourney_player_landed(kg: float) -> String:
+	if not _tourney_running():
+		return ""
+	if kg > float(_tourney["me"]):
+		_tourney["me"] = kg
+		return "TOURNAMENT: new best %.2f kg  (%s)" % [kg, Tournament.ordinal(_tourney_place())]
+	return "TOURNAMENT: your best is still %.2f kg" % float(_tourney["me"])
+
+
+## Your place now, 0 = first. Ties go to whoever got there first: the rival.
+func _tourney_place() -> int:
+	var place := 0
+	for r: Dictionary in _tourney["rivals"]:
+		if float(r["best"]) >= float(_tourney["me"]) and float(r["best"]) > 0.0:
+			place += 1
+	return place
+
+
+func _tourney_text() -> String:
+	var t := maxf(float(_tourney["t"]), 0.0)
+	var lead_name := "you"
+	var lead := float(_tourney["me"])
+	for r: Dictionary in _tourney["rivals"]:
+		if float(r["best"]) > lead:
+			lead = float(r["best"])
+			lead_name = String(r["name"])
+	return "%d:%02d   You %.2f kg (%s)   Leader: %s %.2f kg" % [int(t) / 60, int(t) % 60, float(_tourney["me"]), Tournament.ordinal(_tourney_place()), lead_name, lead]
+
+
+## Counts down; at the horn a fish already on the line still counts, so it waits for the fight.
+func _tick_tourney(delta: float) -> void:
+	if not _tourney_running():
+		return
+	_tourney["t"] = float(_tourney["t"]) - delta
+	_tourney_label.text = "TOURNAMENT  " + _tourney_text()
+	if float(_tourney["t"]) > 0.0 or _state == State.FIGHT or _state == State.BITE:
+		return
+	_tourney["over"] = true
+	_tourney_label.visible = false
+	_amb.play("horn", 0.8)
+	var place := _tourney_place()
+	if float(_tourney["me"]) <= 0.0:
+		place = Tournament.RIVALS
+	var prize := Tournament.pay(place)
+	if place == 0 and not prize.is_empty():
+		_buzz(250)
+	_update_coins()
+	_update_progress_ui()
+	if _talk_panel != null and is_instance_valid(_talk_panel):
+		_talk_panel.queue_free()
+	var panel := _tourney_card("Tournament over:  you are %s" % Tournament.ordinal(place))
+	var box: VBoxContainer = panel.get_child(0)
+	var rows: Array[Array] = [["You", float(_tourney["me"])]]
+	for r: Dictionary in _tourney["rivals"]:
+		rows.append([String(r["name"]), float(r["best"])])
+	rows.sort_custom(func(x: Array, y: Array) -> bool: return float(x[1]) > float(y[1]))
+	for i in rows.size():
+		_plain_label(box, 20, Color(1.0, 0.92, 0.6) if String(rows[i][0]) == "You" else Color.WHITE).text = \
+			"%s   %s   %.2f kg" % [Tournament.ordinal(i), String(rows[i][0]), float(rows[i][1])]
+	if not prize.is_empty():
+		_plain_label(box, 20, Color(0.6, 1.0, 0.6)).text = "Prize: +%d coins, +%d XP" % [int(prize["coins"]), int(prize["xp"])]
+	elif place < Tournament.PRIZES.size():
+		_plain_label(box, 18, Color(0.8, 0.9, 1.0)).text = "This week's prize was already paid. Come back next week."
+	var ok := _tackle_button("OK", false, Vector2(160.0, 60.0))
+	ok.pressed.connect(func() -> void: panel.queue_free())
+	box.add_child(ok)
+	_talk_panel = panel
+	_hud_root.add_child(panel)
+
+
 ## Two shoals of small fish that school (boids) in the shallows.
 func _spawn_shoals() -> void:
 	for g in 6:
@@ -550,6 +714,25 @@ func _build_hud() -> void:
 	_talk_btn.visible = false
 	_talk_btn.pressed.connect(_open_talk_panel)
 	ui.add_child(_talk_btn)
+
+	_tourney_btn = Button.new()
+	_tourney_btn.text = "TOURNAMENT"
+	_tourney_btn.add_theme_font_size_override("font_size", 22)
+	_tourney_btn.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_tourney_btn.offset_left = -360.0
+	_tourney_btn.offset_right = -20.0
+	_tourney_btn.offset_top = 180.0
+	_tourney_btn.offset_bottom = 236.0
+	_tourney_btn.focus_mode = Control.FOCUS_NONE
+	_tourney_btn.visible = not _boat_mode and Tournament.spot_this_week() == GameSession.spot_id
+	_tourney_btn.pressed.connect(_open_tourney_panel)
+	ui.add_child(_tourney_btn)
+	_tourney_label = _plain_label(ui, 20, Color(1.0, 0.9, 0.5))
+	_tourney_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_tourney_label.position = Vector2(20.0, 286.0)
+	_tourney_label.add_theme_constant_override("outline_size", 6)
+	_tourney_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.8))
+	_tourney_label.visible = false
 
 	var bait_btn := Button.new()
 	bait_btn.text = "BAIT / HOOK"
@@ -1548,6 +1731,7 @@ func _update_neighbors(delta: float) -> void:
 					else:
 						st = "land"
 						t = 2.4
+						_tourney_rival_landed(a)
 						if near:
 							_amb.play_at("drips", 0.7, absf(float(a["x"]) - _hand.x) / PX_PER_M)
 				"land":
@@ -1633,6 +1817,7 @@ func _on_caught(id: String, weight_kg: float) -> void:
 		GameSession.outing["kept"] = kept
 		GameSession.outing["kept_kg"] = float(GameSession.outing.get("kept_kg", 0.0)) + weight_kg
 	var for_local := Locals.on_kept(GameSession.spot_id, id)
+	var tourney_line := _tourney_player_landed(weight_kg)
 	var value := int(round(float(sp["base_price"]) * pow(maxf(weight_kg, 0.05), 0.8)))
 	var res := GameSession.record_catch(id, String(sp["name"]), weight_kg, value, int(sp["base_price"]))
 	_update_coins()
@@ -1642,6 +1827,8 @@ func _on_caught(id: String, weight_kg: float) -> void:
 		"On %s, hook %s" % [String(Tackle.BAITS[GameSession.bait_id]["name"]).to_lower(), Tackle.hook_name(GameSession.hook_id)]])
 	if GameSession.LIVE_BAIT_SPECIES.has(id) and weight_kg < 0.4 and GameSession.live_bait < GameSession.LIVE_BAIT_MAX:
 		lines.append("Into the bucket as live bait  (%d)" % GameSession.add_live_bait(1))
+	if tourney_line != "":
+		lines.append(tourney_line)
 	if for_local:
 		var lr := Locals.request(GameSession.spot_id)
 		lines.append("For %s: %d / %d%s" % [String(Locals.person(GameSession.spot_id)["name"]), int(lr["have"]), int(lr["need"]),
@@ -2036,6 +2223,7 @@ func _process(delta: float) -> void:
 		_rod_bend_target = 0.0
 	_rod_bend = lerpf(_rod_bend, _rod_bend_target, 1.0 - exp(-10.0 * delta))
 	_update_talk_button()
+	_tick_tourney(delta)
 
 	for r in _ripples:
 		r["age"] = float(r["age"]) + delta

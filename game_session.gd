@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Shown on screen so a player can tell a fresh deploy from a page the browser cached.
 ## Bump it with every build that changes behaviour.
-const BUILD := "build 53"
+const BUILD := "build 54"
 const SAVE_PATH := "user://save.cfg"
 const SAVE_VERSION := 1
 const START_RIG := "shore_spinning_rig"
@@ -64,6 +64,9 @@ static var start_slot := 1
 ## Locals on the shore (locals.gd): spot id -> friendship, spot id -> open request {species, need, have}.
 static var local_friend: Dictionary = {}
 static var local_req: Dictionary = {}
+## Weekly tournament (tournament.gd): the week whose prize was paid, and how many you have won.
+static var tourney_week := ""
+static var tourney_wins := 0
 const NET_PRICE := 250
 const LIVE_BAIT_MAX := 12
 const LIVE_BAIT_SPECIES: Array[String] = ["mediterranean_horse_mackerel", "european_anchovy", "atlantic_mackerel"]
@@ -150,6 +153,9 @@ static func load_once() -> void:
 	counts = _clean(cfg.get_value("journal", "counts", {}), false)
 	local_friend = _clean(cfg.get_value("locals", "friend", {}), false)
 	local_req = _clean_requests(cfg.get_value("locals", "requests", {}))
+	var tw: Variant = cfg.get_value("tournament", "week", "")
+	tourney_week = String(tw) if tw is String else ""
+	tourney_wins = maxi(0, _to_int(cfg.get_value("tournament", "wins", 0)))
 	for k: String in counts:
 		if not best_kg.has(k):
 			best_kg[k] = 0.0        # the journal reads best_kg for every logged species
@@ -177,6 +183,8 @@ static func save() -> void:
 	cfg.set_value("journal", "counts", counts)
 	cfg.set_value("locals", "friend", local_friend)
 	cfg.set_value("locals", "requests", local_req)
+	cfg.set_value("tournament", "week", tourney_week)
+	cfg.set_value("tournament", "wins", tourney_wins)
 	var err := cfg.save(SAVE_PATH)
 	if err != OK:
 		push_warning("[GameSession] save failed with error %d" % err)

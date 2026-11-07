@@ -301,6 +301,8 @@ func _select(id: String) -> void:
 	var ids: Array = s["species"]
 	_fish_label.text = "Fish here (%d/%d caught): %s" % [_caught_count(ids), ids.size(), ", ".join(names)]
 	_note_label.text = "Evidence: %s (%d sources). %s Pin is town-level, not the exact mark." % [s["evidence"], s["sources"].size(), s["species_note"]]
+	if Tournament.spot_this_week() == id:
+		_note_label.text = "TOURNAMENT THIS WEEK: five minutes, heaviest legal fish wins (TOURNAMENT button on the shore). " + _note_label.text
 	var need := int(s.get("unlock_level", 1))
 	if GameSession.level() < GameSession.BOAT_LEVEL:
 		_boat_button.disabled = true

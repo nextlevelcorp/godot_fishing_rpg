@@ -166,6 +166,25 @@ place with people, not only water; a reason to come back to the same spot.
 - **Test:** CI feature smoke checks the local exists, the TALK button exists and the panel opens.
 Tuning knobs: `COINS_BASE`, `XP_PER_FISH`, `TIERS`, `FRIEND_AT`, `TALK_RADIUS`.
 
+## Weekly shore tournament (build 54)
+Second slice of angler life. A reason to plan a trip and a short burst of pressure inside a
+casual session.
+- **Where and when:** one spot a week, picked from the spots you have unlocked (`tournament.gd`
+  `spot_this_week`, a new pick each Monday). The map note and a TOURNAMENT button on that shore
+  say so.
+- **Rules:** entry 30 coins, five minutes of real time, the heaviest single kept fish wins. Kept
+  means legal size and inside the daily limits, so a released fish does not count. A fish on the
+  line at the horn still counts: the end waits for the fight.
+- **Rivals:** the three anglers nearest you when you enter, the spot's local among them. They run
+  their usual wait-bite-land loop; each landed fish counts if it is of legal size (they release
+  under-size fish like you). The HUD shows time left, your best and place, and the leader.
+- **Prizes:** 300 / 150 / 60 coins and 80 / 40 / 20 XP, paid once a week; entering again that
+  week is for fun. No fish means last place.
+- **Saved:** the week whose prize was paid and the number of wins.
+- **Test:** CI feature smoke enters a tournament, ends it at the horn with no fish and checks that
+  the entry was paid and no prize given.
+Tuning knobs: `ENTRY`, `DURATION_S`, `PRIZES`, `PRIZE_XP`, `RIVALS`.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).
