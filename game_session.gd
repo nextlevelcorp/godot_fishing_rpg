@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Shown on screen so a player can tell a fresh deploy from a page the browser cached.
 ## Bump it with every build that changes behaviour.
-const BUILD := "build 56"
+const BUILD := "build 57"
 const SAVE_PATH := "user://save.cfg"
 const SAVE_VERSION := 1
 const START_RIG := "shore_spinning_rig"
@@ -46,6 +46,9 @@ static var hook_id := "h4"
 ## Live baitfish kept in the bucket: caught small fish (istavrit, hamsi) or bought. Used up when a
 ## fish takes it or small fish strip it.
 static var live_bait := 0
+## Special baits bought at the tackle shop (tackle.gd "shop"): bait id -> how many are left.
+static var bait_stock: Dictionary = {}
+const BAIT_STOCK_MAX := 20
 ## Float rig (bait hangs at the float depth, bites show on the float) or bottom rig (dip takımı:
 ## a sinker holds the bait on the bottom, bites show on the rod tip and its bell). Saved.
 static var rig_mode := "float"
@@ -144,6 +147,7 @@ static func load_once() -> void:
 	var hk: Variant = cfg.get_value("tackle", "hook", "h4")
 	hook_id = String(hk) if (hk is String and Tackle.HOOKS.has(hk)) else "h4"
 	live_bait = clampi(_to_int(cfg.get_value("tackle", "live", 0)), 0, LIVE_BAIT_MAX)
+	bait_stock = _clean(cfg.get_value("tackle", "stock", {}), false)
 	rig_mode = "bottom" if cfg.get_value("tackle", "rig", "float") == "bottom" else "float"
 	has_net = cfg.get_value("tackle", "net", false) == true
 	test_tools = cfg.get_value("settings", "test_tools", false) == true
@@ -175,6 +179,7 @@ static func save() -> void:
 	cfg.set_value("tackle", "bait", bait_id)
 	cfg.set_value("tackle", "hook", hook_id)
 	cfg.set_value("tackle", "live", live_bait)
+	cfg.set_value("tackle", "stock", bait_stock)
 	cfg.set_value("tackle", "rig", rig_mode)
 	cfg.set_value("tackle", "net", has_net)
 	cfg.set_value("settings", "test_tools", test_tools)
@@ -342,6 +347,35 @@ static func buy_live_bait(n: int, price: int) -> bool:
 		return false
 	coins -= price
 	add_live_bait(n)
+	return true
+
+
+## How many of this bait you have: the live-bait bucket, a shop bait's stock, or -1 for unlimited.
+static func stock(bait: String) -> int:
+	if bait == "live_fish":
+		return live_bait
+	if not Tackle.shop(bait).is_empty():
+		return int(bait_stock.get(bait, 0))
+	return -1
+
+
+## One bait gone (taken by a fish or picked off the hook). Free baits are unlimited.
+static func use_bait(bait: String) -> void:
+	if bait == "live_fish":
+		add_live_bait(-1)
+	elif not Tackle.shop(bait).is_empty():
+		bait_stock[bait] = maxi(int(bait_stock.get(bait, 0)) - 1, 0)
+		save()
+
+
+## Buys one pack of a shop bait. False if it is not sold, coins are short or the box is full.
+static func buy_bait(bait: String) -> bool:
+	var sh := Tackle.shop(bait)
+	if sh.is_empty() or coins < int(sh["price"]) or stock(bait) >= BAIT_STOCK_MAX:
+		return false
+	coins -= int(sh["price"])
+	bait_stock[bait] = mini(stock(bait) + int(sh["pack"]), BAIT_STOCK_MAX)
+	save()
 	return true
 
 

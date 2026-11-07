@@ -20,8 +20,13 @@ const BAITS := {
 	"spoon": {"name": "Spoon lure", "tr": "Kaşık", "kind": "lure", "steal": 0.0},
 	"capari": {"name": "Çapari string", "tr": "Çapari", "kind": "lure", "steal": 0.0},
 	"squid_jig": {"name": "Squid jig", "tr": "Kalamar zokası", "kind": "lure", "steal": 0.0},
+	# Special baits sold by the pack at the tackle shop (map). The baits are the ones Turkish shore
+	# anglers prize; pack sizes, prices and liking numbers are game-design fill.
+	"tube_worm": {"name": "Tube worm", "tr": "Boru kurdu", "kind": "natural", "steal": 0.15, "shop": {"pack": 5, "price": 40}},
+	"peeler_crab": {"name": "Peeler crab", "tr": "Soyulmuş yengeç", "kind": "natural", "steal": 0.10, "shop": {"pack": 3, "price": 60}},
+	"live_shrimp": {"name": "Live shrimp", "tr": "Canlı karides", "kind": "live", "steal": 0.12, "shop": {"pack": 5, "price": 50}},
 }
-const BAIT_ORDER: Array[String] = ["mussel", "sea_worm", "shrimp", "squid_strip", "sardine", "bread", "live_fish", "spoon", "capari", "squid_jig"]
+const BAIT_ORDER: Array[String] = ["mussel", "sea_worm", "shrimp", "squid_strip", "sardine", "bread", "live_fish", "spoon", "capari", "squid_jig", "tube_worm", "peeler_crab", "live_shrimp"]
 
 ## Hook sizes, smallest first. strength_n: pull at which the wire opens up and the fish is lost.
 const HOOKS := {
@@ -36,30 +41,30 @@ const HOOK_ORDER: Array[String] = ["h12", "h8", "h4", "h1", "h1_0", "h3_0"]
 
 ## Species -> {bait: liking 0..1.5}. Missing baits count as PREF_OTHER.
 const PREF := {
-	"gilthead_seabream": {"mussel": 1.4, "sea_worm": 1.0, "shrimp": 1.0, "squid_strip": 0.3},
-	"white_seabream": {"mussel": 1.2, "sea_worm": 1.2, "shrimp": 0.9, "bread": 0.4},
-	"striped_sea_bream": {"sea_worm": 1.3, "mussel": 1.0, "shrimp": 0.8},
-	"saddled_bream": {"bread": 1.1, "sea_worm": 1.0, "shrimp": 0.9, "capari": 0.6},
-	"red_mullet": {"sea_worm": 1.4, "shrimp": 0.8, "mussel": 0.5},
+	"gilthead_seabream": {"mussel": 1.4, "sea_worm": 1.0, "shrimp": 1.0, "squid_strip": 0.3, "tube_worm": 1.6, "peeler_crab": 1.6},
+	"white_seabream": {"mussel": 1.2, "sea_worm": 1.2, "shrimp": 0.9, "bread": 0.4, "tube_worm": 1.5},
+	"striped_sea_bream": {"sea_worm": 1.3, "mussel": 1.0, "shrimp": 0.8, "tube_worm": 1.6},
+	"saddled_bream": {"bread": 1.1, "sea_worm": 1.0, "shrimp": 0.9, "capari": 0.6, "tube_worm": 1.2},
+	"red_mullet": {"sea_worm": 1.4, "shrimp": 0.8, "mussel": 0.5, "tube_worm": 1.6},
 	"flathead_grey_mullet": {"bread": 1.5, "sea_worm": 0.5},
-	"european_seabass": {"live_fish": 1.4, "shrimp": 1.2, "squid_strip": 0.9, "spoon": 0.9, "sea_worm": 0.7},
+	"european_seabass": {"live_fish": 1.4, "shrimp": 1.2, "squid_strip": 0.9, "spoon": 0.9, "sea_worm": 0.7, "peeler_crab": 1.6, "live_shrimp": 1.7},
 	"bluefish": {"live_fish": 1.4, "sardine": 1.3, "spoon": 1.2, "squid_strip": 0.6},
 	"garfish": {"spoon": 1.1, "sardine": 1.0, "squid_strip": 0.4},
 	"atlantic_bonito": {"spoon": 1.3, "live_fish": 1.1, "sardine": 0.9},
 	"atlantic_mackerel": {"capari": 1.4, "spoon": 0.8, "sardine": 0.8},
 	"mediterranean_horse_mackerel": {"capari": 1.5, "shrimp": 0.6, "sardine": 0.6},
 	"european_anchovy": {"capari": 0.7},
-	"whiting": {"sea_worm": 1.2, "shrimp": 0.9, "sardine": 0.8},
-	"common_dentex": {"live_fish": 1.4, "squid_strip": 1.2, "shrimp": 0.9},
+	"whiting": {"sea_worm": 1.2, "shrimp": 0.9, "sardine": 0.8, "tube_worm": 1.3},
+	"common_dentex": {"live_fish": 1.4, "squid_strip": 1.2, "shrimp": 0.9, "live_shrimp": 1.6, "peeler_crab": 1.2},
 	"greater_amberjack": {"live_fish": 1.5, "spoon": 0.9},
 	"leerfish": {"live_fish": 1.5, "spoon": 0.8},
-	"dusky_grouper": {"live_fish": 1.3, "squid_strip": 1.2, "sardine": 0.7},
-	"black_scorpionfish": {"squid_strip": 1.2, "sardine": 1.0, "shrimp": 0.9, "sea_worm": 0.7},
+	"dusky_grouper": {"live_fish": 1.3, "squid_strip": 1.2, "sardine": 0.7, "peeler_crab": 1.5},
+	"black_scorpionfish": {"squid_strip": 1.2, "sardine": 1.0, "shrimp": 0.9, "sea_worm": 0.7, "live_shrimp": 1.4, "peeler_crab": 1.2},
 	"greater_weever": {"sea_worm": 1.0, "shrimp": 1.0, "sardine": 0.8},
-	"ornate_wrasse": {"sea_worm": 1.2, "shrimp": 1.0, "mussel": 0.9},
-	"turbot": {"live_fish": 1.1, "sardine": 1.0, "squid_strip": 0.8},
+	"ornate_wrasse": {"sea_worm": 1.2, "shrimp": 1.0, "mussel": 0.9, "tube_worm": 1.3},
+	"turbot": {"live_fish": 1.1, "sardine": 1.0, "squid_strip": 0.8, "live_shrimp": 1.0},
 	"common_octopus": {"squid_jig": 1.2, "sardine": 1.0, "squid_strip": 0.8},
-	"common_cuttlefish": {"squid_jig": 1.4, "shrimp": 1.0, "live_fish": 0.8},
+	"common_cuttlefish": {"squid_jig": 1.4, "shrimp": 1.0, "live_fish": 0.8, "live_shrimp": 1.5},
 	"european_squid": {"squid_jig": 1.6, "sardine": 0.6, "shrimp": 0.6},
 	"blue_crab": {"sardine": 1.1, "mussel": 0.9},
 }
@@ -105,6 +110,11 @@ static func bait_name(id: String) -> String:
 
 static func hook_name(id: String) -> String:
 	return String(HOOKS.get(id, {}).get("name", id))
+
+
+## {pack, price} for a bait sold at the tackle shop; empty for the free ones.
+static func shop(bait: String) -> Dictionary:
+	return BAITS.get(bait, {}).get("shop", {})
 
 
 static func is_lure(bait: String) -> bool:

@@ -967,8 +967,9 @@ func _physics_process(delta: float) -> void:
 			_walk(delta)
 			_adjust_bait_depth(delta)
 			if _cast_edge:
-				if GameSession.bait_id == "live_fish" and GameSession.live_bait <= 0:
-					_flash("No live bait. Catch istavrit on a capari, or buy some at the map's tackle shop")
+				if GameSession.stock(GameSession.bait_id) == 0:
+					_flash("No live bait. Catch istavrit on a capari, or buy some at the map's tackle shop" if GameSession.bait_id == "live_fish" \
+						else "No %s left. Buy a pack at the map's tackle shop, or pick another bait" % String(Tackle.BAITS[GameSession.bait_id]["name"]).to_lower())
 				elif _can_cast():
 					var lim := _aim_limit()
 					_aim = clampf(atan2(_facing.x, -_facing.y), -lim, lim)
@@ -1370,8 +1371,7 @@ func _fish_event() -> void:
 		_set_status("Nibble!  Wait for the real bite")
 		if _rng.randf() < Tackle.steal_chance(GameSession.bait_id):
 			_bait_on = false
-			if GameSession.bait_id == "live_fish":
-				GameSession.add_live_bait(-1)
+			GameSession.use_bait(GameSession.bait_id)
 			_fish_leaves("The float went still")
 			return
 		var hz := maxf(float(_prof["noise_hz"]), 0.5)
@@ -1429,8 +1429,8 @@ func _hook_fish(force: bool = false) -> void:
 		var why := "  (hook too big for its mouth)" if mis > 0 else ("  (hook too small to hold)" if mis < 0 else "")
 		_fish_leaves("Missed! The hook did not set" + why)
 		return
-	if GameSession.bait_id == "live_fish" and not force:
-		GameSession.add_live_bait(-1)          # the fish has taken it
+	if not force:
+		GameSession.use_bait(GameSession.bait_id)          # the fish has taken it
 	var species := BiomeDB.get_species(_fish_id)
 	_weight_kg = _forced_kg if _forced_kg > 0.0 else BiomeDB.roll_weight_kg(_fish_id, _rng)
 	_forced_kg = 0.0
@@ -2112,8 +2112,8 @@ func _open_tackle_panel() -> void:
 	box.add_child(grid)
 	for id: String in Tackle.BAIT_ORDER:
 		var label := Tackle.bait_name(id)
-		if id == "live_fish":
-			label = "Live baitfish  x%d" % GameSession.live_bait
+		if GameSession.stock(id) >= 0:
+			label = "%s  x%d" % [String(Tackle.BAITS[id]["name"]), GameSession.stock(id)]
 		var b := _tackle_button(label, id == GameSession.bait_id, Vector2(290.0, 50.0))
 		b.pressed.connect(func() -> void:
 			GameSession.set_tackle(id, GameSession.hook_id)

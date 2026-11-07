@@ -102,6 +102,15 @@ func _process(_delta: float) -> bool:
 			var tp2: Variant = _scene.get("_talk_panel")
 			if tp2 != null and is_instance_valid(tp2):
 				(tp2 as Node).queue_free()
+			# Tackle shop: a pack of a special bait costs coins, adds stock, and each use takes one.
+			GameSession.coins = 100
+			var stock_before: Dictionary = GameSession.bait_stock.duplicate()
+			GameSession.bait_stock.erase("tube_worm")
+			_check(GameSession.stock("tube_worm") == 0 and GameSession.stock("mussel") == -1, "shop baits start empty, free baits are unlimited")
+			_check(GameSession.buy_bait("tube_worm") and GameSession.stock("tube_worm") == 5 and GameSession.coins == 60, "buying a pack of tube worm adds 5 for 40 coins")
+			GameSession.use_bait("tube_worm")
+			_check(GameSession.stock("tube_worm") == 4, "using a shop bait takes one")
+			GameSession.bait_stock = stock_before
 			GameSession.coins = coins_before
 			_scene.call("_open_test_panel")
 		16:

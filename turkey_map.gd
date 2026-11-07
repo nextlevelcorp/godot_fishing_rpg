@@ -387,6 +387,15 @@ func _clear_list() -> void:
 		c.queue_free()
 
 
+## The species that like this bait best (liking 1.4 or more), as display names.
+func _likers(bait: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	for sp: String in Tackle.PREF:
+		if float(Tackle.PREF[sp].get(bait, 0.0)) >= 1.4:
+			out.append(String(BiomeDB.get_species(sp).get("name", sp)).to_lower())
+	return out
+
+
 func _open_tackle() -> void:
 	_clear_list()
 	_overlay_title.text = "Tackle  -  Coins: %d" % GameSession.coins
@@ -424,6 +433,21 @@ func _open_tackle() -> void:
 		_open_tackle())
 	bb.disabled = GameSession.coins < LIVE_BAIT_PRICE or GameSession.live_bait >= GameSession.LIVE_BAIT_MAX
 	bait_row.add_child(bb)
+	for sb: String in Tackle.BAIT_ORDER:
+		var sh := Tackle.shop(sb)
+		if sh.is_empty():
+			continue
+		var srow := HBoxContainer.new()
+		srow.add_theme_constant_override("separation", 12)
+		_overlay_list.add_child(srow)
+		var sinfo := _make_label(srow, 18, Color.WHITE)
+		sinfo.text = "%s, %d in a pack\nIn your box: %d. %s." % [Tackle.bait_name(sb), int(sh["pack"]), GameSession.stock(sb), "Best for " + ", ".join(_likers(sb))]
+		var sbtn := _make_button("BUY %d  %d" % [int(sh["pack"]), int(sh["price"])], 190.0, func() -> void:
+			GameSession.buy_bait(sb)
+			_update_coins()
+			_open_tackle())
+		sbtn.disabled = GameSession.coins < int(sh["price"]) or GameSession.stock(sb) >= GameSession.BAIT_STOCK_MAX
+		srow.add_child(sbtn)
 	var net_row := HBoxContainer.new()
 	net_row.add_theme_constant_override("separation", 12)
 	_overlay_list.add_child(net_row)

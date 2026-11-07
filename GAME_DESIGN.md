@@ -188,6 +188,20 @@ casual session.
   the entry was paid and no prize given.
 Tuning knobs: `ENTRY`, `DURATION_S`, `PRIZES`, `PRIZE_XP`, `RIVALS`.
 
+## Special baits from the tackle shop (build 57)
+Owner's decision (2026-11-07): the ten everyday baits stay free; special, prized baits cost coins.
+- **Baits** (`tackle.gd`, `shop`): tube worm (boru kurdu, 5 for 40), peeler crab (soyulmuş yengeç,
+  3 for 60) and live shrimp (canlı karides, 5 for 50). Turkish shore anglers prize them for bream,
+  red mullet, seabass and dentex; pack sizes, prices and liking numbers are game-design fill. Each
+  is liked more (1.2-1.7) than any free bait by the species it suits, and is harder to steal.
+- **Use:** bought on the map's tackle shop (which lists the species that like each best), kept in
+  a box of up to 20 per bait (saved). One is used when a fish takes it or a nibble picks it off,
+  the same rule as the live-bait bucket. With none left you cannot cast it.
+- **Why:** a coin sink with a choice: pay for a better chance at the fish you want (a tournament,
+  a local's request, a new species), or fish free.
+- **Test:** CI feature smoke buys a pack, checks stock and coins, uses one.
+Tuning knobs: `pack`, `price`, `steal`, `PREF` entries, `BAIT_STOCK_MAX`.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).
