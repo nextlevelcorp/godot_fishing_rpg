@@ -216,6 +216,23 @@ the device's real month for seasons, now it uses the real moon too.
   direction for both groups, no effect by day, and the phase names.
 Tuning knobs: `DARK_BONUS`, `LIGHT_BONUS`.
 
+## Named winds (build 61)
+Owner's pick ("Rüzgar"). Each outing has one of the winds of the Turkish compass rose (`winds.gd`):
+Yıldız (N), Poyraz (NE), Gündoğusu (E), Keşişleme (SE), Kıble (S), Lodos (SW), Günbatısı (W),
+Karayel (NW), or a calm (limanlık) day.
+- **Sources:** names, directions and lodos as the warm south-westerly that matters to seafarers:
+  the Turkish State Meteorological Service glossary (mgm.gov.tr). Poyraz keeping boats in harbour:
+  press reports from Tekirdağ. No source was found on how lodos changes shore bites.
+- **What it does:** sets the wind's direction on the shore (north up; it pushes the flying bait,
+  the line and the float) and its strength (rolled within each wind's range). Bites: calm x1.08,
+  poyraz x0.85, lodos x0.90, others x0.95-1.0, and x0.92 more above 8 m/s. These numbers, the
+  speed ranges and how often each wind blows are game-design fill. The weather's own wind
+  multiplier (WeatherFx "windy") still applies on top.
+- **Shown:** in the shore HUD line, e.g. "Poyraz (NE) 7 m/s".
+- **Test:** CI checks poyraz blows toward the south-west, calm has no wind, strong poyraz cuts
+  bites, and every rolled wind is known and inside its speed range.
+Tuning knobs: `KINDS` (bite, ms, weight), `PX_PER_MS`.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

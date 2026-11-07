@@ -195,6 +195,21 @@ func _check_game_rules() -> void:
 	_check(Moon.night_factor(false, 1.0, 0.5) > 1.05 and Moon.night_factor(false, 1.0, 0.0) < 0.95, "other night feeders bite better in moonlight")
 	_check(is_equal_approx(Moon.night_factor(true, 0.0, 0.0), 1.0), "the moon changes nothing in daylight")
 	_check(Moon.phase_name(0.0) == "New moon" and Moon.phase_name(0.5) == "Full moon" and Moon.phase_name(0.99) == "New moon", "moon phase names")
+	# Named winds: poyraz (from the north-east) blows toward the south-west; calm is still; rolls are valid.
+	var pz := Winds.vector("poyraz", 6.0)
+	_check(pz.x < 0.0 and pz.y > 0.0, "poyraz blows toward the south-west")
+	_check(Winds.vector("calm", 0.0).length() < 0.01, "a calm day has no wind")
+	_check(Winds.bite_factor("poyraz", 10.0) < Winds.bite_factor("poyraz", 5.0) and Winds.bite_factor("calm", 0.5) > 1.0, "strong poyraz cuts bites, calm water helps")
+	var wrng := RandomNumberGenerator.new()
+	wrng.seed = 7
+	var bad := 0
+	for i in 50:
+		var wr := Winds.roll(wrng)
+		var wk: Dictionary = Winds.KINDS[String(wr["id"])]
+		var rng_ms: Vector2 = wk["ms"]
+		if float(wr["ms"]) < rng_ms.x or float(wr["ms"]) > rng_ms.y:
+			bad += 1
+	_check(bad == 0, "every rolled wind is a known one within its speed range")
 	# Tournament week and spot.
 	var wk1: String = tourney.call("week_key")
 	var sp1: String = tourney.call("spot_this_week")

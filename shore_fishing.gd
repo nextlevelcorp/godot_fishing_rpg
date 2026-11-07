@@ -121,6 +121,7 @@ var _reel_edge := false
 
 # environment forces
 var _wind := Vector2.ZERO          ## air, px/s^2 on the flying bait
+var _wind_roll: Dictionary = {"id": "calm", "ms": 0.0}   ## this outing's named wind (winds.gd)
 var _current := Vector2.ZERO       ## water, px/s drift for the float and the slack line
 
 # cast and float
@@ -220,7 +221,8 @@ func _ready() -> void:
 	_pier_x = 900.0 if hash(GameSession.spot_id) % 2 == 0 else -900.0
 	_build_walkable()
 	_weather_kind = WeatherFx.roll(_rng)
-	_wind = Vector2(_rng.randf_range(-60.0, 60.0), _rng.randf_range(-15.0, 15.0)) * float(WeatherFx.KINDS[_weather_kind]["wind"])
+	_wind_roll = Winds.roll(_rng)
+	_wind = Winds.vector(String(_wind_roll["id"]), float(_wind_roll["ms"])) * float(WeatherFx.KINDS[_weather_kind]["wind"])
 	# The spot's surface current, along the shore (fishing_spots.gd current_ms), varying a little.
 	var cur_ms := float(_spot.get("current_ms", 0.15)) * _rng.randf_range(0.8, 1.2)
 	_current = Vector2((1.0 if _rng.randf() < 0.5 else -1.0) * cur_ms * PX_PER_M, _rng.randf_range(-0.1, 0.1) * cur_ms * PX_PER_M)
@@ -1222,7 +1224,8 @@ func _activity() -> float:
 		base += 1.0 / sqrt(float(BiomeDB.get_species(id)["base_price"]))
 		now += _species_weight(id)
 	var lamp := 1.0 + LAMP_PIER_BONUS * (1.0 - _world.daylight) if _on_pier() else 1.0
-	return clampf(now / maxf(base, 0.0001) * float(WeatherFx.KINDS[_weather_kind]["activity"]) * lamp, 0.15, 2.0)
+	var wind := Winds.bite_factor(String(_wind_roll["id"]), float(_wind_roll["ms"]))
+	return clampf(now / maxf(base, 0.0001) * float(WeatherFx.KINDS[_weather_kind]["activity"]) * lamp * wind, 0.15, 2.0)
 
 
 func _crowd_pos(a: Dictionary) -> Vector2:
@@ -2257,7 +2260,8 @@ func _process(delta: float) -> void:
 	_fight_view.tint = _tint.color
 	_fight_view.daylight = _world.daylight
 	_water.set_daylight(_world.daylight)
-	_clock_label.text = "%s %s   |   %s   |   %s" % [Season.month_name(), _world.clock_text(), _weather.label(), Moon.phase_name()]
+	_clock_label.text = "%s %s   |   %s, %s   |   %s" % [Season.month_name(), _world.clock_text(), _weather.label(),
+		Winds.label(String(_wind_roll["id"]), float(_wind_roll["ms"])), Moon.phase_name()]
 	var probe := _bobber_pos if (_state == State.WAIT or _state == State.BITE) else (_pred_landing if _state == State.CHARGE else _hand + _facing * 60.0)
 	var water := _water_depth(probe)
 	_depth_label.text = ("Bottom rig" if _bottom_rig() else "Float %.1f m" % _bait_depth) + "  |  Water %s  |  Clutch %.0f N  |  %s, hook %s" % [("%.1f m" % water) if water > 0.0 else "-",
