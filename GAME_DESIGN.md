@@ -147,6 +147,25 @@ MORNING 07:55, DUSK 17:16 and NIGHT 21:07 (`GameSession.START_TIMES`). Real angl
 first light and the evening bite; the choice makes the bite-time rules in BiomeDB a decision made
 before the trip. Default MORNING keeps the old feel. Kept for the session, not saved.
 
+## Locals on the shore (build 53)
+First slice of "angler life" (owner's pick from /brainstorm, 2026-11-07). Pillar: the shore is a
+place with people, not only water; a reason to come back to the same spot.
+- **Who:** one named local angler per spot (`locals.gd` `PEOPLE`), e.g. Hasan Amca on Galata
+  Bridge, Kemal Usta on the Çanakkale waterfront. They are one of the anglers already on the
+  shore, nearest the start, drawn in their own clothes with a name tag. All people and lines are
+  game-design fill; no real person is portrayed.
+- **Loop:** walk up (within 130 px) and TALK. They ask for 1-3 fish of one species from the spot's
+  list (weighted to in-season, common fish). Only kept fish count (legal size, daily limits), and
+  the catch card shows the progress. A yellow "!" over their head means the fish are ready: GIVE.
+- **Reward:** 20 + species base price x count coins, 20 XP per fish, friendship +1, and a new
+  request. Friendship tiers: Stranger 0, Known face 1, Friend 3, Old friend 6. The greeting
+  changes with the tier; from Friend on they share a secret each visit (when one of the spot's
+  species feeds and the best bait and hook size, from BiomeDB and `tackle.gd`).
+- **Saved:** friendship and the open request per spot (`GameSession.local_friend`, `local_req`).
+- **Later slices:** weekly shore tournament, a bait shop keeper, locals fishing next to you.
+- **Test:** CI feature smoke checks the local exists, the TALK button exists and the panel opens.
+Tuning knobs: `COINS_BASE`, `XP_PER_FISH`, `TIERS`, `FRIEND_AT`, `TALK_RADIUS`.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

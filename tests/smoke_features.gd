@@ -82,6 +82,13 @@ func _process(_delta: float) -> bool:
 				if (n as Button).text == "TEST":
 					ui_has_test = true
 			_check(ui_has_test, "the TEST button exists on the shore")
+			_check(int(_scene.get("_local_idx")) >= 0, "the spot has a named local angler")
+			_check(_scene.get("_talk_btn") != null, "the TALK button exists on the shore")
+			_scene.call("_open_talk_panel")
+			var tp: Variant = _scene.get("_talk_panel")
+			_check(tp != null and is_instance_valid(tp), "the TALK panel opens")
+			if tp != null and is_instance_valid(tp):
+				(tp as Node).queue_free()
 			_scene.call("_open_test_panel")
 		16:
 			var panels := 0

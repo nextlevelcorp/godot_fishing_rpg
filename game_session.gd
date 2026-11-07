@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Shown on screen so a player can tell a fresh deploy from a page the browser cached.
 ## Bump it with every build that changes behaviour.
-const BUILD := "build 52"
+const BUILD := "build 53"
 const SAVE_PATH := "user://save.cfg"
 const SAVE_VERSION := 1
 const START_RIG := "shore_spinning_rig"
@@ -61,6 +61,9 @@ static var daily_done := ""
 ## the map: anglers go out at first light or for the evening bite, and night species need the dark.
 const START_TIMES: Array[Array] = [["DAWN", 0.24], ["MORNING", 0.33], ["DUSK", 0.72], ["NIGHT", 0.88]]
 static var start_slot := 1
+## Locals on the shore (locals.gd): spot id -> friendship, spot id -> open request {species, need, have}.
+static var local_friend: Dictionary = {}
+static var local_req: Dictionary = {}
 const NET_PRICE := 250
 const LIVE_BAIT_MAX := 12
 const LIVE_BAIT_SPECIES: Array[String] = ["mediterranean_horse_mackerel", "european_anchovy", "atlantic_mackerel"]
@@ -145,6 +148,8 @@ static func load_once() -> void:
 	daily_done = String(dd) if dd is String else ""
 	best_kg = _clean(cfg.get_value("journal", "best_kg", {}), true)
 	counts = _clean(cfg.get_value("journal", "counts", {}), false)
+	local_friend = _clean(cfg.get_value("locals", "friend", {}), false)
+	local_req = _clean_requests(cfg.get_value("locals", "requests", {}))
 	for k: String in counts:
 		if not best_kg.has(k):
 			best_kg[k] = 0.0        # the journal reads best_kg for every logged species
@@ -170,6 +175,8 @@ static func save() -> void:
 	cfg.set_value("player", "daily_done", daily_done)
 	cfg.set_value("journal", "best_kg", best_kg)
 	cfg.set_value("journal", "counts", counts)
+	cfg.set_value("locals", "friend", local_friend)
+	cfg.set_value("locals", "requests", local_req)
 	var err := cfg.save(SAVE_PATH)
 	if err != OK:
 		push_warning("[GameSession] save failed with error %d" % err)
@@ -218,6 +225,18 @@ static func _clean(d: Variant, as_float: bool) -> Dictionary:
 			var v: Variant = d[k]
 			if k is String and (v is float or v is int):
 				out[k] = float(v) if as_float else int(v)
+	return out
+
+
+## Saved local requests, keeping only well-formed ones: {spot: {species: String, need: int, have: int}}.
+static func _clean_requests(d: Variant) -> Dictionary:
+	var out := {}
+	if d is Dictionary:
+		for k: Variant in d:
+			var r: Variant = d[k]
+			if k is String and r is Dictionary and r.get("species") is String \
+					and (r.get("need") is int or r.get("need") is float) and (r.get("have") is int or r.get("have") is float):
+				out[k] = {"species": String(r["species"]), "need": clampi(int(r["need"]), 1, 5), "have": clampi(int(r["have"]), 0, 5)}
 	return out
 
 

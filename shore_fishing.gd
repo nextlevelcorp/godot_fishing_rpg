@@ -44,6 +44,7 @@ const RETRIEVE_SPEED := 55.0         ## px/s the bait travels while REEL is held
 const WALK_SPEED := 150.0          ## px/s, about 1.5 m/s
 const PIER_LEN := 420.0            ## the pier reaches 42 m out
 const PIER_HALF := 26.0
+const TALK_RADIUS := 130.0         ## walk this close to the named local to see TALK
 const TIP_RADIUS := 100.0          ## walk this close to another angler to hear their tip
 
 var _rng := RandomNumberGenerator.new()
@@ -69,6 +70,9 @@ var _xp_bar: ProgressBar
 var _goal_labels: Array[Label] = []
 var _summary: PanelContainer
 var _hud_root: Control
+var _local_idx := -1                 ## index in _crowd of the spot's named local angler (locals.gd), -1 none
+var _talk_btn: Button
+var _talk_panel: PanelContainer
 var _weather: WeatherFx
 var _pov_on := false
 ## Boat outing: the angler sits in a rowing boat out on the water instead of walking the shore.
@@ -324,8 +328,90 @@ func _build_land() -> void:
 				"state": "wait", "t": rng.randf_range(4.0, 40.0), "shirt": Color(rng.randf_range(0.2, 0.7), rng.randf_range(0.2, 0.5), rng.randf_range(0.25, 0.6)),
 				"hat": rng.randf() < 0.5, "kg": 0.3, "sp": ""})
 		cx += rng.randf_range(gap.x, gap.y)
+	_pick_local()
 	for i in 140:
 		_sparkles.append(Vector3(rng.randf_range(-HALF_WIDTH, HALF_WIDTH), rng.randf_range(-1100.0, -40.0), rng.randf() * TAU))
+
+
+## The angler nearest the start becomes the spot's named local (locals.gd): drawn in their own
+## clothes with a name tag, and the TALK button shows when you walk up to them.
+func _pick_local() -> void:
+	var p := Locals.person(GameSession.spot_id)
+	if p.is_empty() or _crowd.is_empty():
+		return
+	var best := INF
+	for i in _crowd.size():
+		var d := absf(float(_crowd[i]["x"]) - 260.0)
+		if d < best:
+			best = d
+			_local_idx = i
+	_crowd[_local_idx]["shirt"] = p["shirt"]
+	_crowd[_local_idx]["hat"] = p["hat"]
+
+
+func _near_local() -> bool:
+	if _local_idx < 0 or _boat_mode:
+		return false
+	return _crowd_pos(_crowd[_local_idx]).distance_to(_hand) < TALK_RADIUS
+
+
+func _update_talk_button() -> void:
+	if _talk_btn == null:
+		return
+	var near := _state == State.AIM and _near_local()
+	_talk_btn.visible = near
+	if near:
+		var p := Locals.person(GameSession.spot_id)
+		_talk_btn.text = ("TALK  %s%s" % [String(p["name"]), "  !" if Locals.can_turn_in(GameSession.spot_id) else ""])
+
+
+func _open_talk_panel() -> void:
+	if _talk_panel != null and is_instance_valid(_talk_panel):
+		_talk_panel.queue_free()
+	var sid := GameSession.spot_id
+	var p := Locals.person(sid)
+	if p.is_empty():
+		return
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.offset_left = -440.0
+	panel.offset_right = 440.0
+	panel.offset_top = -230.0
+	panel.offset_bottom = 230.0
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.02, 0.10, 0.18, 0.95)
+	style.set_corner_radius_all(18)
+	style.set_content_margin_all(20)
+	panel.add_theme_stylebox_override("panel", style)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	panel.add_child(box)
+	_plain_label(box, 28, Color(1.0, 0.92, 0.6)).text = String(p["name"])
+	_plain_label(box, 16, Color(0.75, 0.85, 0.95)).text = "%s  -  %s  (%d)" % [String(p["role"]), Locals.tier_name(sid), Locals.friendship(sid)]
+	for line in Locals.talk_lines(sid):
+		_plain_label(box, 19, Color.WHITE).text = line
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	box.add_child(row)
+	if Locals.can_turn_in(sid):
+		var give := _tackle_button("GIVE  (+%d coins)" % Locals.reward_coins(sid), false, Vector2(300.0, 60.0))
+		give.pressed.connect(func() -> void:
+			var res := Locals.turn_in(sid)
+			_update_coins()
+			_update_progress_ui()
+			_amb.play("bell", 0.4)
+			_buzz(120)
+			if bool(res.get("tier_up", false)):
+				_flash("%s now calls you: %s" % [String(p["name"]), String(res["tier"])])
+			else:
+				_flash("+%d coins, +%d XP" % [int(res.get("coins", 0)), int(res.get("xp", 0))])
+			_open_talk_panel())
+		row.add_child(give)
+	var bye := _tackle_button("BYE", false, Vector2(160.0, 60.0))
+	bye.pressed.connect(func() -> void: panel.queue_free())
+	row.add_child(bye)
+	_talk_panel = panel
+	_hud_root.add_child(panel)
 
 
 ## Two shoals of small fish that school (boids) in the shallows.
@@ -452,6 +538,18 @@ func _build_hud() -> void:
 		_world.time_of_day = fmod(_world.time_of_day + 1.0 / 24.0, 1.0)
 		_flash("Time %s" % _world.clock_text()))
 	ui.add_child(hour_btn)
+
+	_talk_btn = Button.new()
+	_talk_btn.add_theme_font_size_override("font_size", 22)
+	_talk_btn.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_talk_btn.offset_left = -360.0
+	_talk_btn.offset_right = -20.0
+	_talk_btn.offset_top = 118.0
+	_talk_btn.offset_bottom = 174.0
+	_talk_btn.focus_mode = Control.FOCUS_NONE
+	_talk_btn.visible = false
+	_talk_btn.pressed.connect(_open_talk_panel)
+	ui.add_child(_talk_btn)
 
 	var bait_btn := Button.new()
 	bait_btn.text = "BAIT / HOOK"
@@ -1534,6 +1632,7 @@ func _on_caught(id: String, weight_kg: float) -> void:
 		kept[id] = int(kept.get(id, 0)) + 1
 		GameSession.outing["kept"] = kept
 		GameSession.outing["kept_kg"] = float(GameSession.outing.get("kept_kg", 0.0)) + weight_kg
+	var for_local := Locals.on_kept(GameSession.spot_id, id)
 	var value := int(round(float(sp["base_price"]) * pow(maxf(weight_kg, 0.05), 0.8)))
 	var res := GameSession.record_catch(id, String(sp["name"]), weight_kg, value, int(sp["base_price"]))
 	_update_coins()
@@ -1543,6 +1642,10 @@ func _on_caught(id: String, weight_kg: float) -> void:
 		"On %s, hook %s" % [String(Tackle.BAITS[GameSession.bait_id]["name"]).to_lower(), Tackle.hook_name(GameSession.hook_id)]])
 	if GameSession.LIVE_BAIT_SPECIES.has(id) and weight_kg < 0.4 and GameSession.live_bait < GameSession.LIVE_BAIT_MAX:
 		lines.append("Into the bucket as live bait  (%d)" % GameSession.add_live_bait(1))
+	if for_local:
+		var lr := Locals.request(GameSession.spot_id)
+		lines.append("For %s: %d / %d%s" % [String(Locals.person(GameSession.spot_id)["name"]), int(lr["have"]), int(lr["need"]),
+			"  -  go and give them!" if Locals.can_turn_in(GameSession.spot_id) else ""])
 	var daily := Daily.try_complete(GameSession.spot_id, id, weight_kg)
 	if daily > 0:
 		lines.append("DAILY CHALLENGE DONE!  +%d coins, +%d XP" % [daily, Daily.XP])
@@ -1932,6 +2035,7 @@ func _process(delta: float) -> void:
 	elif _state != State.FIGHT:
 		_rod_bend_target = 0.0
 	_rod_bend = lerpf(_rod_bend, _rod_bend_target, 1.0 - exp(-10.0 * delta))
+	_update_talk_button()
 
 	for r in _ripples:
 		r["age"] = float(r["age"]) + delta
@@ -2132,10 +2236,13 @@ func _draw_shore() -> void:
 
 
 func _draw_crowd() -> void:
-	for a in _crowd:
+	for ci in _crowd.size():
+		var a: Dictionary = _crowd[ci]
 		var x := float(a["x"])
 		if absf(x - _cam.position.x) > 1500.0:
 			continue
+		if ci == _local_idx:
+			_draw_local_tag(Vector2(x, float(a["y"]) - 46.0))
 		var y := float(a["y"])
 		var hold := _neighbor_hold(a)
 		var tip := _neighbor_tip(a)
@@ -2163,6 +2270,19 @@ func _draw_crowd() -> void:
 				draw_circle(end, 3.0, Color(0.95, 0.3, 0.2, 0.9))
 			else:
 				draw_arc(end, 6.0 + sin(_time * 6.0) * 2.0, 0.0, TAU, 10, Color(1.0, 1.0, 1.0, 0.6), 1.5)
+
+
+## Name over the local's head; a yellow "!" when the fish they asked for are ready to hand over.
+func _draw_local_tag(at: Vector2) -> void:
+	var p := Locals.person(GameSession.spot_id)
+	var font := ThemeDB.fallback_font
+	var nm := String(p["name"])
+	var w := font.get_string_size(nm, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+	draw_rect(Rect2(at + Vector2(-w * 0.5 - 6.0, -16.0), Vector2(w + 12.0, 22.0)), Color(0.0, 0.0, 0.0, 0.45))
+	draw_string(font, at + Vector2(-w * 0.5, 0.0), nm, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 0.95, 0.8))
+	if Locals.can_turn_in(GameSession.spot_id):
+		var bob := sin(_time * 4.0) * 3.0
+		draw_string(font, at + Vector2(-5.0, -22.0 + bob), "!", HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(1.0, 0.85, 0.2))
 
 
 func _draw_foam() -> void:
