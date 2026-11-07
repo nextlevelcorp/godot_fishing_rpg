@@ -18,6 +18,7 @@ var _overlay_title: Label
 var _overlay_body: VBoxContainer
 var _sound_btn: Button
 var _vibrate_btn: Button
+var _test_btn: Button
 var _menu: VBoxContainer
 
 
@@ -124,8 +125,10 @@ func _open_settings() -> void:
 	_vibrate_btn = _button("", 24, _toggle_vibration)
 	_overlay_body.add_child(_sound_btn)
 	_overlay_body.add_child(_vibrate_btn)
+	_test_btn = _button("", 24, _toggle_test_tools)
+	_overlay_body.add_child(_test_btn)
 	var note := Label.new()
-	note.text = "Vibration works on Android browsers. iPhone Safari does not allow it.\nYour progress is saved in this browser; clearing site data erases it."
+	note.text = "Vibration works on Android browsers. iPhone Safari does not allow it.\nTEST TOOLS adds a TEST button on the shore: hook any species at once and trigger jumps, to check the pictures. Test catches give no coins or XP.\nYour progress is saved in this browser; clearing site data erases it."
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	note.add_theme_font_size_override("font_size", 16)
 	note.add_theme_color_override("font_color", Color(0.8, 0.9, 1.0))
@@ -168,7 +171,13 @@ func _toggle_vibration() -> void:
 	_refresh_settings()
 
 
+func _toggle_test_tools() -> void:
+	GameSession.set_test_tools(not GameSession.test_tools)
+	_refresh_settings()
+
+
 func _refresh_settings() -> void:
+	_test_btn.text = "TEST TOOLS: %s" % ("ON" if GameSession.test_tools else "OFF")
 	_sound_btn.text = "SOUND: %s" % ("ON" if GameSession.sound_on else "OFF")
 	_vibrate_btn.text = "VIBRATION: %s" % ("ON" if GameSession.vibration_on else "OFF")
 

@@ -83,6 +83,11 @@ var _empty_t := 0.0
 var _escape_reason := ""
 var _overhook_t := 0.0
 var _was_shaking := false
+var _test_fish := false           ## a fish hooked from the TEST panel: no rewards
+var _forced_kg := 0.0
+var _test_panel: PanelContainer
+var _test_bar: HBoxContainer
+var _test_size := 0.4
 var _anchor_seen := 0
 var _step_half := 0
 var _stroke_n := 0
@@ -456,6 +461,30 @@ func _build_hud() -> void:
 	bait_btn.pressed.connect(_open_tackle_panel)
 	ui.add_child(bait_btn)
 
+	if GameSession.test_tools:
+		var test_btn := Button.new()
+		test_btn.text = "TEST"
+		test_btn.add_theme_font_size_override("font_size", 20)
+		test_btn.position = Vector2(340.0, 96.0)
+		test_btn.size = Vector2(110.0, 48.0)
+		test_btn.focus_mode = Control.FOCUS_NONE
+		test_btn.pressed.connect(_open_test_panel)
+		ui.add_child(test_btn)
+		_test_bar = HBoxContainer.new()
+		_test_bar.position = Vector2(470.0, 96.0)
+		_test_bar.add_theme_constant_override("separation", 8)
+		for entry: Array in [["JUMP", "jump"], ["THRASH", "thrash"], ["ROLL", "roll"], ["LAND", "land"]]:
+			var b := Button.new()
+			b.text = String(entry[0])
+			b.custom_minimum_size = Vector2(110.0, 48.0)
+			b.add_theme_font_size_override("font_size", 18)
+			b.focus_mode = Control.FOCUS_NONE
+			var what := String(entry[1])
+			b.pressed.connect(func() -> void: _test_action(what))
+			_test_bar.add_child(b)
+		_test_bar.visible = false
+		ui.add_child(_test_bar)
+
 	var star := TextureRect.new()
 	star.texture = load("res://assets/kenney_game_icons/star.png") as Texture2D
 	star.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -547,6 +576,8 @@ func _show_fight_ui(on: bool) -> void:
 	_tension_bar.visible = on
 	_stamina_bar.visible = on
 	_tension_label.visible = on
+	if _test_bar != null:
+		_test_bar.visible = on and _test_fish
 
 
 # ---------------------------------------------------------------- helpers
@@ -1101,17 +1132,18 @@ func _retrieve(message: String) -> void:
 	_set_status(message + ".   Aim and throw again")
 
 
-func _hook_fish() -> void:
+func _hook_fish(force: bool = false) -> void:
 	# Does the strike set the hook? Depends on the hook size against this fish's mouth.
-	if _rng.randf() > Tackle.hookup_chance(_fish_id, GameSession.hook_id, GameSession.bait_id):
+	if not force and _rng.randf() > Tackle.hookup_chance(_fish_id, GameSession.hook_id, GameSession.bait_id):
 		var mis := Tackle.hook_misfit(_fish_id, GameSession.hook_id, GameSession.bait_id)
 		var why := "  (hook too big for its mouth)" if mis > 0 else ("  (hook too small to hold)" if mis < 0 else "")
 		_fish_leaves("Missed! The hook did not set" + why)
 		return
-	if GameSession.bait_id == "live_fish":
+	if GameSession.bait_id == "live_fish" and not force:
 		GameSession.add_live_bait(-1)          # the fish has taken it
 	var species := BiomeDB.get_species(_fish_id)
-	_weight_kg = BiomeDB.roll_weight_kg(_fish_id, _rng)
+	_weight_kg = _forced_kg if _forced_kg > 0.0 else BiomeDB.roll_weight_kg(_fish_id, _rng)
+	_forced_kg = 0.0
 	_fishing.apply_rig(BiomeDB.get_rig(GameSession.rig_id))
 	_fishing.hook_fish(_fish_id, species, _weight_kg, _cast_dist_m)
 	var start := _bobber_pos if _fish_agent == null else _fish_agent.pos
@@ -1440,6 +1472,7 @@ func _on_tension(_tension_n: float, ratio: float, bend: float) -> void:
 
 ## keep_view: leave the side view up (the catch card is showing and fades out on its own).
 func _end_fight(keep_view: bool = false) -> void:
+	_test_fish = false
 	_show_fight_ui(false)
 	if not keep_view:
 		_fight_view.end()
@@ -1453,6 +1486,16 @@ func _end_fight(keep_view: bool = false) -> void:
 
 func _on_caught(id: String, weight_kg: float) -> void:
 	var sp := BiomeDB.get_species(id)
+	if _test_fish:
+		_test_fish = false
+		var tcm := Regulations.length_cm(id, weight_kg)
+		_fight_view.show_catch("TEST: " + String(sp["name"]), PackedStringArray(["%.2f kg, %.0f cm" % [weight_kg, tcm], String(sp["scientific"]), "Test catch: no coins, no XP, not in the journal"]))
+		_result_label.text = ""
+		_set_status("Test catch")
+		_amb.play("splash", 0.7)
+		_amb.play("drips", 0.8)
+		_end_fight(true)
+		return
 	# From a pier, quay or bridge the fish has to come up through the air. Lifted on the line, its
 	# weight plus the jerk of the lift (about twice its weight) can part the line; a net takes it.
 	var high := not _boat_mode and (_on_pier() or String(_spot["kind"]) == "bridge" or String(_spot["kind"]) == "harbor")
@@ -1641,6 +1684,97 @@ func _show_summary() -> void:
 	keep.pressed.connect(func() -> void: _summary.queue_free())
 	row.add_child(keep)
 	_hud_root.add_child(_summary)
+
+
+## TEST tools (GameSession.test_tools): hook any species at once to check its picture and fight.
+func _open_test_panel() -> void:
+	if _state != State.AIM:
+		_flash("Reel in first")
+		return
+	if _test_panel != null and is_instance_valid(_test_panel):
+		_test_panel.queue_free()
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.offset_left = -470.0
+	panel.offset_right = 470.0
+	panel.offset_top = -330.0
+	panel.offset_bottom = 330.0
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.02, 0.10, 0.18, 0.96)
+	style.set_corner_radius_all(18)
+	style.set_content_margin_all(16)
+	panel.add_theme_stylebox_override("panel", style)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
+	_plain_label(box, 26, Color(1.0, 0.92, 0.6)).text = "Test: hook a species now"
+	var sizes := HBoxContainer.new()
+	sizes.add_theme_constant_override("separation", 8)
+	box.add_child(sizes)
+	_plain_label(sizes, 18, Color.WHITE).text = "Size:"
+	for entry: Array in [["SMALL", 0.05], ["MEDIUM", 0.4], ["LARGE", 0.95]]:
+		var sb := _tackle_button(String(entry[0]), absf(_test_size - float(entry[1])) < 0.01, Vector2(150.0, 46.0))
+		var v := float(entry[1])
+		sb.pressed.connect(func() -> void:
+			_test_size = v
+			_open_test_panel())
+		sizes.add_child(sb)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	scroll.add_child(grid)
+	var ids: Array[String] = []
+	for sid: String in BiomeDB.fish.keys():
+		ids.append(sid)
+	ids.sort()
+	for sid: String in ids:
+		var mark := "* " if RealFish.sprite(sid) != null else ""
+		var tb := _tackle_button(mark + String(BiomeDB.get_species(sid)["name"]), false, Vector2(290.0, 46.0))
+		tb.pressed.connect(func() -> void:
+			panel.queue_free()
+			_test_hook(sid, _test_size))
+		grid.add_child(tb)
+	_plain_label(box, 15, Color(0.8, 0.9, 1.0)).text = "* = has a painted picture. After hooking, use JUMP, THRASH, ROLL and LAND at the top. Test catches give no coins or XP."
+	var close := _tackle_button("CLOSE", false, Vector2(200.0, 52.0))
+	close.pressed.connect(func() -> void: panel.queue_free())
+	box.add_child(close)
+	_test_panel = panel
+	_hud_root.add_child(panel)
+
+
+## Hooks `id` at once, 25 m out in front of you, at a size from 0 (smallest) to 1 (largest).
+func _test_hook(id: String, size01: float) -> void:
+	if _state != State.AIM:
+		return
+	_facing = Vector2.UP
+	_aim = 0.0
+	_cast_dist_m = 25.0
+	_bobber_pos = _rod_tip() + _aim_dir() * _cast_dist_m * PX_PER_M
+	_fight_view.begin_cast()
+	_bait_on = true
+	_fish_id = id
+	_prof = BiomeDB.get_bite_profile(id)
+	var wr: Vector2 = BiomeDB.get_species(id)["weight_kg"]
+	_forced_kg = lerpf(wr.x, wr.y, size01)
+	_test_fish = true
+	_hook_fish(true)
+
+
+## The buttons at the top while a test fish is on: force a surfacing, or land it now.
+func _test_action(what: String) -> void:
+	if _state != State.FIGHT:
+		return
+	if what == "land":
+		_fishing.fish_pos_m = 0.5
+		_fishing.stamina = 0.0
+		_fishing._finish(FishingController.State.LANDED)
+	else:
+		_fight_view.surface(what)
 
 
 ## Bait and hook choice. Only while not fishing: you change tackle with the line in.

@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Shown on screen so a player can tell a fresh deploy from a page the browser cached.
 ## Bump it with every build that changes behaviour.
-const BUILD := "build 43"
+const BUILD := "build 44"
 const SAVE_PATH := "user://save.cfg"
 const SAVE_VERSION := 1
 const START_RIG := "shore_spinning_rig"
@@ -51,6 +51,10 @@ static var live_bait := 0
 static var rig_mode := "float"
 ## A landing net (kepçe): needed to land a heavy fish from a pier, quay or bridge. Saved.
 static var has_net := false
+## Test tools (set in the title screen's Settings): a TEST button on the shore hooks any species at
+## once and lets you trigger jumps and the landing, to check a sprite or a fight in seconds.
+## Test catches give no coins, XP or journal entry.
+static var test_tools := false
 ## Date (YYYY-MM-DD) of the last completed daily challenge (see Daily).
 static var daily_done := ""
 const NET_PRICE := 250
@@ -132,6 +136,7 @@ static func load_once() -> void:
 	live_bait = clampi(_to_int(cfg.get_value("tackle", "live", 0)), 0, LIVE_BAIT_MAX)
 	rig_mode = "bottom" if cfg.get_value("tackle", "rig", "float") == "bottom" else "float"
 	has_net = cfg.get_value("tackle", "net", false) == true
+	test_tools = cfg.get_value("settings", "test_tools", false) == true
 	var dd: Variant = cfg.get_value("player", "daily_done", "")
 	daily_done = String(dd) if dd is String else ""
 	best_kg = _clean(cfg.get_value("journal", "best_kg", {}), true)
@@ -157,6 +162,7 @@ static func save() -> void:
 	cfg.set_value("tackle", "live", live_bait)
 	cfg.set_value("tackle", "rig", rig_mode)
 	cfg.set_value("tackle", "net", has_net)
+	cfg.set_value("settings", "test_tools", test_tools)
 	cfg.set_value("player", "daily_done", daily_done)
 	cfg.set_value("journal", "best_kg", best_kg)
 	cfg.set_value("journal", "counts", counts)
@@ -177,6 +183,11 @@ static func set_tackle(bait: String, hook: String) -> void:
 		bait_id = bait
 	if Tackle.HOOKS.has(hook):
 		hook_id = hook
+	save()
+
+
+static func set_test_tools(on: bool) -> void:
+	test_tools = on
 	save()
 
 

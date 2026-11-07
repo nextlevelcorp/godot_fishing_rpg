@@ -962,7 +962,7 @@ func _cover_with_water(at: Vector2, len_px: float, depth_frac: float) -> void:
 
 func _draw_caught_fish() -> void:
 	var len_px := clampf(_fish_len_m() * 280.0, 150.0, 330.0)
-	if _creature != "":
+	if _creature != "" and RealFish.sprite(_fish_id) == null:
 		_draw_creature(_creature, _fish_pos, _facing, _tilt, len_px / 160.0, Color.WHITE)
 	else:
 		RealFish.draw(_canvas, _fish_id, _fish_pos, len_px, _tilt - 0.15, _facing, _flex_phase * 0.6, 0.5 + 0.5 * clampf(_catch_t / 3.4, 0.0, 1.0), daylight, 1.0)

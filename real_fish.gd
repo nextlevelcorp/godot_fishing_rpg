@@ -81,6 +81,9 @@ static func sprite(id: String) -> Texture2D:
 
 
 const SPRITE_SLICES := 24
+## Painted sprites that must not bend like a fish: the crab is seen from above, so a swim wave
+## would only warp it. It is drawn as one picture.
+const NO_BEND: Array[String] = ["blue_crab"]
 
 
 ## Draws a painted sprite, bent like a swimming fish: the picture is a strip of SPRITE_SLICES
@@ -128,7 +131,7 @@ static func draw(ci: CanvasItem, id: String, center: Vector2, length: float, rot
 	# A painted sprite in assets/art/fish/<id>.png (see docs/ART_BRIEF_AI.md) replaces the drawing.
 	var tex := sprite(id)
 	if tex != null:
-		_draw_sprite_fish(ci, tex, center, length, rot, facing, phase, flex, dim)
+		_draw_sprite_fish(ci, tex, center, length, rot, facing, phase, 0.0 if NO_BEND.has(id) else flex, dim)
 		return
 	var lk := look(id)
 	var shade := Color(dim, dim, dim)

@@ -107,6 +107,11 @@ Measured, not listened to: spectrograms of every sound, loop-join click detector
 ## Bending sprites (build 43)
 A painted fish sprite is drawn as a strip of 24 quads whose corners follow the swim wave (`RealFish._bend`: small at the head, large at the tail, a wave running head to tail), so the picture swims, jumps and flaps instead of staying stiff. Neighbouring quads share corner points, so the outline bends smoothly with no steps or seams; icons (no flex) stay one plain picture. Checked offline by simulating the same shear on the real sprites at four phases (smooth outlines, tails swing). Not verified: frame time on the phone (24 small polygons per visible fish).
 
+## Test tools and every sprite (build 44)
+- Title Settings has TEST TOOLS (saved). When on, the shore HUD has a TEST button: pick any species and a size, and it is hooked at once 25 m out (no waiting, no hook-up roll). While a test fish is on, JUMP, THRASH and ROLL force a surfacing and LAND lands it. Test catches give no coins, XP or journal entry; the card says "TEST". Species with a painted picture are marked with a star in the list. Test: turn it on, hook a Whiting at LARGE, press JUMP, then LAND.
+- The squid, cuttlefish and blue crab pictures are used wherever a species is drawn (catch, other anglers' catches, journal); the squid and cuttlefish bend, the crab (seen from above) does not. Octopus has no picture yet and keeps its drawing.
+- `tools/art/import_sprites.py` is the one way a picture becomes a sprite (empty check, background cut, trim, scale, contact sheet).
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

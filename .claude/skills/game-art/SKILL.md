@@ -21,12 +21,17 @@ allowed-tools: Read, Glob, Grep, Write, Edit, Bash, WebSearch, WebFetch, AskUser
 - No pixel art (user decision). Smooth, painted look throughout.
 
 ## Importing a painted sprite
-1. Check the upload is not empty (all-transparent) and is the species it claims to be.
-2. Remove a white or checkerboard background by flood fill from the edges; keep the largest
-   piece; soften the edge 1 px. Keep real transparency as it is.
-3. Trim to the subject, scale to at most 1024 px wide, save as `<species id>.png`.
-4. Look at a contact sheet of the result on a sea-blue background before committing.
-5. Record the batch in `assets/art/SOURCE.md` (tool, plan, date, what was done).
+Use the tool, never hand steps: `python3 tools/art/import_sprites.py species_id=picture.png ...`
+(`tools/art/import_sprites.py` explains itself). It skips empty pictures, keeps real transparency,
+floods a light or checkerboard background away from the edges, trims, scales to at most 1024 px wide
+and writes `assets/art/fish/<species id>.png`. Then:
+1. Check which species each picture is (the owner's file names are not reliable) and that it faces right.
+2. Look at the contact sheet the tool writes (default `/tmp/sprite_sheet/sheet.png`, outside the project).
+3. Record the batch in `assets/art/SOURCE.md` (tool, plan, date, what was done, what was skipped).
+4. Sprites bend like swimming fish in `RealFish`; a species seen from above goes into `RealFish.NO_BEND`.
+   Cephalopods and the crab use their sprite when one exists, else the procedural drawing.
+5. With TEST TOOLS on (title Settings) the shore has a TEST button: hook the species at once and use
+   JUMP, THRASH, ROLL and LAND to see the picture on the phone in seconds.
 
 ## Sourcing assets
 1. Prefer CC0. Record every pack in `assets/<pack>/SOURCE.md` (author, version, licence, where

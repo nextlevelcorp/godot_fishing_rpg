@@ -17,7 +17,7 @@ func _init(id: String = "", is_known: bool = true) -> void:
 
 
 func _draw() -> void:
-	if species == "" or FightView.CREATURES.has(species):
+	if species == "" or (FightView.CREATURES.has(species) and RealFish.sprite(species) == null):
 		return
 	var length := size.x * 0.9
 	var sprite := RealFish.sprite(species)
