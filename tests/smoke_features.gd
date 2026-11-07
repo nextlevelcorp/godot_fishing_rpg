@@ -188,6 +188,13 @@ func _check_game_rules() -> void:
 	# Reactions.
 	var nod: String = locals.call("react", String(spot_species[0]), 0.1, true)
 	_check(nod.begins_with("Good, put it back"), "the local approves of a released fish")
+	# The moon: real phases on known dates, and the night effect.
+	_check(absf(Moon.phase_at(1706205240.0) - 0.5) < 0.03, "the moon is full on 2024-01-25")
+	_check(minf(Moon.phase_at(1704974220.0), 1.0 - Moon.phase_at(1704974220.0)) < 0.03, "the moon is new on 2024-01-11")
+	_check(Moon.night_factor(true, 1.0, 0.0) > 1.1 and Moon.night_factor(true, 1.0, 0.5) < 0.9, "squid bite better on a dark night than a full moon")
+	_check(Moon.night_factor(false, 1.0, 0.5) > 1.05 and Moon.night_factor(false, 1.0, 0.0) < 0.95, "other night feeders bite better in moonlight")
+	_check(is_equal_approx(Moon.night_factor(true, 0.0, 0.0), 1.0), "the moon changes nothing in daylight")
+	_check(Moon.phase_name(0.0) == "New moon" and Moon.phase_name(0.5) == "Full moon" and Moon.phase_name(0.99) == "New moon", "moon phase names")
 	# Tournament week and spot.
 	var wk1: String = tourney.call("week_key")
 	var sp1: String = tourney.call("spot_this_week")

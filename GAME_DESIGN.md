@@ -202,6 +202,20 @@ Owner's decision (2026-11-07): the ten everyday baits stay free; special, prized
 - **Test:** CI feature smoke buys a pack, checks stock and coins, uses one.
 Tuning knobs: `pack`, `price`, `steal`, `PREF` entries, `BAIT_STOCK_MAX`.
 
+## The real moon (build 60)
+Invented in /brainstorm (owner: "invent"). Realism with no new UI to learn: the game already uses
+the device's real month for seasons, now it uses the real moon too.
+- **Phase** (`moon.gd`): from the device date, mean synodic month 29.530588853 days from the new
+  moon of 2000-01-06 18:14 UTC; right to about half a day. Shown in the shore HUD line (month, time,
+  weather, moon). The first-person sky draws the moon with its real phase (waxing lit on the right).
+- **Effect on night fishing** (only at night, fading with daylight): squid, cuttlefish and octopus
+  bite x1.15 at new moon down to x0.85 at full moon (they come to the lamp on dark nights); other
+  night feeders such as bass bite x0.90 at new moon up to x1.10 at full moon. The numbers are
+  game-design fill from common angling lore, not surveyed.
+- **Test:** CI checks the phase on two known dates (full 2024-01-25, new 2024-01-11), the effect
+  direction for both groups, no effect by day, and the phase names.
+Tuning knobs: `DARK_BONUS`, `LIGHT_BONUS`.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

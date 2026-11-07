@@ -45,6 +45,7 @@ const WALK_SPEED := 150.0          ## px/s, about 1.5 m/s
 const PIER_LEN := 420.0            ## the pier reaches 42 m out
 const PIER_HALF := 26.0
 const LOCAL_EARSHOT := 450.0       ## the local calls out about fish you land this close
+const CEPHALOPODS: Array[String] = ["european_squid", "common_cuttlefish", "common_octopus"]   ## come to the lamp on dark nights (Moon)
 const TALK_RADIUS := 130.0         ## walk this close to the named local to see TALK
 const TIP_RADIUS := 100.0          ## walk this close to another angler to hear their tip
 
@@ -1208,6 +1209,8 @@ func _species_weight(id: String) -> float:
 	w *= BiomeDB.activity_factor(id, _world.time_of_day)
 	w *= Tackle.bite_factor(id, GameSession.bait_id, GameSession.hook_id)
 	w *= Season.factor(id)
+	if BiomeDB.activity_kind(id) == "night":
+		w *= Moon.night_factor(CEPHALOPODS.has(id), 1.0 - _world.daylight)
 	return w
 
 
@@ -2254,7 +2257,7 @@ func _process(delta: float) -> void:
 	_fight_view.tint = _tint.color
 	_fight_view.daylight = _world.daylight
 	_water.set_daylight(_world.daylight)
-	_clock_label.text = "%s %s   |   %s" % [Season.month_name(), _world.clock_text(), _weather.label()]
+	_clock_label.text = "%s %s   |   %s   |   %s" % [Season.month_name(), _world.clock_text(), _weather.label(), Moon.phase_name()]
 	var probe := _bobber_pos if (_state == State.WAIT or _state == State.BITE) else (_pred_landing if _state == State.CHARGE else _hand + _facing * 60.0)
 	var water := _water_depth(probe)
 	_depth_label.text = ("Bottom rig" if _bottom_rig() else "Float %.1f m" % _bait_depth) + "  |  Water %s  |  Clutch %.0f N  |  %s, hook %s" % [("%.1f m" % water) if water > 0.0 else "-",

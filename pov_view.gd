@@ -628,7 +628,11 @@ func _draw_sun_moon(c: CanvasItem, sky_low: Color) -> void:
 		var mp := Vector2(CX + (mt - 0.5) * 2.0 * 820.0, HY - melev * 230.0)
 		c.draw_circle(mp, 30.0, Color(0.9, 0.92, 1.0, 0.12))
 		c.draw_circle(mp, 16.0, Color(0.95, 0.95, 0.88))
-		c.draw_circle(mp + Vector2(6.0, -3.0), 13.0, sky_low.lerp(Color(0.05, 0.06, 0.14), 0.6))
+		# The real phase: a shadow disc slides across the moon. Waxing is lit on the right, waning on the left.
+		var lit := Moon.illumination()
+		var side := 1.0 if Moon.phase() < 0.5 else -1.0
+		if lit < 0.97:
+			c.draw_circle(mp + Vector2(-side * 32.0 * lit, -3.0 * (1.0 - lit)), 17.0, sky_low.lerp(Color(0.05, 0.06, 0.14), 0.6))
 
 
 func _draw_gulls(ci: CanvasItem, night: float) -> void:
