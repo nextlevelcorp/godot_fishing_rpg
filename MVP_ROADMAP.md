@@ -32,7 +32,7 @@ HUD text overlap, object leak at exit (CI warning).
 - [x] Pause/resume and audio lifecycle (#2)
 - [ ] Gameplay bug batch (#5)
 - [ ] Camera culling and draw-once layers (#3): town drawing culled to the camera (build 21); shore and boats still open; no measurement yet
-- [ ] Remove legacy boat game from build (#9)
+- [x] Remove legacy boat game from build (#9): 16 files deleted in build 58, owner's choice
 - [ ] Robust save (#10) (partly: type-checked load, version field)
 
 ## M1 — MVP feature-complete

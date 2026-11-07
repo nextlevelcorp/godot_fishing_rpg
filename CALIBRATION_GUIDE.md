@@ -1,5 +1,7 @@
 # Nibble, Bite and Sonar: Telemetry and Calibration Guide
 
+> Historical: describes the legacy boat prototype, removed in build 58 (2026-11-07). The shipped game is described in `TECHNICAL_ARCHITECTURE.md` and `GAME_DESIGN.md`; the old files are in git history.
+
 ## 1. How a bite works
 
 ```

@@ -1,5 +1,7 @@
 # Global Fishing RPG: Architecture and Math (Godot 4, GDScript)
 
+> Historical: describes the legacy boat prototype, removed in build 58 (2026-11-07). The shipped game is described in `TECHNICAL_ARCHITECTURE.md` and `GAME_DESIGN.md`; the old files are in git history.
+
 All text, IDs, data and UI strings are English. Files are flat here; move them into `res://scripts/...` as you like. Scripts use `class_name`, so paths do not matter. Only `BiomeDB` needs registering as an autoload.
 
 ## 1. Global RPG Biome and Data Architecture

@@ -27,7 +27,8 @@ boat prototype.
 | `fishing_spots.gd` | spot data with sources |
 | `game_session.gd` | static cross-scene state; save/load via ConfigFile `user://save.cfg` |
 | `water_surface.gd`, `nightshoal_water.gdshader` | water shader driven by the camera |
-| legacy: `main_sandbox.*`, `boat*.gd`, `fish_school.gd`, `fish_interaction_ai.gd`, `sonar_*.gd`, `weather_*.gd`, `progression_manager.gd`, `fishing_hud.*`, `debug_overlay.gd`, `cargo_hold.gd`, `day_night_cycle.gd`, `ocean_current_field.gd` | boat prototype, still shipped and reachable from the map |
+| `weather_manager.gd` | weather state the water shader can read (optional) |
+| removed in build 58 (owner's choice, 2026-11-07): the legacy boat prototype `main_sandbox.*`, `boat*.gd`, `fish_school.gd`, `fish_interaction_ai.gd`, `sonar_*.gd`, `weather_dashboard.gd`, `progression_manager.gd`, `fishing_hud.*`, `debug_overlay.gd`, `cargo_hold.gd`, `day_night_cycle.gd`, `ocean_current_field.gd`, and the boat wake in `water_surface.gd` | nothing in the game opened them; they stay in git history |
 
 ## Input
 Keyboard actions are registered at runtime by `input_defaults.gd`. Touch goes through
