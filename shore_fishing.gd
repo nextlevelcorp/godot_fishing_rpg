@@ -84,6 +84,8 @@ var _escape_reason := ""
 var _overhook_t := 0.0
 var _was_shaking := false
 var _anchor_seen := 0
+var _step_half := 0
+var _stroke_n := 0
 var _lap_t := 3.0
 var _horn_t := 40.0
 var _tackle_panel: PanelContainer
@@ -753,8 +755,24 @@ func _walk(delta: float) -> void:
 	var ny := _hand + Vector2(0.0, step.y)
 	if _walkable(ny):
 		_hand = ny
-	_walk_phase += step.length() * 0.12
+	_walk_phase += step.length() * 0.05          # about 2.4 steps a second at full speed
+	var half := int(floor(_walk_phase / PI))
+	if half != _step_half:
+		_step_half = half
+		_amb.play(_step_kind(), randf_range(0.28, 0.4))
 	_check_tip()
+
+
+## What the ground sounds like under the angler's feet.
+func _step_kind() -> String:
+	if _on_pier():
+		return "step_wood"
+	match String(_spot["kind"]):
+		"beach":
+			return "step_sand"
+		"rocky":
+			return "step_gravel"
+	return "step_stone"
 
 
 func _adjust_bait_depth(delta: float) -> void:
@@ -825,7 +843,11 @@ func _update_boat(delta: float) -> void:
 	_hand = nxt
 	_moving = mv.length() > 0.05
 	if _moving:
-		_walk_phase += delta * 4.0
+		_walk_phase += delta * 2.6               # a stroke every 2.4 s, a leisurely row
+		var stroke := int(floor(_walk_phase / TAU))
+		if stroke != _stroke_n:
+			_stroke_n = stroke
+			_amb.play("oar", 0.5)
 
 
 func _is_land(p: Vector2) -> bool:
@@ -1154,6 +1176,8 @@ func _update_soundscape(delta: float) -> void:
 	for b in _boats:
 		near = minf(near, (b.pos as Vector2).distance_to(_hand))
 	_amb.set_bed("engine", clampf(1.0 - near / 900.0, 0.0, 1.0) * 0.6)
+	_amb.set_bed("rain", 0.6 if _weather_kind == "drizzle" else 0.0)
+	_amb.set_bed("wind", clampf(_wind.length() / 150.0, 0.0, 1.0) * 0.8)
 	_lap_t -= delta
 	if _lap_t <= 0.0:
 		_lap_t = _rng.randf_range(2.5, 6.0)
@@ -1164,7 +1188,7 @@ func _update_soundscape(delta: float) -> void:
 		_horn_t -= delta
 		if _horn_t <= 0.0:
 			_horn_t = _rng.randf_range(70.0, 150.0)
-			_amb.play("horn", 0.35)
+			_amb.play_at("horn", 1.0, 120.0)          # a ferry across the water: dull and a third of a second late
 
 
 # ---------------------------------------------------------------- first-person view
@@ -1385,7 +1409,7 @@ func _update_neighbors(delta: float) -> void:
 					a["kg"] = BiomeDB.roll_weight_kg(String(a["sp"]), _rng) if String(a["sp"]) != "" else 0.4
 					if near:
 						_splash(_neighbor_float(a), 0.7)
-						_amb.play("splash", clampf(1.0 - absf(float(a["x"]) - _cam.position.x) / 1400.0, 0.15, 0.6))
+						_amb.play_at("splash", 0.9, absf(float(a["x"]) - _hand.x) / PX_PER_M)
 				"fight":
 					if _rng.randf() < 0.25:
 						st = "cast"                                  # it got away
@@ -1394,7 +1418,7 @@ func _update_neighbors(delta: float) -> void:
 						st = "land"
 						t = 2.4
 						if near:
-							_amb.play("drips", 0.4)
+							_amb.play_at("drips", 0.7, absf(float(a["x"]) - _hand.x) / PX_PER_M)
 				"land":
 					st = "cast"
 					t = 0.8
@@ -1402,7 +1426,7 @@ func _update_neighbors(delta: float) -> void:
 					st = "wait"
 					t = _rng.randf_range(12.0, 45.0) / maxf(_activity(), 0.3)
 					if near:
-						_amb.play("cast", 0.25)
+						_amb.play_at("cast", 0.8, absf(float(a["x"]) - _hand.x) / PX_PER_M)
 		a["t"] = t
 		a["state"] = st
 
@@ -1490,6 +1514,7 @@ func _on_caught(id: String, weight_kg: float) -> void:
 	_set_status("Nice one")
 	_amb.play("splash", 0.7)
 	_amb.play("drips", 0.8)
+	_amb.play_later("flop", 0.5, 0.9)            # it lands on the planks or the rocks and thrashes
 	_end_fight(true)
 
 

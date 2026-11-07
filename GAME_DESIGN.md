@@ -101,6 +101,9 @@ Each spot has a surface current along the shore (`current_ms` in `fishing_spots.
 ## Soundscape (build 40)
 Background life follows the real month, the hour and the place (`_update_soundscape`): cicadas on summer days (June-September, daylight), crickets on warm nights (May-October), the tak-tak of a fishing boat's single-cylinder diesel rising as a boat passes within about 90 m, waves lapping the rocks or pier posts every 2.5-6 s when you are at the edge, and a ferry horn every 70-150 s at Istanbul and the harbours. All rendered offline from models in `tools/audio/render_sfx.py` (no recordings).
 
+## Sound check (build 41)
+Measured, not listened to: spectrograms of every sound, loop-join click detector (linear-prediction residual), level step at the end of each one-shot. Fixed: a click at the engine loop join, a hard cut at the end of the ferry horn (8 dB step) and of the cast line hiss (16 dB), a small step at the end of the float nibble. More natural: gull call (quick rise and long fall, pitch wobble, rough grating, breath), clutch ratchet with uneven clicks (no steady buzz), engine with uneven firings, cicadas as two voices, line snap with almost no room tail. New: rain on water (the "Light rain" weather now sounds), wind that follows the weather's wind, footsteps by ground (pier planks, gravel on rocks, sand on beaches, stone on quays and bridges; walking is also slower, about 2.4 steps a second), oar strokes in the boat, a flop when a fish lands, distance for other anglers' splashes and the ferry horn (quieter, duller, and late at 343 m/s). Every sound has its own seed, so editing one never changes another. Not verified: how any of it sounds on the phone.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).
