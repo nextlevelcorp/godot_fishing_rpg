@@ -28,7 +28,7 @@ const EDGE_M := {"rocky": 5.0, "beach": 6.0, "harbor": 3.0, "bridge": 4.0, "boat
 ## Sound cues for the shore scene to play: exit, drips, splash, splash_big.
 signal sfx(kind: String, volume: float)
 const G := 9.8
-const HANG_BELOW := Vector2(-70.0, 95.0)    ## the landed fish hangs by its mouth this far below the rod tip
+const HANG_LINE := 120.0                     ## px of line between the rod tip and the landed fish's mouth
 const PX_PER_M := 280.0                      ## scale of the fish held up close (px per metre of fish)
 const WAVE_ROWS := 12
 
@@ -89,6 +89,9 @@ var _hang_w := 0.0                ## rad/s
 var _kick := 0.0                  ## 0..1, a flap of the body that dies away
 var _kick_wait := 0.3             ## s until the next flap
 var _hang_phase := 0.0            ## tail-beat phase while hanging
+var _line_len := HANG_LINE        ## px of line from the rod tip to the hook; reeled in after the lift
+var _line_b := 0.0                ## radians of the line from straight down (it swings too)
+var _line_w := 0.0
 
 
 func _ready() -> void:
@@ -462,30 +465,37 @@ func _hang_len_px() -> float:
 	return clampf(_fish_len_m() * PX_PER_M, 140.0, 300.0)
 
 
-## Landed: the fish is lifted out on the line and hangs by the hook in its mouth. _fish_pos is the
-## hook. The hook follows the rod tip on a damped spring; the body is a pendulum swinging from it,
-## pushed by the hook's own acceleration (it lags and overshoots when the hook stops) and by the
-## fish's flaps, which come in bursts and weaken as it tires. Water drips from the tail.
+## Landed: the fish hangs by the hook in its mouth from a short length of line under the rod tip.
+## Two pendulums (Nature of Code): the line swings from the tip, slowly; the body swings from the
+## hook, pushed by the hook's acceleration (it lags and overshoots). A line can only pull: when the
+## hook decelerates faster than gravity the line goes slack instead of pushing, so the fish never
+## flips over. Flaps come in bursts and weaken as it tires. Water drips from the tail.
 func _animate_catch(delta: float) -> void:
-	var anchor := _tip + HANG_BELOW
-	var acc := (anchor - _fish_pos) * 26.0 - _lift_v * 6.0
-	_lift_v += acc * delta
-	_fish_pos += _lift_v * delta
-	# Pendulum about the mouth: radius about half the body (its centre of mass), in metres.
+	_line_len = lerpf(_line_len, HANG_LINE, 1.0 - exp(-2.5 * delta))     # reeled up to hanging length
+	var lm := maxf(_line_len / PX_PER_M, 0.15)
+	var alpha_b := -(G / lm) * sin(_line_b) - 0.5 * _line_w
+	_line_w += alpha_b * delta
+	_line_b = clampf(_line_b + _line_w * delta, -1.2, 1.2)
+	var radial := Vector2(sin(_line_b), cos(_line_b))
+	var tangent := Vector2(cos(_line_b), -sin(_line_b))
+	_fish_pos = _tip + radial * _line_len
+	# Hook acceleration in m/s^2 (tangential from the swing, centripetal toward the tip).
+	var acc := (tangent * alpha_b - radial * _line_w * _line_w) * lm
 	var r := maxf(_fish_len_m() * 0.5, 0.06)
-	var ax := acc.x / PX_PER_M
-	var ay := acc.y / PX_PER_M
-	var alpha := (-ax * cos(_hang_a) - (G - ay) * sin(_hang_a)) / r - 1.8 * _hang_w
+	var gy := maxf(G - acc.y, 0.3 * G)                 # slack line: no push past 0.3 g
+	var alpha := (-acc.x * cos(_hang_a) - gy * sin(_hang_a)) / r - 0.9 * _hang_w
 	var life := clampf(_catch_t / 3.4, 0.25, 1.0)
 	_kick_wait -= delta
 	if _kick_wait <= 0.0:
 		_kick = 1.0
-		_kick_wait = _rng.randf_range(0.45, 1.2) / life
-		_hang_w += (1.0 if _rng.randf() < 0.5 else -1.0) * _rng.randf_range(1.5, 3.5) * life
-	_kick *= exp(-3.0 * delta)
+		_kick_wait = _rng.randf_range(0.6, 1.4) / life
+		var side := 1.0 if _rng.randf() < 0.5 else -1.0
+		_hang_w += side * _rng.randf_range(1.0, 2.2) * life
+		_line_w -= side * 0.25 * life                      # the flap tugs the line the other way
+	_kick *= exp(-3.5 * delta)
 	_hang_w += alpha * delta
-	_hang_a = clampf(_hang_a + _hang_w * delta, -1.3, 1.3)
-	_hang_phase += delta * (5.0 + 20.0 * _kick)
+	_hang_a = clampf(_hang_a + _hang_w * delta, -1.1, 1.1)
+	_hang_phase += delta * (4.0 + 18.0 * _kick)
 	if _rng.randf() < delta * 20.0:
 		var down := Vector2(sin(_hang_a), cos(_hang_a))
 		var tail := _fish_pos + down * _hang_len_px() * _rng.randf_range(0.6, 0.95)
@@ -496,8 +506,12 @@ func _animate_catch(delta: float) -> void:
 func show_catch(title: String, lines: PackedStringArray) -> void:
 	super.show_catch(title, lines)
 	_fish_pos = _line_end()
-	_lift_v = Vector2(0.0, -600.0)
-	_hang_a = _rng.randf_range(-0.6, 0.6)
+	# Start the line where it left the water, then reel it up to hanging length.
+	var d := _fish_pos - _tip
+	_line_len = clampf(d.length(), HANG_LINE, 420.0)
+	_line_b = clampf(atan2(d.x, maxf(d.y, 1.0)), -0.8, 0.8)
+	_line_w = 0.0
+	_hang_a = _line_b * 0.5
 	_hang_w = 0.0
 	_kick = 1.0
 	_kick_wait = 0.3

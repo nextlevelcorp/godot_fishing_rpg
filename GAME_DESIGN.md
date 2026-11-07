@@ -116,14 +116,16 @@ A painted fish sprite is drawn as a strip of 24 quads whose corners follow the s
 ## The fish hangs from the hook (build 47)
 Device report on build 46: the landed fish was drawn level and the line met the middle of its body,
 so it did not look hooked, and its motion was jerky. Now the hook is in the mouth:
-- **Landed fish** (`pov_view.gd` `_animate_catch`): the hook follows the rod tip on a damped
-  spring; the body is a pendulum hanging snout-up from the hook (radius half the fish length,
-  gravity 9.8 m/s², 280 px per metre). The hook's own acceleration swings the body, so it lags and
-  overshoots when the lift stops. The fish flaps in bursts (every 0.45-1.2 s, slower as it tires);
-  each flap kicks the swing and bends the body, then dies away. The line runs straight to the mouth.
+- **Landed fish** (`pov_view.gd` `_animate_catch`, build 48): two pendulums. The line swings
+  slowly from the rod tip and is reeled up to `HANG_LINE` px; the body swings from the hook,
+  pushed by the hook's acceleration (radius half the fish length, gravity 9.8 m/s², 280 px per
+  metre). A line only pulls: when the hook decelerates faster than gravity the line goes slack
+  (effective gravity never below 0.3 g), so the fish cannot flip over. Flaps come every 0.6-1.4 s,
+  slower as it tires; each kicks the body one way and tugs the line the other. Softer damping
+  (0.9 body, 0.5 line) lets the swing die out over a few seconds instead of stopping dead.
 - **Jump and thrash** (`_jump_pose`): the line runs to the mouth, not to the body centre. The head
   shake is smaller (0.12 rad) and the thrash eases in and out instead of snapping.
-Tuning knobs: `HANG_BELOW`, `PX_PER_M`, flap interval and strength in `_animate_catch`.
+Tuning knobs: `HANG_LINE`, `PX_PER_M`, flap interval and strength in `_animate_catch`.
 
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
