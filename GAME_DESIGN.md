@@ -104,6 +104,9 @@ Background life follows the real month, the hour and the place (`_update_soundsc
 ## Sound check (build 41)
 Measured, not listened to: spectrograms of every sound, loop-join click detector (linear-prediction residual), level step at the end of each one-shot. Fixed: a click at the engine loop join, a hard cut at the end of the ferry horn (8 dB step) and of the cast line hiss (16 dB), a small step at the end of the float nibble. More natural: gull call (quick rise and long fall, pitch wobble, rough grating, breath), clutch ratchet with uneven clicks (no steady buzz), engine with uneven firings, cicadas as two voices, line snap with almost no room tail. New: rain on water (the "Light rain" weather now sounds), wind that follows the weather's wind, footsteps by ground (pier planks, gravel on rocks, sand on beaches, stone on quays and bridges; walking is also slower, about 2.4 steps a second), oar strokes in the boat, a flop when a fish lands, distance for other anglers' splashes and the ferry horn (quieter, duller, and late at 343 m/s). Every sound has its own seed, so editing one never changes another. Not verified: how any of it sounds on the phone.
 
+## Bending sprites (build 43)
+A painted fish sprite is drawn as a strip of 24 quads whose corners follow the swim wave (`RealFish._bend`: small at the head, large at the tail, a wave running head to tail), so the picture swims, jumps and flaps instead of staying stiff. Neighbouring quads share corner points, so the outline bends smoothly with no steps or seams; icons (no flex) stay one plain picture. Checked offline by simulating the same shear on the real sprites at four phases (smooth outlines, tails swing). Not verified: frame time on the phone (24 small polygons per visible fish).
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

@@ -80,6 +80,41 @@ static func sprite(id: String) -> Texture2D:
 	return _sprites[id] as Texture2D
 
 
+const SPRITE_SLICES := 24
+
+
+## Draws a painted sprite, bent like a swimming fish: the picture is a strip of SPRITE_SLICES
+## quads whose corners follow the same travelling wave as the drawn fish (_bend: small at the head,
+## largest at the tail, a wave that runs from head to tail). Neighbouring quads share their edge
+## corners, so the outline bends smoothly with no steps and no seams. With no flex (icons) it is
+## one plain picture.
+static func _draw_sprite_fish(ci: CanvasItem, tex: Texture2D, center: Vector2, length: float, rot: float,
+		facing: float, phase: float, flex: float, dim: float) -> void:
+	var th := float(tex.get_height()) * length / float(tex.get_width())     # sprites are trimmed to the fish
+	var col := Color(dim, dim, dim)
+	ci.draw_set_transform(center, rot, Vector2(facing, 1.0))
+	if flex < 0.02:
+		ci.draw_texture_rect(tex, Rect2(-length * 0.5, -th * 0.5, length, th), false, col)
+	else:
+		var n := SPRITE_SLICES
+		var sw := length / float(n)
+		var cols := PackedColorArray([col, col, col, col])
+		for i in n:
+			var f0 := float(i) / float(n)                # 0 at the tail end of the picture, 1 at the snout
+			var f1 := float(i + 1) / float(n)
+			var x0 := -length * 0.5 + float(i) * sw
+			var x1 := x0 + sw
+			var dy0 := _bend(f0, length, phase, flex) * 1.3
+			var dy1 := _bend(f1, length, phase, flex) * 1.3
+			ci.draw_polygon(
+				PackedVector2Array([Vector2(x0, -th * 0.5 + dy0), Vector2(x1, -th * 0.5 + dy1),
+					Vector2(x1, th * 0.5 + dy1), Vector2(x0, th * 0.5 + dy0)]),
+				cols,
+				PackedVector2Array([Vector2(f0, 0.0), Vector2(f1, 0.0), Vector2(f1, 1.0), Vector2(f0, 1.0)]),
+				tex)
+	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
 static func look(id: String) -> Dictionary:
 	return LOOKS.get(id, DEFAULT)
 
@@ -93,10 +128,7 @@ static func draw(ci: CanvasItem, id: String, center: Vector2, length: float, rot
 	# A painted sprite in assets/art/fish/<id>.png (see docs/ART_BRIEF_AI.md) replaces the drawing.
 	var tex := sprite(id)
 	if tex != null:
-		var sc := length / float(tex.get_width())          # sprites are trimmed to the fish
-		ci.draw_set_transform(center, rot, Vector2(facing * sc, sc))
-		ci.draw_texture(tex, -tex.get_size() * 0.5, Color(dim, dim, dim))
-		ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		_draw_sprite_fish(ci, tex, center, length, rot, facing, phase, flex, dim)
 		return
 	var lk := look(id)
 	var shade := Color(dim, dim, dim)
