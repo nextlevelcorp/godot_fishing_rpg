@@ -63,6 +63,8 @@ for i, line in enumerate(src, 1):
         # typed results: a cast or a typed builtin (lerpf, clampf, sin...) around the whole value
         typed = re.match(r"(float|int|String|bool|Vector2|Color|lerpf|clampf|minf|maxf|absf|sqrt|pow|sin|cos|snappedf)\(", rhs3)
         bare = re.sub(r"\b(float|int|String|bool)\(\s*%s\s*\)" % loop[1], "", rhs3) if loop else rhs3
+        if mv and re.search(r"\bas\s+\w+\s*$", rhs3):
+            typed = True
         if mv and not typed and re.search(r"\b%s\b" % loop[1], bare):
             issues.append(f"{path}:{i}: `:=` uses loop variable `{loop[1]}` from an untyped array literal; "
                           f"write `for {loop[1]}: float in [...]` (or the right type)")

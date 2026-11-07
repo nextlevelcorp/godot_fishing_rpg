@@ -84,6 +84,8 @@ var _escape_reason := ""
 var _overhook_t := 0.0
 var _was_shaking := false
 var _anchor_seen := 0
+var _lap_t := 3.0
+var _horn_t := 40.0
 var _tackle_panel: PanelContainer
 var _build_label: Label
 var _fps_t := 0.0
@@ -1137,6 +1139,34 @@ func _tick_fight(delta: float) -> void:
 		_amb.play("drag", 0.7)
 
 
+# ---------------------------------------------------------------- soundscape
+## Background life by season, hour and place: cicadas on summer days, crickets on warm nights,
+## the tak-tak of a fishing boat's diesel as one passes close, waves lapping the rocks or posts,
+## and now and then a ferry's horn at Istanbul and the harbours.
+func _update_soundscape(delta: float) -> void:
+	var m := Season.month()
+	var day := _world.daylight
+	var summer := m >= 6 and m <= 9
+	var warm := m >= 5 and m <= 10
+	_amb.set_bed("cicada", (0.35 * clampf((day - 0.55) * 3.0, 0.0, 1.0)) if summer else 0.0)
+	_amb.set_bed("cricket", (0.3 * clampf((0.35 - day) * 4.0, 0.0, 1.0)) if warm else 0.0)
+	var near := 99999.0
+	for b in _boats:
+		near = minf(near, (b.pos as Vector2).distance_to(_hand))
+	_amb.set_bed("engine", clampf(1.0 - near / 900.0, 0.0, 1.0) * 0.6)
+	_lap_t -= delta
+	if _lap_t <= 0.0:
+		_lap_t = _rng.randf_range(2.5, 6.0)
+		if _hand.y > -60.0 or _on_pier():
+			_amb.play("lap", _rng.randf_range(0.15, 0.35))
+	var kind := String(_spot["kind"])
+	if kind == "bridge" or kind == "harbor":
+		_horn_t -= delta
+		if _horn_t <= 0.0:
+			_horn_t = _rng.randf_range(70.0, 150.0)
+			_amb.play("horn", 0.35)
+
+
 # ---------------------------------------------------------------- first-person view
 ## Feeds the first-person view: where the bait, float or fish is, in metres right of and ahead of
 ## the rod tip along the aim line, and hides the top-down world while the view covers it.
@@ -1750,6 +1780,7 @@ func _process(delta: float) -> void:
 	_world.wind = _wind
 	_world.view_x = _cam.position.x
 	_amb.gull_rate = 0.02 + 0.08 * _world.daylight
+	_update_soundscape(delta)
 	var cranking := Input.is_action_pressed(&"reel_in") and (_state == State.FIGHT or _state == State.WAIT)
 	_amb.set_loop("reel", cranking, 0.45 + 0.4 * clampf(_tension_ratio, 0.0, 1.0) if _state == State.FIGHT else 0.35)
 	_tint.color = _world.tint(_region_tint())

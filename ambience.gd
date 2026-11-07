@@ -24,11 +24,13 @@ var _next := 0
 var _surf: AudioStreamPlayer
 var _loops: Dictionary = {}            ## name -> AudioStreamPlayer
 var _loop_hold: Dictionary = {}        ## name -> seconds left (for timed loops such as drag)
+var _beds: Dictionary = {}             ## always-running background loops faded by set_bed: engine, cicada, cricket
+var _bed_target: Dictionary = {}
 
 
 func _ready() -> void:
 	for n in ["splash_small", "splash_big", "splash_exit", "drips", "bloop", "nibble", "cast", "strike",
-			"reel_loop", "drag_loop", "snap", "bell", "gull_0", "gull_1", "gull_2", "surf_loop"]:
+			"reel_loop", "drag_loop", "snap", "bell", "engine_loop", "cicada_loop", "cricket_loop", "lap", "horn", "gull_0", "gull_1", "gull_2", "surf_loop"]:
 		var s := load(DIR + n + ".wav") as AudioStreamWAV
 		if s != null:
 			_streams[n] = s
@@ -42,6 +44,12 @@ func _ready() -> void:
 		_surf.play()
 	_loops["reel"] = _make_loop("reel_loop")
 	_loops["drag"] = _make_loop("drag_loop")
+	for id: String in ["engine", "cicada", "cricket"]:
+		var p: AudioStreamPlayer = _make_loop(id + "_loop")
+		if p != null:
+			p.volume_db = -60.0
+			p.play()
+			_beds[id] = p
 
 
 func _make_loop(id: String) -> AudioStreamPlayer:
@@ -82,6 +90,10 @@ func play(kind: String, volume: float = 1.0) -> void:
 			snd = "snap"
 		"bell":
 			snd = "bell"
+		"lap":
+			snd = "lap"
+		"horn":
+			snd = "horn"
 		"gull":
 			snd = "gull_%d" % randi_range(0, 2)
 		"drag":
@@ -97,6 +109,11 @@ func play(kind: String, volume: float = 1.0) -> void:
 	p.volume_db = linear_to_db(clampf(volume, 0.01, 1.0))
 	p.pitch_scale = randf_range(0.92, 1.08)
 	p.play()
+
+
+## Sets how loud a background bed is, 0..1 ("engine", "cicada", "cricket"); it fades there.
+func set_bed(id: String, level: float) -> void:
+	_bed_target[id] = clampf(level, 0.0, 1.0)
 
 
 ## Starts or stops a looping sound ("reel" or "drag").
@@ -120,6 +137,10 @@ func hold_loop(id: String, seconds: float, volume: float = 1.0) -> void:
 func _process(delta: float) -> void:
 	if randf() < gull_rate * delta:
 		play("gull", randf_range(0.25, 0.6))
+	for id: String in _beds:
+		var bp: AudioStreamPlayer = _beds[id]
+		var want := linear_to_db(maxf(float(_bed_target.get(id, 0.0)), 0.001))
+		bp.volume_db = lerpf(bp.volume_db, want, delta * 1.5)
 	if _surf != null:
 		_surf.volume_db = lerpf(_surf.volume_db, linear_to_db(maxf(surf_level, 0.01)) - 8.0, delta * 2.0)
 	for id: String in _loop_hold.keys():

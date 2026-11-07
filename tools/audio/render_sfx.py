@@ -324,6 +324,65 @@ def surf_loop(dur=16.0):
     return out
 
 
+def engine_loop(dur=2.0, rate=5.5):
+    """Single-cylinder diesel of a wooden fishing boat: the tak-tak of each firing, a hull hum."""
+    t = t_axis(dur)
+    buf = np.zeros(len(t))
+    n = int(dur * rate)
+    period = dur / n
+    for i in range(n):
+        tt = t_axis(0.12)
+        thump = (np.sin(2 * math.pi * 55 * tt) + 0.5 * np.sin(2 * math.pi * 110 * tt)) * np.exp(-tt * 40)
+        knock = bandpass(rng.uniform(-1, 1, len(tt)), 700, 2.0) * np.exp(-tt * 70) * 0.6
+        place(buf, thump + knock, i * period)
+    hum = lowpass(rng.uniform(-1, 1, len(t)), 180) * 0.6
+    return buf + hum
+
+
+def cicada_loop(dur=3.0):
+    """Cicadas in summer heat: a 5 kHz buzz pulsing about 25 times a second, swelling slowly."""
+    t = t_axis(dur)
+    carrier = bandpass(rng.uniform(-1, 1, len(t)), 5200, 6.0) + 0.6 * np.sin(2 * math.pi * 5200 * t)
+    pulse = 0.5 + 0.5 * np.sin(2 * math.pi * 26 * t)
+    swell = 0.75 + 0.25 * np.sin(2 * math.pi * t / dur)       # one swell per loop: repeats cleanly
+    return carrier * pulse ** 2 * swell
+
+
+def cricket_loop(dur=2.0):
+    """Night crickets: short 4.6 kHz chirps in pairs and threes."""
+    t = t_axis(dur)
+    buf = np.zeros(len(t))
+    at = 0.05
+    while at < dur - 0.2:
+        for k in range(rng.integers(2, 4)):
+            tt = t_axis(0.035)
+            chirp = np.sin(2 * math.pi * 4600 * tt) * np.sin(math.pi * tt / 0.035)
+            place(buf, chirp * rng.uniform(0.6, 1.0), at + k * 0.06)
+        at += rng.uniform(0.35, 0.6)
+    return buf
+
+
+def lap():
+    """A wavelet slapping a rock or a pier post: a soft low splash with a few bubbles."""
+    buf = np.zeros(int(0.7 * SR))
+    t = t_axis(0.7)
+    buf += lowpass(rng.uniform(-1, 1, len(t)), 900) * np.exp(-t * 9) * (1 - np.exp(-t * 200))
+    bubbles(buf, 6, 0.02, 0.3, 500, 1500, 0.25)
+    return fade(reverb(buf, 0.15))
+
+
+def horn():
+    """Distant ferry horn: two low reed tones with harmonics, long fade, lots of air."""
+    dur = 3.0
+    t = t_axis(dur)
+    s = np.zeros_like(t)
+    for f, a in ((147.0, 1.0), (185.0, 0.7)):
+        for h in range(1, 7):
+            s += a / h * np.sin(2 * math.pi * f * h * t)
+    env = np.minimum(t / 0.25, 1.0) * np.where(t > 2.0, np.exp(-(t - 2.0) * 3.0), 1.0)
+    return fade(reverb(lowpass(s, 1200) * env, 0.45, 0.86))
+
+
 def main():
     save("splash_small", splash(0.9, 2200, 0.08, 14, 900, 3000, 0.0))      # float or bait lands
     save("splash_big", splash(1.4, 1800, 0.22, 45, 350, 2600, 0.6))       # fish crashes back, hook set
@@ -340,6 +399,12 @@ def main():
     for i in range(3):
         save(f"gull_{i}", gull(40 + i), 0.7)
     save("surf_loop", surf_loop(), 0.7)
+    # added later: rendered after the surf so the earlier files keep their random sequence
+    save("engine_loop", engine_loop(), 0.6)
+    save("cicada_loop", cicada_loop(), 0.5)
+    save("cricket_loop", cricket_loop(), 0.5)
+    save("lap", lap(), 0.6)
+    save("horn", horn(), 0.7)
 
 
 if __name__ == "__main__":

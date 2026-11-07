@@ -98,6 +98,9 @@ From level 3 the map offers RENT A BOAT (60 coins per outing) beside FROM SHORE.
 ## Currents (build 39)
 Each spot has a surface current along the shore (`current_ms` in `fishing_spots.gd`): Galata 1.0 m/s (the Bosphorus surface current runs south at up to about 2 m/s, Livius; the Golden Horn mouth is calmer, the value is game-design fill), Black Sea coasts 0.3-0.35, Aegean and Mediterranean bays 0.08-0.2 (game-design fill), varied ±20 % per outing. A float rides 60 % of it, so at Galata it drifts fast and you recast or fish a bottom rig; a bottom lead holds (2 %) unless the current is over 0.7 m/s, then it rolls (15 %). A boat that is not anchored drifts with it. The HUD line shows the current. Test: at Galata a float drifts visibly within 20 s; a bottom rig stays put far longer.
 
+## Soundscape (build 40)
+Background life follows the real month, the hour and the place (`_update_soundscape`): cicadas on summer days (June-September, daylight), crickets on warm nights (May-October), the tak-tak of a fishing boat's single-cylinder diesel rising as a boat passes within about 90 m, waves lapping the rocks or pier posts every 2.5-6 s when you are at the edge, and a ferry horn every 70-150 s at Istanbul and the harbours. All rendered offline from models in `tools/audio/render_sfx.py` (no recordings).
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).
