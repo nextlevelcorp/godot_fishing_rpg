@@ -140,6 +140,13 @@ aspect "expand": the screen is at least 1280x720 design units and wider phones s
 - Safe areas: Safari keeps page content inside the notch insets on its own, so nothing is added.
 - Portrait still shows the "turn your phone" screen (`device_guard.gd`).
 
+## Pick the hour you go out (build 52)
+Every outing used to start at 07:12, so night species (squid, cuttlefish, scorpionfish) took
+minutes of waiting or "+1 hour" taps. The map now has a START button that cycles DAWN 05:45,
+MORNING 07:55, DUSK 17:16 and NIGHT 21:07 (`GameSession.START_TIMES`). Real anglers plan around
+first light and the evening bite; the choice makes the bite-time rules in BiomeDB a decision made
+before the trip. Default MORNING keeps the old feel. Kept for the session, not saved.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

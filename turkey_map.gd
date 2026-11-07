@@ -77,6 +77,7 @@ var _fish_label: Label
 var _note_label: Label
 var _go_button: Button
 var _boat_button: Button
+var _time_button: Button
 var _coins_label: Label
 var _overlay: PanelContainer
 var _overlay_title: Label
@@ -197,6 +198,13 @@ func _build_panel() -> void:
 	_go_button.disabled = true
 	_go_button.pressed.connect(_on_go_pressed)
 	row.add_child(_go_button)
+
+	_time_button = Button.new()
+	_time_button.text = "START  " + GameSession.start_label()
+	_time_button.custom_minimum_size = Vector2(230, 60)
+	_time_button.add_theme_font_size_override("font_size", 20)
+	_time_button.pressed.connect(_on_time_pressed)
+	row.add_child(_time_button)
 
 	_boat_button = Button.new()
 	_boat_button.text = "BOAT"
@@ -489,6 +497,12 @@ func _feeds_text(fid: String) -> String:
 		"day":
 			return "by day"
 	return "at dawn and dusk"
+
+
+## Cycles the hour the outing starts: dawn, morning, dusk, night.
+func _on_time_pressed() -> void:
+	GameSession.start_slot = (GameSession.start_slot + 1) % GameSession.START_TIMES.size()
+	_time_button.text = "START  " + GameSession.start_label()
 
 
 func _on_go_pressed() -> void:

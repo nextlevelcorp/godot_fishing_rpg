@@ -41,7 +41,7 @@ HUD text overlap, object leak at exit (CI warning).
 - [x] Onboarding at the first spot (coach card, shown once); waiting feedback (quiet water, bait gone)
 - [x] Session summary ("end of outing": catches, coins, records) and return to the map
 - [x] Score and progression: angler level from catches; spots unlock by level (forgiving spots first)
-- [ ] Time-of-day control (start at dawn or dusk, wait until evening) (partly: "+1 hour" button)
+- [x] Time-of-day control: start at dawn, morning, dusk or night (map, build 52) and "+1 hour" on the shore
 - [x] Pre-rendered audio (#4): offline renders in tools/audio/render_sfx.py, sample player in ambience.gd
 - [ ] Turkish localisation (#8)
 - [ ] Scripted CI play-through (#6) (partly: tests/smoke_features.gd hooks, jumps and lands a TEST fish)

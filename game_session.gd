@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Shown on screen so a player can tell a fresh deploy from a page the browser cached.
 ## Bump it with every build that changes behaviour.
-const BUILD := "build 51"
+const BUILD := "build 52"
 const SAVE_PATH := "user://save.cfg"
 const SAVE_VERSION := 1
 const START_RIG := "shore_spinning_rig"
@@ -57,6 +57,10 @@ static var has_net := false
 static var test_tools := false
 ## Date (YYYY-MM-DD) of the last completed daily challenge (see Daily).
 static var daily_done := ""
+## When an outing starts, as a fraction of the day (0 midnight, 0.25 sunrise, 0.75 sunset). Picked on
+## the map: anglers go out at first light or for the evening bite, and night species need the dark.
+const START_TIMES: Array[Array] = [["DAWN", 0.24], ["MORNING", 0.33], ["DUSK", 0.72], ["NIGHT", 0.88]]
+static var start_slot := 1
 const NET_PRICE := 250
 const LIVE_BAIT_MAX := 12
 const LIVE_BAIT_SPECIES: Array[String] = ["mediterranean_horse_mackerel", "european_anchovy", "atlantic_mackerel"]
@@ -338,3 +342,13 @@ static func equip(id: String) -> void:
 	if owned_rigs.has(id):
 		rig_id = id
 		save()
+
+
+static func start_time() -> float:
+	return float(START_TIMES[clampi(start_slot, 0, START_TIMES.size() - 1)][1])
+
+
+## "DAWN 05:45" for the map button.
+static func start_label() -> String:
+	var minutes := int(start_time() * 24.0 * 60.0)
+	return "%s %02d:%02d" % [String(START_TIMES[clampi(start_slot, 0, START_TIMES.size() - 1)][0]), minutes / 60, minutes % 60]

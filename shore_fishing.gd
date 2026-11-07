@@ -234,6 +234,7 @@ func _ready() -> void:
 
 	_world = ShoreWorld.new()
 	_world.setup(_spot, hash(GameSession.spot_id))
+	_world.time_of_day = GameSession.start_time()       # picked on the map
 	_world.z_index = 1
 	add_child(_world)
 
