@@ -95,6 +95,9 @@ From a pier, harbour quay or bridge a landed fish must be lifted through the air
 ## Boat fishing (build 37)
 From level 3 the map offers RENT A BOAT (60 coins per outing) beside FROM SHORE. In a boat outing you sit in a rowing kayık about 65 m out: the joystick rows (oar force, water drag, Nature of Code forces), and while not anchored the current and wind drift the boat, in every state, so the line and float move with you. ANCH drops or lifts the anchor; rowing lifts it. You can cast in any direction; the water is deeper, so deeper species come through the depth match. In the first-person view the eye is 1.4 m above the water, the bow of the kayık rocks in front of you, and fish can come right alongside (1.2 m). No lifting from height, so no net is needed. Game-design fill for the numbers. Test: rent a boat at Çeşme, row out, anchor, fish a bottom rig: dentex and scorpionfish show up more than from the shore.
 
+## Currents (build 39)
+Each spot has a surface current along the shore (`current_ms` in `fishing_spots.gd`): Galata 1.0 m/s (the Bosphorus surface current runs south at up to about 2 m/s, Livius; the Golden Horn mouth is calmer, the value is game-design fill), Black Sea coasts 0.3-0.35, Aegean and Mediterranean bays 0.08-0.2 (game-design fill), varied ±20 % per outing. A float rides 60 % of it, so at Galata it drifts fast and you recast or fish a bottom rig; a bottom lead holds (2 %) unless the current is over 0.7 m/s, then it rolls (15 %). A boat that is not anchored drifts with it. The HUD line shows the current. Test: at Galata a float drifts visibly within 20 s; a bottom rig stays put far longer.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

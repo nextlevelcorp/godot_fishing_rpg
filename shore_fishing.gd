@@ -202,7 +202,9 @@ func _ready() -> void:
 	_build_walkable()
 	_weather_kind = WeatherFx.roll(_rng)
 	_wind = Vector2(_rng.randf_range(-60.0, 60.0), _rng.randf_range(-15.0, 15.0)) * float(WeatherFx.KINDS[_weather_kind]["wind"])
-	_current = Vector2(_rng.randf_range(-14.0, 14.0), _rng.randf_range(-4.0, 4.0))
+	# The spot's surface current, along the shore (fishing_spots.gd current_ms), varying a little.
+	var cur_ms := float(_spot.get("current_ms", 0.15)) * _rng.randf_range(0.8, 1.2)
+	_current = Vector2((1.0 if _rng.randf() < 0.5 else -1.0) * cur_ms * PX_PER_M, _rng.randf_range(-0.1, 0.1) * cur_ms * PX_PER_M)
 	_cast_seen = int(TouchControls.presses.get(&"cast", 0))
 	_reel_seen = int(TouchControls.presses.get(&"reel_in", 0))
 	_anchor_seen = int(TouchControls.presses.get(&"anchor", 0))
@@ -1191,7 +1193,11 @@ func _update_float(delta: float) -> void:
 	var r := Noc.spring_step(_float_x, _float_v, rest, 70.0, 7.0, delta)
 	_float_x = r.x
 	_float_v = r.y
-	var drifted := _bobber_pos + _current * delta * 0.25
+	# A float rides the current; a bottom lead holds, but rolls along when the current is strong.
+	var hold := 0.6
+	if _bottom_rig():
+		hold = 0.15 if _current.length() > 0.7 * PX_PER_M else 0.02
+	var drifted := _bobber_pos + _current * delta * hold
 	if not _is_land(drifted):          # the current never pushes the float onto the planks or the shore
 		_bobber_pos = drifted
 
@@ -1754,7 +1760,7 @@ func _process(delta: float) -> void:
 	var probe := _bobber_pos if (_state == State.WAIT or _state == State.BITE) else (_pred_landing if _state == State.CHARGE else _hand + _facing * 60.0)
 	var water := _water_depth(probe)
 	_depth_label.text = ("Bottom rig" if _bottom_rig() else "Float %.1f m" % _bait_depth) + "  |  Water %s  |  Clutch %.0f N  |  %s, hook %s" % [("%.1f m" % water) if water > 0.0 else "-",
-		_fishing.drag_setting_n, String(Tackle.BAITS[GameSession.bait_id]["name"]), Tackle.hook_name(GameSession.hook_id)]
+		_fishing.drag_setting_n, String(Tackle.BAITS[GameSession.bait_id]["name"]), Tackle.hook_name(GameSession.hook_id)] + "  |  Current %.1f m/s" % (_current.length() / PX_PER_M)
 	_toast_t = maxf(0.0, _toast_t - delta)
 	_toast_label.text = _toast_text if _toast_t > 0.0 else ""
 
