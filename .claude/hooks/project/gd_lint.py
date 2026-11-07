@@ -39,6 +39,8 @@ for i, line in enumerate(src, 1):
         # Typed arrays indexed by a number (pts[i]) have a known type; Dictionary reads do not.
         chain = r'[A-Za-z_][\w\.]*(\s*\[\s*"[^"]*"\s*\]|\.data\[[^\[\]]*\]|\.get\([^()]*\))(\s*\[[^\[\]]*\])*'
         reads_variant = re.fullmatch(chain + r"\s*", rhs) or re.match(chain + r"\s*[-+*/%]", rhs)
+        # A lookup in a dictionary literal ({...}.get(k, d)) is a Variant too (locals.gd, build 53).
+        reads_variant = reads_variant or re.match(r"\{.*\}\s*(\.get\(|\[)", rhs)
         # A property read on an InputEvent-typed parameter (event.pressed, event.position, ...) has no
         # static type either: `var t := event is A and event.pressed` fails to load.
         reads_event = re.search(r"\bevent\.(pressed|position|index|button_index|button_mask|keycode|relative|echo|strength)\b", rhs)
