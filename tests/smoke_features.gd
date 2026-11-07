@@ -113,6 +113,8 @@ func _process(_delta: float) -> bool:
 			GameSession.bait_stock = stock_before
 			GameSession.coins = coins_before
 			_scene.call("_open_test_panel")
+		14:
+			_check_game_rules()
 		16:
 			var panels := 0
 			for n in _scene.find_children("*", "Button", true, false):
@@ -139,3 +141,85 @@ func _process(_delta: float) -> bool:
 			print("SMOKE done: %d failure(s)" % _fails)
 			quit(1 if _fails > 0 else 0)
 	return false
+
+
+## Rules that need no screen: the local's request and friendship, the weekly tournament's week and
+## spot, and that the new saved fields survive a save and load. The classes that use BiomeDB are
+## loaded at run time (see the note at the top: naming them here would stop this script compiling).
+func _check_game_rules() -> void:
+	var locals: GDScript = load("res://locals.gd")
+	var tourney: GDScript = load("res://tournament.gd")
+	var spot := "dikili_bay"
+	var saved_friend: Dictionary = GameSession.local_friend.duplicate()
+	var saved_req: Dictionary = GameSession.local_req.duplicate()
+	var saved_coins := GameSession.coins
+	var saved_xp := GameSession.xp
+	GameSession.local_friend = {}
+	GameSession.local_req = {}
+	# The local's request: a species from the spot, 1 fish at friendship 0.
+	var req: Dictionary = locals.call("request", spot)
+	var spot_species: Array = FishingSpots.get_spot(spot)["species"]
+	_check(not req.is_empty() and spot_species.has(String(req["species"])) and int(req["need"]) == 1, "the local asks for 1 fish of a species from this spot")
+	_check(not bool(locals.call("on_kept", spot, "not_a_species")), "a wrong species does not count for the request")
+	_check(not bool(locals.call("can_turn_in", spot)), "the request cannot be handed in before the fish is kept")
+	_check(bool(locals.call("on_kept", spot, String(req["species"]))), "the asked species counts toward the request")
+	_check(bool(locals.call("can_turn_in", spot)), "the request can be handed in once the fish is kept")
+	# Hand-in pays coins and XP, adds friendship and clears the request.
+	GameSession.coins = 0
+	GameSession.xp = 0
+	var reward := int(locals.call("reward_coins", spot))
+	var res: Dictionary = locals.call("turn_in", spot)
+	_check(not res.is_empty() and GameSession.coins == reward and reward > 0, "handing in pays the reward (%d coins)" % reward)
+	_check(GameSession.xp == 20 and int(locals.call("friendship", spot)) == 1 and not GameSession.local_req.has(spot), "XP, friendship +1 and a fresh request after the hand-in")
+	_check(not bool(locals.call("can_turn_in", spot)), "the same fish cannot be handed in twice")
+	var lines: PackedStringArray = locals.call("talk_lines", spot)
+	_check(lines.size() >= 2, "the local has a greeting and a request to say")
+	# Tiers: Stranger 0, Known face 1, Friend 3, Old friend 6; friends tell a secret.
+	_check(int(locals.call("tier", 0)) == 0 and int(locals.call("tier", 2)) == 1 and int(locals.call("tier", 3)) == 2 and int(locals.call("tier", 9)) == 3, "friendship tiers")
+	GameSession.local_friend[spot] = 3
+	var friend_lines: PackedStringArray = locals.call("talk_lines", spot)
+	_check(friend_lines.size() >= 3 and friend_lines[friend_lines.size() - 1].begins_with("Between us:"), "a friend shares a secret")
+	# Every spot has its local.
+	var missing := 0
+	for id: String in FishingSpots.ids():
+		if (locals.call("person", id) as Dictionary).is_empty():
+			missing += 1
+	_check(missing == 0, "every spot has a named local")
+	# Reactions.
+	var nod: String = locals.call("react", String(spot_species[0]), 0.1, true)
+	_check(nod.begins_with("Good, put it back"), "the local approves of a released fish")
+	# Tournament week and spot.
+	var wk1: String = tourney.call("week_key")
+	var sp1: String = tourney.call("spot_this_week")
+	_check(wk1.begins_with("w") and wk1 == String(tourney.call("week_key")), "the tournament week key is stable")
+	_check(sp1 != "" and GameSession.is_unlocked(FishingSpots.get_spot(sp1)) and sp1 == String(tourney.call("spot_this_week")), "this week's tournament spot is unlocked and stable")
+	# New saved fields survive a save and load.
+	var saved_stock: Dictionary = GameSession.bait_stock.duplicate()
+	var saved_week := GameSession.tourney_week
+	var saved_wins := GameSession.tourney_wins
+	GameSession.local_friend = {"dikili_bay": 4}
+	GameSession.local_req = {"dikili_bay": {"species": "garfish", "need": 2, "have": 1}}
+	GameSession.bait_stock = {"tube_worm": 7}
+	GameSession.tourney_week = "w-test"
+	GameSession.tourney_wins = 3
+	GameSession.save()
+	GameSession.local_friend = {}
+	GameSession.local_req = {}
+	GameSession.bait_stock = {}
+	GameSession.tourney_week = ""
+	GameSession.tourney_wins = 0
+	GameSession._loaded = false
+	GameSession.load_once()
+	_check(int(GameSession.local_friend.get("dikili_bay", 0)) == 4, "local friendship survives save and load")
+	var lr: Dictionary = GameSession.local_req.get("dikili_bay", {})
+	_check(String(lr.get("species", "")) == "garfish" and int(lr.get("need", 0)) == 2 and int(lr.get("have", 0)) == 1, "the open request survives save and load")
+	_check(int(GameSession.bait_stock.get("tube_worm", 0)) == 7, "special bait stock survives save and load")
+	_check(GameSession.tourney_week == "w-test" and GameSession.tourney_wins == 3, "the tournament week and wins survive save and load")
+	# Put everything back so nothing leaks into the checks that follow or the next run.
+	GameSession.local_friend = saved_friend
+	GameSession.local_req = saved_req
+	GameSession.bait_stock = saved_stock
+	GameSession.tourney_week = saved_week
+	GameSession.tourney_wins = saved_wins
+	GameSession.coins = saved_coins
+	GameSession.xp = saved_xp
