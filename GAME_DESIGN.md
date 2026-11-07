@@ -125,6 +125,8 @@ so it did not look hooked, and its motion was jerky. Now the hook is in the mout
   (0.9 body, 0.5 line) lets the swing die out over a few seconds instead of stopping dead.
 - **Jump and thrash** (`_jump_pose`): the line runs to the mouth, not to the body centre. The head
   shake is smaller (0.12 rad) and the thrash eases in and out instead of snapping.
+- **Same side every time** (build 49, owner choice): the hanging fish always shows the same side,
+  snout up; it no longer picks left or right at random.
 Tuning knobs: `HANG_LINE`, `PX_PER_M`, flap interval and strength in `_animate_catch`.
 
 ## Content

@@ -515,7 +515,7 @@ func show_catch(title: String, lines: PackedStringArray) -> void:
 	_hang_w = 0.0
 	_kick = 1.0
 	_kick_wait = 0.3
-	_facing = 1.0 if _rng.randf() < 0.5 else -1.0
+	_facing = 1.0                       # always the same side toward you (owner choice, build 49)
 	_open = false
 	phase = "off"
 
