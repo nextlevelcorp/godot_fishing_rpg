@@ -165,7 +165,7 @@ static func secret(spot_id: String) -> String:
 	if ids.is_empty():
 		return ""
 	var sid := String(ids[(friendship(spot_id) + 1) % ids.size()])
-	var when := {"night": "after dark", "day": "in daylight", "twilight": "at dawn and dusk"}.get(BiomeDB.activity_kind(sid), "at dawn and dusk")
+	var when := String({"night": "after dark", "day": "in daylight", "twilight": "at dawn and dusk"}.get(BiomeDB.activity_kind(sid), "at dawn and dusk"))
 	var baits := Tackle.best_baits(sid, 1)
 	var bait := baits[0] if not baits.is_empty() else "a good bait"
 	return "Between us: the %s here feed %s. Use %s, hook %s." % [species_name(sid).to_lower(), when, bait, Tackle.hook_range(sid)]
