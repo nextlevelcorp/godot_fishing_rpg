@@ -15,9 +15,11 @@ allowed-tools: Read, Glob, Grep, Write, Edit, WebSearch, WebFetch, AskUserQuesti
   metallic click trains, gulls = harmonic glide through formants, surf/wind/rain = shaped noise,
   engine = firing pulses, steps = grains and board resonance. No recordings, nothing to license.
 - Beds (`set_bed`): surf, engine, cicada, cricket, rain, wind. Loops (`set_loop`): reel, drag.
-  One-shots (`play`). Distance (`play_at`): 1/r level, low-pass `FarSfx` bus beyond 30 m, 343 m/s delay.
+  One-shots (`play`). Distance (`play_at`): 1/r level, a little softer and lower beyond 30 m, 343 m/s delay.
+  No custom audio bus (a risk on the web export); sound problems are traced with the SOUND TEST
+  button in the title Settings and `tests/smoke_features.gd` in CI.
 - Browsers start audio only after the first touch or click; Godot resumes the context itself.
-- Master is muted for pause, background and "sound off"; `FarSfx` sends to Master so it follows.
+- Master is muted for pause, background and "sound off".
 
 ## Rules
 - Every player action gets feedback within one frame: cast whoosh, splash on landing, bloop or bell

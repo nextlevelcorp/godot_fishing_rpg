@@ -19,6 +19,7 @@ var _overlay_body: VBoxContainer
 var _sound_btn: Button
 var _vibrate_btn: Button
 var _test_btn: Button
+var _diag: Label
 var _menu: VBoxContainer
 
 
@@ -91,8 +92,8 @@ func _build_overlay() -> void:
 	_overlay.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_overlay.offset_left = -400.0
 	_overlay.offset_right = 400.0
-	_overlay.offset_top = -250.0
-	_overlay.offset_bottom = 250.0
+	_overlay.offset_top = -290.0
+	_overlay.offset_bottom = 290.0
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.02, 0.10, 0.18, 0.96)
 	style.set_corner_radius_all(18)
@@ -108,8 +109,12 @@ func _build_overlay() -> void:
 	box.add_child(_overlay_title)
 	_overlay_body = VBoxContainer.new()
 	_overlay_body.add_theme_constant_override("separation", 12)
-	_overlay_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	box.add_child(_overlay_body)
+	_overlay_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var body_scroll := ScrollContainer.new()
+	body_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(body_scroll)
+	body_scroll.add_child(_overlay_body)
 	box.add_child(_button("BACK", 24, _close_overlay))
 
 
@@ -127,6 +132,12 @@ func _open_settings() -> void:
 	_overlay_body.add_child(_vibrate_btn)
 	_test_btn = _button("", 24, _toggle_test_tools)
 	_overlay_body.add_child(_test_btn)
+	_overlay_body.add_child(_button("SOUND TEST", 24, _sound_test))
+	_diag = Label.new()
+	_diag.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_diag.add_theme_font_size_override("font_size", 15)
+	_diag.add_theme_color_override("font_color", Color(1.0, 0.92, 0.6))
+	_overlay_body.add_child(_diag)
 	var note := Label.new()
 	note.text = "Vibration works on Android browsers. iPhone Safari does not allow it.\nTEST TOOLS adds a TEST button on the shore: hook any species at once and trigger jumps, to check the pictures. Test catches give no coins or XP.\nYour progress is saved in this browser; clearing site data erases it."
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -169,6 +180,24 @@ func _toggle_vibration() -> void:
 	if GameSession.vibration_on:
 		Input.vibrate_handheld(60)
 	_refresh_settings()
+
+
+## Plays a splash on a fresh player and reports what the phone sees, so a missing sound can be traced
+## without a console: is the file there, is the setting on, is the master bus muted.
+func _sound_test() -> void:
+	var s := load("res://assets/audio/splash_small.wav") as AudioStreamWAV
+	var lines: Array[String] = []
+	lines.append("sound file: %s" % ("found" if s != null else "MISSING"))
+	lines.append("setting: %s   master bus muted: %s   buses: %d   mix rate: %d Hz" % [
+		"ON" if GameSession.sound_on else "OFF", "YES" if AudioServer.is_bus_mute(0) else "no", AudioServer.bus_count, int(AudioServer.get_mix_rate())])
+	if s != null:
+		var p := AudioStreamPlayer.new()
+		p.stream = s
+		add_child(p)
+		p.play()
+		p.finished.connect(p.queue_free)
+		lines.append("playing a splash now. If you hear nothing: check the phone's silent switch and volume.")
+	_diag.text = "\n".join(lines)
 
 
 func _toggle_test_tools() -> void:

@@ -110,6 +110,7 @@ A painted fish sprite is drawn as a strip of 24 quads whose corners follow the s
 ## Test tools and every sprite (build 44)
 - Title Settings has TEST TOOLS (saved). When on, the shore HUD has a TEST button: pick any species and a size, and it is hooked at once 25 m out (no waiting, no hook-up roll). While a test fish is on, JUMP, THRASH and ROLL force a surfacing and LAND lands it. Test catches give no coins, XP or journal entry; the card says "TEST". Species with a painted picture are marked with a star in the list. Test: turn it on, hook a Whiting at LARGE, press JUMP, then LAND.
 - The squid, cuttlefish and blue crab pictures are used wherever a species is drawn (catch, other anglers' catches, journal); the squid and cuttlefish bend, the crab (seen from above) does not. Octopus has no picture yet and keeps its drawing.
+- **Sound trace (build 45):** title Settings has SOUND TEST: it plays a splash on a fresh player and prints whether the file is found, the setting and the master bus mute state, the bus count and the mix rate, so a missing sound can be traced on the phone without a console. The distance sound no longer uses a custom audio bus (a risk on the web export). CI now also runs `tests/smoke_features.gd`, which drives the real shore scene: sounds load and play, settings survive a save, a TEST fish is hooked, jumps and is landed with no rewards. It proves the code runs; it cannot hear.
 - `tools/art/import_sprites.py` is the one way a picture becomes a sprite (empty check, background cut, trim, scale, contact sheet).
 
 ## Content

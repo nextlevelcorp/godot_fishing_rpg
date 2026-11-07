@@ -63,6 +63,19 @@ jobs:
           done
           exit $status
 
+      - name: Feature smoke test (audio, settings, TEST fish)
+        # Drives the real shore scene: sounds load and play, settings survive a save, a TEST fish is
+        # hooked, jumps and is landed with no rewards. It proves the code paths run; it cannot hear.
+        run: |
+          G=$HOME/godot/Godot_v4.4-stable_linux.x86_64
+          timeout 180 $G --headless --path . -s res://tests/smoke_features.gd --quit-after 2000 > feat.log 2>&1 || echo "(exit code $?)"
+          cat feat.log
+          if grep -E "SCRIPT ERROR|Parse Error|^ERROR:|SMOKE FAIL" feat.log | grep -v -E "resources still in use at exit|ObjectDB instances leaked"; then
+            echo "::error::Feature smoke test failed"
+            exit 1
+          fi
+          grep -q "SMOKE done" feat.log || { echo "::error::Feature smoke test did not finish"; exit 1; }
+
       - name: Export Web build (unique file names, no stale cache)
         # Godot's web files (index.pck, index.wasm) get cached hard by phones, so a new deploy could
         # keep showing the old game. Each build is exported under its own name (g<run number>) and

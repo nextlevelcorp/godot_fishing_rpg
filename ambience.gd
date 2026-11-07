@@ -8,14 +8,13 @@
 ##   beds     engine, cicada, cricket, rain, wind: always running, faded by set_bed()
 ##   one-shots play(kind, volume): splash, splash_big, exit, drips, plop, nibble, cast, strike, snap,
 ##            gull, bell, lap, horn, oar, flop, step_wood / step_gravel / step_sand / step_stone
-##   distance play_at(kind, volume, metres): quieter, duller (low-pass bus) and late (343 m/s)
+##   distance play_at(kind, volume, metres): quieter, a little lower in pitch and late (343 m/s)
 ## Browsers only start audio after the first touch or click; Godot resumes it on its own.
 class_name Ambience
 extends Node
 
 const DIR := "res://assets/audio/"
 const VOICES := 10
-const FAR_BUS := "FarSfx"
 const STEP_KINDS := ["step_wood", "step_gravel", "step_sand", "step_stone"]
 
 ## 0..1 loudness of the surf bed. The shore scene sets it from the spot and the weather.
@@ -46,7 +45,6 @@ func _ready() -> void:
 			var st := load(DIR + "%s_%d.wav" % [kind, v]) as AudioStreamWAV
 			if st != null:
 				_streams["%s_%d" % [kind, v]] = st
-	_ensure_far_bus()
 	for i in VOICES:
 		var p := AudioStreamPlayer.new()
 		add_child(p)
@@ -65,20 +63,6 @@ func _ready() -> void:
 			_beds[id] = p
 
 
-## A bus that dulls what comes through it: air absorbs high frequencies over distance. It sends to
-## Master, so muting Master (pause, sound off) silences it too.
-func _ensure_far_bus() -> void:
-	if AudioServer.get_bus_index(FAR_BUS) != -1:
-		return
-	AudioServer.add_bus()
-	var i := AudioServer.bus_count - 1
-	AudioServer.set_bus_name(i, FAR_BUS)
-	AudioServer.set_bus_send(i, &"Master")
-	var lp := AudioEffectLowPassFilter.new()
-	lp.cutoff_hz = 2200.0
-	AudioServer.add_bus_effect(i, lp)
-
-
 func _make_loop(id: String) -> AudioStreamPlayer:
 	if not _streams.has(id):
 		return null
@@ -92,9 +76,9 @@ func _make_loop(id: String) -> AudioStreamPlayer:
 	return p
 
 
-## Plays a sound that happens `distance_m` away. Level falls about as 1/r, the highs are cut by the
-## FarSfx bus beyond 30 m, and it arrives late: sound travels at 343 m/s, so a splash 120 m away is
-## heard a third of a second after it is seen.
+## Plays a sound that happens `distance_m` away. Level falls about as 1/r, far sounds are a little
+## lower and softer, and it arrives late: sound travels at 343 m/s, so a splash 120 m away is heard
+## a third of a second after it is seen. (No extra audio bus: a custom bus is a risk on the web export.)
 func play_at(kind: String, volume: float, distance_m: float) -> void:
 	var vol := volume / (1.0 + distance_m / 20.0)
 	if vol < 0.01:
@@ -115,7 +99,7 @@ func play_later(kind: String, volume: float, delay: float) -> void:
 ## kind: "splash" (small, or big when volume > 0.9), "splash_big", "exit", "drips", "plop", "nibble",
 ## "cast", "strike", "click" (ignored: the reel loop covers it), "drag", "snap", "gull", "bell", "lap",
 ## "horn", "oar", "flop", "step_wood", "step_gravel", "step_sand", "step_stone". volume 0..1.
-## `far` sends it through the low-pass bus (see play_at).
+## `far` plays it a little lower in pitch and softer (see play_at).
 func play(kind: String, volume: float = 1.0, far: bool = false) -> void:
 	var snd := ""
 	match kind:
@@ -161,9 +145,8 @@ func play(kind: String, volume: float = 1.0, far: bool = false) -> void:
 	var p := _voices[_next]
 	_next = (_next + 1) % _voices.size()
 	p.stream = _streams[snd]
-	p.bus = FAR_BUS if far else &"Master"
-	p.volume_db = linear_to_db(clampf(volume, 0.01, 1.0))
-	p.pitch_scale = randf_range(0.92, 1.08)
+	p.volume_db = linear_to_db(clampf(volume, 0.01, 1.0)) - (3.0 if far else 0.0)
+	p.pitch_scale = randf_range(0.92, 1.08) * (0.9 if far else 1.0)
 	p.play()
 
 
