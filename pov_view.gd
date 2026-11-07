@@ -302,7 +302,7 @@ func _process(delta: float) -> void:
 		var l: Control = layer
 		l.visible = true
 		l.modulate = _canvas.modulate
-		l.position.y = -_pitch
+		l.position.y = _canvas.position.y - _pitch
 	if absf(time_of_day - _bg_time) > 0.002 or absf(daylight - _bg_light) > 0.01:
 		_bg_time = time_of_day
 		_bg_light = daylight
@@ -535,7 +535,8 @@ func _draw_view() -> void:
 	var deep: Color = wcol.get("deep", Color(0.02, 0.15, 0.32))
 	var far_sea := sky_low.lerp(deep, 0.55).darkened(0.1 * night)
 	var near_sea := deep.lerp(shallow, 0.35).darkened(0.55 * night)
-	c.draw_polygon(PackedVector2Array([Vector2(0, hy), Vector2(W, hy), Vector2(W, H), Vector2(0, H)]),
+	var pd := pad()
+	c.draw_polygon(PackedVector2Array([Vector2(-pd.x, hy), Vector2(W + pd.x, hy), Vector2(W + pd.x, H + pd.y), Vector2(-pd.x, H + pd.y)]),
 		PackedColorArray([far_sea, far_sea, near_sea, near_sea]))
 	_draw_glitter(day, night, dusk)
 	_draw_waves(night)
@@ -559,7 +560,7 @@ func _draw_view() -> void:
 
 func _make_layer(draw_fn: Callable) -> Control:
 	var l := Control.new()
-	l.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center_design_rect(l)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	l.visible = false
 	l.draw.connect(draw_fn)
@@ -582,7 +583,8 @@ func _draw_sky_layer() -> void:
 	var dusk := _dusk()
 	var sky_top := Color(0.30, 0.56, 0.88).lerp(Color(0.02, 0.03, 0.10), night).lerp(Color(0.32, 0.30, 0.55), dusk * 0.5)
 	var sky_low := _sky_low(night, dusk)
-	c.draw_polygon(PackedVector2Array([Vector2(0, -10.0), Vector2(W, -10.0), Vector2(W, HY + 2.0), Vector2(0, HY + 2.0)]),
+	var pd := pad()
+	c.draw_polygon(PackedVector2Array([Vector2(-pd.x, -10.0 - pd.y), Vector2(W + pd.x, -10.0 - pd.y), Vector2(W + pd.x, HY + 2.0), Vector2(-pd.x, HY + 2.0)]),
 		PackedColorArray([sky_top, sky_top, sky_low, sky_low]))
 	if night > 0.3:
 		for i in _stars.size():
@@ -706,8 +708,8 @@ func _draw_waves(night: float) -> void:
 		var near := clampf(6.0 / z, 0.0, 1.0)
 		var amp := (0.10 + 0.05 * wave_amp) * F / z * 0.12 * wave_amp
 		var pts := PackedVector2Array()
-		var x := -20.0
-		while x <= W + 20.0:
+		var x := -20.0 - pad().x
+		while x <= W + 20.0 + pad().x:
 			var wx := (x - CX) * z / F
 			var y := base + sin(wx * 0.9 + z * 0.8 - _time * 1.6) * amp + sin(wx * 0.37 - _time * 0.9 + float(row)) * amp * 0.7
 			pts.append(Vector2(x, y))
@@ -816,35 +818,35 @@ func _draw_foreground(night: float) -> void:
 	c.draw_set_transform(Vector2(0.0, edge_y - 666.0), 0.0, Vector2.ONE)
 	match kind:
 		"bridge":
-			c.draw_rect(Rect2(0.0, 660.0, W, 400.0), Color(0.42, 0.42, 0.44).darkened(dark))
-			c.draw_rect(Rect2(0.0, 640.0, W, 10.0), Color(0.30, 0.32, 0.34).darkened(dark))
-			var x := 20.0
-			while x < W:
+			c.draw_rect(Rect2(-pad().x, 660.0, W + 2.0 * pad().x, 400.0), Color(0.42, 0.42, 0.44).darkened(dark))
+			c.draw_rect(Rect2(-pad().x, 640.0, W + 2.0 * pad().x, 10.0), Color(0.30, 0.32, 0.34).darkened(dark))
+			var x := 20.0 - floorf(pad().x / 90.0 + 1.0) * 90.0
+			while x < W + pad().x:
 				c.draw_rect(Rect2(x, 600.0, 8.0, 60.0), Color(0.28, 0.30, 0.32).darkened(dark))
 				x += 90.0
-			c.draw_rect(Rect2(0.0, 596.0, W, 7.0), Color(0.35, 0.37, 0.40).darkened(dark))
+			c.draw_rect(Rect2(-pad().x, 596.0, W + 2.0 * pad().x, 7.0), Color(0.35, 0.37, 0.40).darkened(dark))
 		"harbor":
-			c.draw_rect(Rect2(0.0, 670.0, W, 400.0), Color(0.62, 0.60, 0.56).darkened(dark))
-			c.draw_rect(Rect2(0.0, 664.0, W, 8.0), Color(0.75, 0.73, 0.68).darkened(dark))
+			c.draw_rect(Rect2(-pad().x, 670.0, W + 2.0 * pad().x, 400.0), Color(0.62, 0.60, 0.56).darkened(dark))
+			c.draw_rect(Rect2(-pad().x, 664.0, W + 2.0 * pad().x, 8.0), Color(0.75, 0.73, 0.68).darkened(dark))
 			c.draw_circle(Vector2(180.0, 668.0), 16.0, Color(0.2, 0.2, 0.22).darkened(dark))
 			_draw_foam(662.0, night)
 		"beach":
 			var sand := Color(0.86, 0.78, 0.60).darkened(dark)
-			var pts := PackedVector2Array([Vector2(0.0, H + 400.0)])
-			var x2 := 0.0
-			while x2 <= W:
+			var pts := PackedVector2Array([Vector2(-pad().x - 40.0, H + 400.0)])
+			var x2 := -pad().x - 40.0
+			while x2 <= W + pad().x + 40.0:
 				pts.append(Vector2(x2, 668.0 + sin(x2 * 0.01) * 8.0))
 				x2 += 40.0
-			pts.append(Vector2(W, H + 400.0))
+			pts.append(Vector2(x2, H + 400.0))
 			c.draw_colored_polygon(pts, sand)
 			_draw_foam(664.0, night)
 		_:
 			_draw_rocks(night)
 			_draw_foam(670.0, night)
 	if on_pier:
-		c.draw_rect(Rect2(0.0, 690.0, W, 300.0), Color(0.50, 0.37, 0.24).darkened(dark))
+		c.draw_rect(Rect2(-pad().x, 690.0, W + 2.0 * pad().x, 300.0), Color(0.50, 0.37, 0.24).darkened(dark))
 		for i in 12:
-			c.draw_line(Vector2(0.0, 694.0 + float(i) * 14.0), Vector2(W, 694.0 + float(i) * 14.0), Color(0.38, 0.27, 0.17).darkened(dark), 2.0)
+			c.draw_line(Vector2(-pad().x, 694.0 + float(i) * 14.0), Vector2(W + pad().x, 694.0 + float(i) * 14.0), Color(0.38, 0.27, 0.17).darkened(dark), 2.0)
 	c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
@@ -852,8 +854,8 @@ func _draw_foreground(night: float) -> void:
 func _draw_foam(y: float, night: float) -> void:
 	var wash := sin(_time * 0.9) * 6.0
 	var pts := PackedVector2Array()
-	var x := 0.0
-	while x <= W:
+	var x := -pad().x
+	while x <= W + pad().x:
 		pts.append(Vector2(x, y + wash + sin(x * 0.03 + _time * 1.4) * 3.0 + _noise.get_noise_2d(x * 0.02, _time) * 5.0))
 		x += 24.0
 	_canvas.draw_polyline(pts, Color(1.0, 1.0, 1.0, 0.75 - 0.4 * night), 4.0, true)
@@ -866,7 +868,7 @@ func _draw_rocks(night: float) -> void:
 	c.draw_circle(Vector2(230.0, 760.0), 95.0, col.lightened(0.06))
 	c.draw_circle(Vector2(1220.0, 750.0), 130.0, col.darkened(0.05))
 	c.draw_circle(Vector2(640.0, 800.0), 140.0, col.lightened(0.03))
-	c.draw_rect(Rect2(0.0, 760.0, W, 400.0), col)
+	c.draw_rect(Rect2(-pad().x, 760.0, W + 2.0 * pad().x, 400.0), col)
 	c.draw_circle(Vector2(40.0, 690.0), 30.0, col.lightened(0.15))
 
 

@@ -129,6 +129,17 @@ so it did not look hooked, and its motion was jerky. Now the hook is in the mout
   snout up; it no longer picks left or right at random.
 Tuning knobs: `HANG_LINE`, `PX_PER_M`, flap interval and strength in `_animate_catch`.
 
+## Wide phones fill the screen (build 51)
+The window used to keep 16:9 with bars at the sides on 19.5:9 phones. It now stretches with
+aspect "expand": the screen is at least 1280x720 design units and wider phones see more.
+- Touch buttons and the joystick are pinned to the nearest screen corner (`TouchControls._pin`),
+  so they stay under the thumbs at the edges.
+- The first-person view keeps its 1280x720 design rect centred (`FightView.center_design_rect`);
+  sky, sea, waves, foam and the shore foreground are drawn out to the screen edges (`pad()`).
+- The shore camera, the map and the title screen already lay out from the screen size.
+- Safe areas: Safari keeps page content inside the notch insets on its own, so nothing is added.
+- Portrait still shows the "turn your phone" screen (`device_guard.gd`).
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

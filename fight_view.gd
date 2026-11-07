@@ -102,13 +102,34 @@ var _drips: Array = []
 var _card := StyleBoxFlat.new()
 
 
+## Keeps a full-screen drawing in the 1280x720 design space, centred on screens of any shape
+## (the window stretches with aspect "expand"). Draw backgrounds out to the screen edges with pad().
+static func center_design_rect(c: Control) -> void:
+	c.anchor_left = 0.5
+	c.anchor_right = 0.5
+	c.anchor_top = 0.5
+	c.anchor_bottom = 0.5
+	c.offset_left = -W * 0.5
+	c.offset_right = W * 0.5
+	c.offset_top = -H * 0.5
+	c.offset_bottom = H * 0.5
+
+
+## How far the screen reaches past the 1280x720 design rect on each side (0 on a 16:9 screen).
+func pad() -> Vector2:
+	if not is_inside_tree():
+		return Vector2.ZERO
+	var vs := get_viewport().get_visible_rect().size
+	return Vector2(maxf((vs.x - W) * 0.5, 0.0), maxf((vs.y - H) * 0.5, 0.0))
+
+
 func _ready() -> void:
 	layer = 3
 	_noise.noise_type = FastNoiseLite.TYPE_PERLIN
 	_noise.frequency = 0.25
 	_rng.randomize()
 	_canvas = Control.new()
-	_canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center_design_rect(_canvas)
 	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_canvas.draw.connect(_draw_view)
 	_canvas.visible = false
@@ -418,7 +439,8 @@ func _draw_view() -> void:
 	var night := 1.0 - daylight
 	var sky_top := Color(0.45, 0.70, 0.92).lerp(Color(0.03, 0.05, 0.14), night)
 	var sky_low := Color(0.86, 0.93, 1.0).lerp(Color(0.10, 0.12, 0.26), night)
-	c.draw_polygon(PackedVector2Array([Vector2(0, 0), Vector2(W, 0), Vector2(W, SURFACE_Y), Vector2(0, SURFACE_Y)]),
+	var pd := pad()
+	c.draw_polygon(PackedVector2Array([Vector2(-pd.x, -pd.y), Vector2(W + pd.x, -pd.y), Vector2(W + pd.x, SURFACE_Y), Vector2(-pd.x, SURFACE_Y)]),
 		PackedColorArray([sky_top, sky_top, sky_low, sky_low]))
 	var hills := Color(0.35, 0.45, 0.42).lerp(Color(0.08, 0.10, 0.16), night)
 	var hp := PackedVector2Array([Vector2(W, SURFACE_Y), Vector2(500, SURFACE_Y)])
@@ -431,7 +453,7 @@ func _draw_view() -> void:
 	var w: Dictionary = spot.get("water", {})
 	var shallow: Color = w.get("shallow", Color(0.12, 0.78, 0.82))
 	var deep: Color = w.get("deep", Color(0.01, 0.08, 0.26))
-	c.draw_polygon(PackedVector2Array([Vector2(0, SURFACE_Y), Vector2(W, SURFACE_Y), Vector2(W, H), Vector2(0, H)]),
+	c.draw_polygon(PackedVector2Array([Vector2(-pd.x, SURFACE_Y), Vector2(W + pd.x, SURFACE_Y), Vector2(W + pd.x, H + pd.y), Vector2(-pd.x, H + pd.y)]),
 		PackedColorArray([shallow, shallow, deep, deep]))
 
 	# Light shafts from the surface, swaying slowly.
@@ -613,13 +635,13 @@ func _draw_creature(kind: String, center: Vector2, facing: float, rot: float, sc
 			c.draw_circle(Vector2(30.0, -6.0), 4.0, Color(0.1, 0.1, 0.1))
 		"crab":
 			var col4 := Color(0.28, 0.48, 0.82) * tint_col
-			for side in [-1.0, 1.0]:
+			for side: float in [-1.0, 1.0]:
 				for k in 3:
 					var base := Vector2(-14.0 + float(k) * 14.0, 6.0 * side)
 					var knee := base + Vector2(-6.0, 16.0 * side + sin(_time * 10.0 + float(k)) * 4.0)
 					c.draw_polyline(PackedVector2Array([base, knee, knee + Vector2(-4.0, 10.0 * side)]), col4.darkened(0.2), 4.0, true)
 			_ellipse(Vector2.ZERO, Vector2(30.0, 18.0), col4)
-			for side2 in [-1.0, 1.0]:
+			for side2: float in [-1.0, 1.0]:
 				var arm := Vector2(26.0, 10.0 * side2)
 				c.draw_line(Vector2(18.0, 6.0 * side2), arm, col4.darkened(0.15), 5.0)
 				c.draw_circle(arm + Vector2(6.0, 0.0), 8.0, Color(0.9, 0.45, 0.30))

@@ -28,7 +28,7 @@ HUD text overlap, object leak at exit (CI warning).
 
 ## M0 — Stabilise and verify (next)
 - [x] Confirm touch buttons and joystick on the user's phone (build label on screen)
-- [ ] Mobile layout: expand aspect, anchored controls, safe areas, portrait screen (#1)
+- [ ] Mobile layout (#1): portrait screen done (device_guard.gd); expand aspect, corner-pinned touch controls and a centred fishing view done in build 51, needs a phone check; safe areas left to Safari's own insets
 - [x] Pause/resume and audio lifecycle (#2)
 - [ ] Gameplay bug batch (#5)
 - [ ] Camera culling and draw-once layers (#3): town drawing culled to the camera (build 21); shore and boats still open; no measurement yet

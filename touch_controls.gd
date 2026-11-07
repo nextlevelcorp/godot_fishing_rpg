@@ -74,8 +74,7 @@ func _ready() -> void:
 		btn.action = action
 		btn.label = b[1]
 		btn.radius = float(b[4]) * TOUCH_SCALE
-		btn.position = Vector2(b[2], b[3]) - Vector2.ONE * btn.radius
-		btn.size = Vector2.ONE * btn.radius * 2.0
+		_pin(btn, Vector2(b[2], b[3]) - Vector2.ONE * btn.radius, Vector2.ONE * btn.radius * 2.0)
 		var look: Array = VISUALS.get(action, ["button_circle", "", 0.0])
 		btn.plate = _load_art(look[0])
 		btn.icon = _load_art(look[1])
@@ -91,9 +90,26 @@ func _add_joystick() -> void:
 	j.radius = 105.0
 	j.pad = _load_art("joystick_circle_pad_a")
 	j.nub = _load_art("joystick_circle_nub_a")
-	j.position = Vector2(175.0, 555.0) - Vector2.ONE * j.radius * 1.25
-	j.size = Vector2.ONE * j.radius * 2.5
+	_pin(j, Vector2(175.0, 555.0) - Vector2.ONE * j.radius * 1.25, Vector2.ONE * j.radius * 2.5)
 	_root.add_child(j)
+
+
+## Places a control given in 1280x720 design coordinates and pins it to the nearest screen corner,
+## so on a wider (or taller) screen the buttons stay under the thumbs at the edges instead of
+## drifting toward the middle. The window stretches with aspect "expand" (project.godot).
+static func _pin(c: Control, pos: Vector2, sz: Vector2) -> void:
+	var right := pos.x + sz.x * 0.5 > 640.0
+	var bottom := pos.y + sz.y * 0.5 > 360.0
+	var ax := 1.0 if right else 0.0
+	var ay := 1.0 if bottom else 0.0
+	c.anchor_left = ax
+	c.anchor_right = ax
+	c.anchor_top = ay
+	c.anchor_bottom = ay
+	c.offset_left = pos.x - 1280.0 * ax
+	c.offset_right = c.offset_left + sz.x
+	c.offset_top = pos.y - 720.0 * ay
+	c.offset_bottom = c.offset_top + sz.y
 
 
 func _load_art(art_name: String) -> Texture2D:
