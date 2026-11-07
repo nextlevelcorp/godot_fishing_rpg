@@ -3,6 +3,7 @@
 Positioning: casual, realistic shore fishing at real Turkish spots (see GAME_DESIGN.md).
 Rule: no monetization and no backend before the MVP is validated on real phones.
 
+Reviewed 2026-11-07 (build 50): checkboxes updated from the code and CI; nothing re-measured on a device.
 Sources for this plan (2026-11-04): CI run for 6214098 (parse-check all scripts ok; smoke run of
 both scenes 600 frames, no script errors, BiomeDB 42 species OK); architecture review and QA
 review by read-only subagents (code reading only, nothing run on a device).
@@ -35,14 +36,15 @@ HUD text overlap, object leak at exit (CI warning).
 - [ ] Robust save (#10) (partly: type-checked load, version field)
 
 ## M1 — MVP feature-complete
+- [x] Ten real spots, unlock levels 1-10 (Çanakkale Waterfront at level 7, build 50)
 - [x] Title screen with Play, Settings (sound, vibration), Credits (Kenney CC0, sources); language comes with Turkish localisation
-- [x] Onboarding at the first spot (coach card, shown once); waiting feedback still open (#7)
+- [x] Onboarding at the first spot (coach card, shown once); waiting feedback (quiet water, bait gone)
 - [x] Session summary ("end of outing": catches, coins, records) and return to the map
 - [x] Score and progression: angler level from catches; spots unlock by level (forgiving spots first)
-- [ ] Time-of-day control (start at dawn or dusk, wait until evening)
-- [ ] Pre-rendered audio (#4)
+- [ ] Time-of-day control (start at dawn or dusk, wait until evening) (partly: "+1 hour" button)
+- [x] Pre-rendered audio (#4): offline renders in tools/audio/render_sfx.py, sample player in ambience.gd
 - [ ] Turkish localisation (#8)
-- [ ] Scripted CI play-through (#6)
+- [ ] Scripted CI play-through (#6) (partly: tests/smoke_features.gd hooks, jumps and lands a TEST fish)
 - [ ] Balance pass with playtest data (rigs vs fish, bite windows on touch)
 
 ## M2 — MVP validation
@@ -52,7 +54,7 @@ HUD text overlap, object leak at exit (CI warning).
 
 ## Growth (after MVP validation)
 - [ ] Analytics events and KPIs (D1/D7 retention, session length, catches, spot usage)
-- [ ] Daily challenge (a species, spot and hour) and streaks
+- [x] Daily challenge (daily.gd); streaks still open
 - [ ] Rewarded ads, opt-in only, never during a fight (see monetization-analyst)
 - [ ] Cloud save only if retention shows players return across devices
 

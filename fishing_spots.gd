@@ -124,6 +124,27 @@ const SPOTS := {
 		"water": {"shallow": Color(0.18, 0.55, 0.55), "mid": Color(0.03, 0.28, 0.40), "deep": Color(0.01, 0.09, 0.20)},
 		"shore_color": Color(0.62, 0.62, 0.60),
 	},
+	"canakkale_kordon": {
+		"name": "Canakkale Waterfront", "local_name": "Çanakkale Kordonu", "region": "Çanakkale / Dardanelles",
+		"lat_lon": Vector2(40.1553, 26.4142), "kind": "harbor",
+		"slope": 0.30, "max_depth_m": 14.0,
+		"unlock_level": 7,
+		"current_ms": 1.4,  # surface current toward the Aegean is about 3.5-4 knots (1.8-2 m/s) in the narrows off Çanakkale (cruiserswiki.org/wiki/Dardanelles); a little gentler along the quay: 1.4 is game-design fill
+		"tips": ["Shore fishing is the most popular kind of angling on the strait.", "Bluefish pass through the strait on their way between the Black Sea and the Aegean.", "The current is strong here: a heavy bottom rig holds better than a float.", "Fish bite best around dawn and dusk.", "Set your float depth (DEEP / SHAL): fish only take bait at their own depth."],
+		"species": ["bluefish", "mediterranean_horse_mackerel", "atlantic_bonito", "european_seabass", "white_seabream", "atlantic_mackerel", "garfish", "black_scorpionfish"],
+		"species_note": "A study of recreational fishing in the strait names shore fishing as the most popular kind and bluefish as a species anglers take a lot of. Press reports describe anglers selling small bluefish (çinekop) and lüfer caught along the waterfront, and bonito runs off Çanakkale. Horse mackerel is a common hand-line target in the area. Sea bass, white seabream, mackerel, garfish and scorpionfish: game-design fill.",
+		"evidence": "survey + press/guide",
+		"sources": [
+			"https://avesis.comu.edu.tr/publication/details/40f6017f-ec28-4ac6-baab-0f4277ca986c/oai",
+			"https://acikerisim.comu.edu.tr/items/bb9e2860-cb8e-4770-a95f-48aec3da8c76",
+			"https://www.sondakika.com/yerel/haber-sofralarda-cinakop-zamani-6895751/",
+			"https://www.memurlar.net/haber/990690",
+			"https://www.CruisersWiki.org/wiki/Dardanelles",
+		],
+		"blurb": "A long quay on the narrows where the strait runs fast toward the Aegean. Bluefish pass through here.",
+		"water": {"shallow": Color(0.16, 0.66, 0.70), "mid": Color(0.03, 0.38, 0.56), "deep": Color(0.01, 0.13, 0.32)},
+		"shore_color": Color(0.58, 0.56, 0.52),
+	},
 	"fethiye_bay": {
 		"name": "Fethiye Bay", "local_name": "Fethiye", "region": "Mediterranean",
 		"lat_lon": Vector2(36.6200, 29.1200), "kind": "rocky",
