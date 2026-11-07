@@ -64,9 +64,7 @@ jobs:
           exit $status
 
       - name: Feature smoke test (audio, settings, TEST fish)
-        # New and not yet proven stable: a failure shows as a warning and does not stop the deploy.
-        # Make it blocking (remove continue-on-error) once it has been green for a while.
-        continue-on-error: true
+        # Blocking since 2026-11-07 (green from build 46 on): a failed check stops the deploy.
         # Drives the real shore scene: sounds load and play, settings survive a save, a TEST fish is
         # hooked, jumps and is landed with no rewards. It proves the code paths run; it cannot hear.
         run: |
