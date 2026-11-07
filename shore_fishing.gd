@@ -44,6 +44,7 @@ const RETRIEVE_SPEED := 55.0         ## px/s the bait travels while REEL is held
 const WALK_SPEED := 150.0          ## px/s, about 1.5 m/s
 const PIER_LEN := 420.0            ## the pier reaches 42 m out
 const PIER_HALF := 26.0
+const LOCAL_EARSHOT := 450.0       ## the local calls out about fish you land this close
 const TALK_RADIUS := 130.0         ## walk this close to the named local to see TALK
 const TIP_RADIUS := 100.0          ## walk this close to another angler to hear their tip
 
@@ -351,6 +352,13 @@ func _pick_local() -> void:
 			_local_idx = i
 	_crowd[_local_idx]["shirt"] = p["shirt"]
 	_crowd[_local_idx]["hat"] = p["hat"]
+
+
+## The local's call when you land a fish within earshot (LOCAL_EARSHOT px), for the catch card.
+func _local_says(species: String, kg: float, released: bool) -> String:
+	if _local_idx < 0 or _boat_mode or _crowd_pos(_crowd[_local_idx]).distance_to(_hand) > LOCAL_EARSHOT:
+		return ""
+	return "%s: \"%s\"" % [String(Locals.person(GameSession.spot_id)["name"]), Locals.react(species, kg, released)]
 
 
 func _near_local() -> bool:
@@ -1806,7 +1814,11 @@ func _on_caught(id: String, weight_kg: float) -> void:
 		GameSession.xp += 3
 		GameSession.save()
 		_update_progress_ui()
-		_fight_view.show_catch("Released: " + String(sp["name"]), PackedStringArray(["%.2f kg, %.0f cm" % [weight_kg, cm], why_release, "+3 XP for doing it right"]))
+		var rel_lines := PackedStringArray(["%.2f kg, %.0f cm" % [weight_kg, cm], why_release, "+3 XP for doing it right"])
+		var nod := _local_says(id, weight_kg, true)
+		if nod != "":
+			rel_lines.append(nod)
+		_fight_view.show_catch("Released: " + String(sp["name"]), rel_lines)
 		_result_label.text = ""
 		_set_status("Released. Good practice keeps the fish coming")
 		_amb.play("splash", 0.5)
@@ -1829,6 +1841,9 @@ func _on_caught(id: String, weight_kg: float) -> void:
 		lines.append("Into the bucket as live bait  (%d)" % GameSession.add_live_bait(1))
 	if tourney_line != "":
 		lines.append(tourney_line)
+	var shout := _local_says(id, weight_kg, false)
+	if shout != "":
+		lines.append(shout)
 	if for_local:
 		var lr := Locals.request(GameSession.spot_id)
 		lines.append("For %s: %d / %d%s" % [String(Locals.person(GameSession.spot_id)["name"]), int(lr["have"]), int(lr["need"]),

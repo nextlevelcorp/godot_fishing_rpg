@@ -169,3 +169,17 @@ static func secret(spot_id: String) -> String:
 	var baits := Tackle.best_baits(sid, 1)
 	var bait := baits[0] if not baits.is_empty() else "a good bait"
 	return "Between us: the %s here feed %s. Use %s, hook %s." % [species_name(sid).to_lower(), when, bait, Tackle.hook_range(sid)]
+
+
+## What the local calls out when you land a fish near them: by its size within the species' range,
+## or a nod when you release one. Game-design fill.
+static func react(species: String, kg: float, released: bool) -> String:
+	if released:
+		return "Good, put it back. Let it grow."
+	var wr: Vector2 = BiomeDB.get_species(species)["weight_kg"]
+	var f := clampf((kg - wr.x) / maxf(wr.y - wr.x, 0.01), 0.0, 1.0)
+	if f > 0.6:
+		return "Maşallah! That's a real %s!" % species_name(species).to_lower()
+	if f > 0.25:
+		return "Nice %s. Dinner tonight." % species_name(species).to_lower()
+	return "Small, but it counts."

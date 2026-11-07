@@ -162,7 +162,10 @@ place with people, not only water; a reason to come back to the same spot.
   changes with the tier; from Friend on they share a secret each visit (when one of the spot's
   species feeds and the best bait and hook size, from BiomeDB and `tackle.gd`).
 - **Saved:** friendship and the open request per spot (`GameSession.local_friend`, `local_req`).
-- **Later slices:** weekly shore tournament, a bait shop keeper, locals fishing next to you.
+- **Calls out (build 56):** land a fish within 450 px of the local and their line goes on the
+  catch card: by the fish's size in its species' weight range (big, fair, small), or a nod when
+  you release one (`Locals.react`).
+- **Later slices:** a bait shop keeper.
 - **Test:** CI feature smoke checks the local exists, the TALK button exists and the panel opens.
 Tuning knobs: `COINS_BASE`, `XP_PER_FISH`, `TIERS`, `FRIEND_AT`, `TALK_RADIUS`.
 
