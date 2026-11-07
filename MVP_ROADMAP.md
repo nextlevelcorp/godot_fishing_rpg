@@ -31,7 +31,7 @@ HUD text overlap, object leak at exit (CI warning).
 - [ ] Mobile layout (#1): portrait screen done (device_guard.gd); expand aspect, corner-pinned touch controls and a centred fishing view done in build 51, needs a phone check; safe areas left to Safari's own insets
 - [x] Pause/resume and audio lifecycle (#2)
 - [ ] Gameplay bug batch (#5)
-- [ ] Camera culling and draw-once layers (#3): town drawing culled to the camera (build 21); shore and boats still open; no measurement yet
+- [ ] Camera culling and draw-once layers (#3): town drawing culled to the camera (build 21); shore rocks, pebbles, lamps, bollards and sparkles culled to the camera (build 59); no phone measurement yet (53 fps reported on build 46)
 - [x] Remove legacy boat game from build (#9): 16 files deleted in build 58, owner's choice
 - [ ] Robust save (#10) (partly: type-checked load, version field)
 

@@ -2367,9 +2367,19 @@ func _draw_tip() -> void:
 	draw_multiline_string(font, box.position + Vector2(14.0, 26.0), _tip_text, HORIZONTAL_ALIGNMENT_LEFT, width - 28.0, 17, 4, Color(0.10, 0.14, 0.20))
 
 
+## Half the width of world the camera shows, plus a margin: things farther from the camera's x than
+## this are off screen and are not drawn (the world is 8000 px wide, the screen about 1200).
+func _view_half() -> float:
+	return get_viewport_rect().size.x * 0.5 / maxf(_cam.zoom.x, 0.1) + 100.0
+
+
 func _draw_sparkles() -> void:
 	var day := _world.daylight
+	var cx := _cam.position.x
+	var half := _view_half()
 	for s in _sparkles:
+		if absf(s.x - cx) > half:
+			continue
 		var tw := sin(_time * 2.6 + s.z)
 		if tw > 0.55:
 			var k := (tw - 0.55) / 0.45 * (0.35 + 0.65 * day)
@@ -2384,6 +2394,8 @@ func _draw_shore() -> void:
 	var base: Color = _spot["shore_color"]
 	var shallow: Color = _spot["water"]["shallow"]
 	var w := HALF_WIDTH
+	var cx := _cam.position.x
+	var half := _view_half()
 	for i in 7:
 		var a := 0.30 - float(i) * 0.04
 		draw_rect(Rect2(-w, -float(i + 1) * 20.0, w * 2.0, 20.0), Color(shallow.r, shallow.g, shallow.b, a))
@@ -2396,13 +2408,17 @@ func _draw_shore() -> void:
 		draw_rect(Rect2(-w, 80.0, w * 2.0, 4.0), base.lightened(0.08))
 		var lx := -HALF_WIDTH + 200.0
 		while lx <= HALF_WIDTH - 200.0:
-			draw_circle(Vector2(lx, 62.0), 7.0, Color(1.0, 0.95, 0.7))
+			if absf(lx - cx) < half:
+				draw_circle(Vector2(lx, 62.0), 7.0, Color(1.0, 0.95, 0.7))
 			lx += 240.0
 	elif kind == "harbor":
 		draw_rect(Rect2(-w, 0.0, w * 2.0, 150.0), base)
 		draw_rect(Rect2(-w, 0.0, w * 2.0, 8.0), base.darkened(0.4))
 		var bx := -HALF_WIDTH + 200.0
 		while bx <= HALF_WIDTH - 200.0:
+			if absf(bx - cx) > half:
+				bx += 160.0
+				continue
 			draw_circle(Vector2(bx, 26.0), 9.0, base.darkened(0.5))
 			draw_rect(Rect2(bx + 40.0, 60.0, 34.0, 26.0), Color(0.45, 0.32, 0.20))
 			draw_rect(Rect2(bx + 40.0, 60.0, 34.0, 26.0), Color(0.30, 0.20, 0.12), false, 2.0)
@@ -2419,11 +2435,15 @@ func _draw_shore() -> void:
 			wet.append(p + Vector2(0.0, 12.0))
 		draw_polyline(wet, base.darkened(0.14), 16.0)
 		for pb in _pebbles:
-			draw_circle(Vector2(pb.x, pb.y), pb.z, base.darkened(0.25))
+			if absf(pb.x - cx) < half:
+				draw_circle(Vector2(pb.x, pb.y), pb.z, base.darkened(0.25))
 		_draw_foam()
 	else:
 		draw_rect(Rect2(-w, 40.0, w * 2.0, 260.0), base.darkened(0.2))
 		for rock: Dictionary in _rocks:
+			var rc0: Vector2 = rock["c"]
+			if absf(rc0.x - cx) > half + float(rock["r"]):
+				continue
 			var pts: PackedVector2Array = rock["pts"]
 			var col: Color = rock["color"]
 			draw_colored_polygon(pts, col)
