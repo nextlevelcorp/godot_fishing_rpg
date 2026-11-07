@@ -113,6 +113,18 @@ A painted fish sprite is drawn as a strip of 24 quads whose corners follow the s
 - **Sound trace (build 45):** title Settings has SOUND TEST: it plays a splash on a fresh player and prints whether the file is found, the setting and the master bus mute state, the bus count and the mix rate, so a missing sound can be traced on the phone without a console. The distance sound no longer uses a custom audio bus (a risk on the web export). CI now also runs `tests/smoke_features.gd`, which drives the real shore scene: sounds load and play, settings survive a save, a TEST fish is hooked, jumps and is landed with no rewards. It proves the code runs; it cannot hear.
 - `tools/art/import_sprites.py` is the one way a picture becomes a sprite (empty check, background cut, trim, scale, contact sheet).
 
+## The fish hangs from the hook (build 47)
+Device report on build 46: the landed fish was drawn level and the line met the middle of its body,
+so it did not look hooked, and its motion was jerky. Now the hook is in the mouth:
+- **Landed fish** (`pov_view.gd` `_animate_catch`): the hook follows the rod tip on a damped
+  spring; the body is a pendulum hanging snout-up from the hook (radius half the fish length,
+  gravity 9.8 m/s², 280 px per metre). The hook's own acceleration swings the body, so it lags and
+  overshoots when the lift stops. The fish flaps in bursts (every 0.45-1.2 s, slower as it tires);
+  each flap kicks the swing and bends the body, then dies away. The line runs straight to the mouth.
+- **Jump and thrash** (`_jump_pose`): the line runs to the mouth, not to the body centre. The head
+  shake is smaller (0.12 rad) and the thrash eases in and out instead of snapping.
+Tuning knobs: `HANG_BELOW`, `PX_PER_M`, flap interval and strength in `_animate_catch`.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

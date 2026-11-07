@@ -28,7 +28,8 @@ const EDGE_M := {"rocky": 5.0, "beach": 6.0, "harbor": 3.0, "bridge": 4.0, "boat
 ## Sound cues for the shore scene to play: exit, drips, splash, splash_big.
 signal sfx(kind: String, volume: float)
 const G := 9.8
-const CATCH_AT := Vector2(470.0, 430.0)      ## where the landed fish is held up to look at
+const HANG_BELOW := Vector2(-70.0, 95.0)    ## the landed fish hangs by its mouth this far below the rod tip
+const PX_PER_M := 280.0                      ## scale of the fish held up close (px per metre of fish)
 const WAVE_ROWS := 12
 
 ## Set by ShoreFishing every frame.
@@ -82,6 +83,12 @@ var _ring_t := 0.0
 var _prev_dip := 0.0
 ## Surfacing event in world metres: {kind, t, x, z, h, vh, vx}
 var _jump: Dictionary = {}
+# The landed fish is a pendulum hanging from the hook in its mouth (Nature of Code: pendulum).
+var _hang_a := 0.0                ## radians from straight down; + swings the tail to the right
+var _hang_w := 0.0                ## rad/s
+var _kick := 0.0                  ## 0..1, a flap of the body that dies away
+var _kick_wait := 0.3             ## s until the next flap
+var _hang_phase := 0.0            ## tail-beat phase while hanging
 
 
 func _ready() -> void:
@@ -242,9 +249,39 @@ func _spray_at(p: Vector2, n: int, strength: float) -> void:
 
 ## Where the line ends on screen right now.
 func _line_end() -> Vector2:
-	if phase == "fight" and not _jump.is_empty():
-		return _proj(float(_jump["x"]), float(_jump["z"]), float(_jump["h"]))
+	if phase == "fight" and not _jump.is_empty() and _creature == "":
+		var pose := _jump_pose()
+		if pose.has("mouth"):
+			return pose["mouth"]
 	return _proj(target_x, target_z, target_h)
+
+
+## Where and how the fish is drawn while it shows itself, and where the hook sits in its mouth
+## (the line runs to the mouth, not to the middle of the body). Empty "mouth" for a roll.
+func _jump_pose() -> Dictionary:
+	var z: float = _jump["z"]
+	var len_px := F * _fish_len_m() / z
+	var k := String(_jump["kind"])
+	var t: float = _jump["t"]
+	var dir := 1.0 if float(_jump["vx"]) >= 0.0 else -1.0
+	var water := _proj(float(_jump["x"]), z, 0.0)
+	var center := water
+	var rot := 0.0
+	if k == "jump":
+		var vh: float = _jump["vh"]
+		center = _proj(float(_jump["x"]), z, float(_jump["h"]))
+		# Nose follows the flight path; near the top of the arc it shakes its head against the hook.
+		var top := clampf(1.0 - absf(vh) / 3.0, 0.0, 1.0)
+		rot = -atan2(vh, 3.5) * 0.9 + sin(t * 25.0) * 0.12 * top
+	elif k == "thrash":
+		# Head lifted out against the line, shaking; eases in and out so it never snaps.
+		var e := sin(clampf(t / 0.8, 0.0, 1.0) * PI)
+		rot = (-0.35 + sin(t * 18.0) * 0.28) * e
+		center = water + Vector2(0.0, -len_px * 0.08 * e)
+	else:
+		return {"center": water, "len": len_px, "dir": dir, "rot": 0.0, "water": water}
+	var mouth := center + Vector2(dir * len_px * 0.46, 0.0).rotated(rot * dir)
+	return {"center": center, "len": len_px, "dir": dir, "rot": rot * dir, "water": water, "mouth": mouth}
 
 
 # ---------------------------------------------------------------- simulation
@@ -421,23 +458,50 @@ func _step_particles(delta: float) -> void:
 	_drips = dkeep
 
 
-## Landed: the fish swings up into view on the line, a pendulum on a spring, dripping water.
+func _hang_len_px() -> float:
+	return clampf(_fish_len_m() * PX_PER_M, 140.0, 300.0)
+
+
+## Landed: the fish is lifted out on the line and hangs by the hook in its mouth. _fish_pos is the
+## hook. The hook follows the rod tip on a damped spring; the body is a pendulum swinging from it,
+## pushed by the hook's own acceleration (it lags and overshoots when the hook stops) and by the
+## fish's flaps, which come in bursts and weaken as it tires. Water drips from the tail.
 func _animate_catch(delta: float) -> void:
-	var target := CATCH_AT
-	var acc := (target - _fish_pos) * 26.0 - _lift_v * 6.0
+	var anchor := _tip + HANG_BELOW
+	var acc := (anchor - _fish_pos) * 26.0 - _lift_v * 6.0
 	_lift_v += acc * delta
 	_fish_pos += _lift_v * delta
-	_facing = -1.0
-	_tilt = sin(_time * 9.0) * 0.4 * clampf(_catch_t / 3.4, 0.2, 1.0)
+	# Pendulum about the mouth: radius about half the body (its centre of mass), in metres.
+	var r := maxf(_fish_len_m() * 0.5, 0.06)
+	var ax := acc.x / PX_PER_M
+	var ay := acc.y / PX_PER_M
+	var alpha := (-ax * cos(_hang_a) - (G - ay) * sin(_hang_a)) / r - 1.8 * _hang_w
+	var life := clampf(_catch_t / 3.4, 0.25, 1.0)
+	_kick_wait -= delta
+	if _kick_wait <= 0.0:
+		_kick = 1.0
+		_kick_wait = _rng.randf_range(0.45, 1.2) / life
+		_hang_w += (1.0 if _rng.randf() < 0.5 else -1.0) * _rng.randf_range(1.5, 3.5) * life
+	_kick *= exp(-3.0 * delta)
+	_hang_w += alpha * delta
+	_hang_a = clampf(_hang_a + _hang_w * delta, -1.3, 1.3)
+	_hang_phase += delta * (5.0 + 20.0 * _kick)
 	if _rng.randf() < delta * 20.0:
-		_drips.append(Noc.Particle.new(_fish_pos + Vector2(_rng.randf_range(-40.0, 40.0), 10.0),
+		var down := Vector2(sin(_hang_a), cos(_hang_a))
+		var tail := _fish_pos + down * _hang_len_px() * _rng.randf_range(0.6, 0.95)
+		_drips.append(Noc.Particle.new(tail + Vector2(_rng.randf_range(-8.0, 8.0), 0.0),
 			Vector2(_rng.randf_range(-20.0, 20.0), _rng.randf_range(0.0, 60.0)), 0.0, 0.0, 1.2, _rng.randf_range(2.0, 4.0), Color(0.8, 0.95, 1.0, 0.9)))
 
 
 func show_catch(title: String, lines: PackedStringArray) -> void:
 	super.show_catch(title, lines)
-	_fish_pos = _proj(target_x, target_z, 0.0)
+	_fish_pos = _line_end()
 	_lift_v = Vector2(0.0, -600.0)
+	_hang_a = _rng.randf_range(-0.6, 0.6)
+	_hang_w = 0.0
+	_kick = 1.0
+	_kick_wait = 0.3
+	_facing = 1.0 if _rng.randf() < 0.5 else -1.0
 	_open = false
 	phase = "off"
 
@@ -831,10 +895,12 @@ func _draw_rod_and_line(night: float) -> void:
 
 	# Line: sags when slack, straight when tight; from the tip down to the water.
 	if phase != "off" or _catch_t > 0.0:
-		var to := line_end if _catch_t <= 0.0 else _fish_pos + Vector2(-30.0, -10.0)
+		var to := line_end if _catch_t <= 0.0 else _fish_pos
 		var sag := (1.0 - clampf(tension * 2.0, 0.0, 1.0)) * 50.0
 		if phase == "fly":
 			sag = 15.0
+		elif _catch_t > 0.0:
+			sag = 0.0                     # the fish's weight pulls the line straight
 		var mid := tip.lerp(to, 0.5) + Vector2(0.0, sag)
 		c.draw_polyline(_bezier(tip, mid, to, 16), Color(1.0, 1.0, 1.0, 0.8 - 0.3 * night), 1.5, true)
 		# The line also runs back along the rod through the guides to the spool.
@@ -913,25 +979,20 @@ func _draw_line_entry() -> void:
 func _draw_surfacing() -> void:
 	if phase != "fight" or _jump.is_empty() or _creature != "":
 		return
-	var z: float = _jump["z"]
-	var hgt: float = _jump["h"]
-	var p := _proj(float(_jump["x"]), z, hgt)
-	var len_px := F * _fish_len_m() / z
+	var pose := _jump_pose()
+	var len_px: float = pose["len"]
 	var k := String(_jump["kind"])
 	var t: float = _jump["t"]
-	var dir := 1.0 if float(_jump["vx"]) >= 0.0 else -1.0
-	var water := _proj(float(_jump["x"]), z, 0.0)
+	var dir: float = pose["dir"]
+	var water: Vector2 = pose["water"]
 	match k:
 		"jump":
-			var vh: float = _jump["vh"]
-			var rot := -atan2(vh, 3.5) * 0.9 + sin(t * 32.0) * 0.18 * clampf(1.0 - absf(vh) / 3.0, 0.0, 1.0)
-			RealFish.draw(_canvas, _fish_id, p, len_px, rot * dir, dir, _flex_phase, 0.9, daylight, 1.0)
+			RealFish.draw(_canvas, _fish_id, pose["center"], len_px, pose["rot"], dir, _flex_phase, 0.9, daylight, 1.0)
 			# a sheet of water torn up behind it in the first moments
 			if t < 0.25:
 				_ellipse_line(water, Vector2(len_px * 0.5, len_px * 0.12), Color(1.0, 1.0, 1.0, 0.8 - t * 3.0), 3.0)
 		"thrash":
-			var rot2 := sin(t * 28.0) * 0.45 - 0.25
-			RealFish.draw(_canvas, _fish_id, water + Vector2(0.0, -len_px * 0.08), len_px, rot2 * dir, dir, _flex_phase * 1.3, 1.0, daylight, 1.0)
+			RealFish.draw(_canvas, _fish_id, pose["center"], len_px, pose["rot"], dir, _flex_phase * 1.3, 1.0, daylight, 1.0)
 			_cover_with_water(water, len_px, 0.55)
 			for i in 3:
 				_ellipse_line(water, Vector2(len_px * (0.5 + 0.15 * float(i)), len_px * (0.10 + 0.03 * float(i))), Color(1.0, 1.0, 1.0, 0.7 - 0.2 * float(i)), 2.5)
@@ -961,11 +1022,18 @@ func _cover_with_water(at: Vector2, len_px: float, depth_frac: float) -> void:
 
 
 func _draw_caught_fish() -> void:
-	var len_px := clampf(_fish_len_m() * 280.0, 150.0, 330.0)
+	var len_px := _hang_len_px()
+	var down := Vector2(sin(_hang_a), cos(_hang_a))       # from the mouth toward the tail
 	if _creature != "" and RealFish.sprite(_fish_id) == null:
-		_draw_creature(_creature, _fish_pos, _facing, _tilt, len_px / 160.0, Color.WHITE)
-	else:
-		RealFish.draw(_canvas, _fish_id, _fish_pos, len_px, _tilt - 0.15, _facing, _flex_phase * 0.6, 0.5 + 0.5 * clampf(_catch_t / 3.4, 0.0, 1.0), daylight, 1.0)
+		_draw_creature(_creature, _fish_pos + down * len_px * 0.3, _facing, _hang_a * 0.5, len_px / 160.0, Color.WHITE)
+		return
+	# Snout up at the hook, body hanging below it; flex grows with each flap.
+	var snout := -down
+	var rot := snout.angle() if _facing > 0.0 else snout.angle() - PI
+	var center := _fish_pos + down * len_px * 0.46
+	RealFish.draw(_canvas, _fish_id, center, len_px, rot, _facing, _hang_phase, 0.12 + 0.7 * _kick, daylight, 1.0)
+	# The hook shank showing at the corner of the mouth.
+	_canvas.draw_line(_fish_pos, _fish_pos + down.rotated(0.5) * 9.0, Color(0.75, 0.75, 0.78), 2.0)
 
 
 ## Catch card, with the species drawn as it looks (not a sprite).
