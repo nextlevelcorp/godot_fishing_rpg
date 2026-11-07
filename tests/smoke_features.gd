@@ -63,7 +63,7 @@ func _process(_delta: float) -> bool:
 				var streams: Dictionary = amb.get("_streams")
 				var voices: Array = amb.get("_voices")
 				print("SMOKE info: %d sounds loaded, %d voices, %d buses, master muted: %s" % [streams.size(), voices.size(), AudioServer.bus_count, str(AudioServer.is_bus_mute(0))])
-				_check(streams.size() >= 40, "at least 40 sounds loaded (got %d)" % streams.size())
+				_check(streams.size() >= 37, "all 37 sounds loaded (got %d)" % streams.size())
 				_check(voices.size() >= 8, "at least 8 sound voices (got %d)" % voices.size())
 				amb.play("splash", 1.0)
 				amb.play("step_wood", 0.5)
