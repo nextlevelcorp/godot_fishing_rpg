@@ -422,8 +422,17 @@ func _draw_sky() -> void:
 		var s := h.orthogonal()
 		var p: Vector2 = g.pos
 		var sh := p + Vector2(40.0, 90.0)
-		_sky.draw_polyline(PackedVector2Array([sh - s * 14.0 - h * fl * 0.4, sh, sh + s * 14.0 - h * fl * 0.4]), Color(0.0, 0.0, 0.0, 0.15), 3.0)
-		_sky.draw_polyline(PackedVector2Array([p - s * 16.0 - h * fl, p + h * 3.0, p + s * 16.0 - h * fl]), Color(1.0, 1.0, 1.0, 0.95), 3.0)
+		# Seen from above: a soft shadow on the water, a white body, and wings that bend at the wrist
+		# with grey-black tips (a yellow-legged gull), beating with `fl`.
+		_sky.draw_texture_rect(_soft_disc, Rect2(sh - Vector2(18.0, 8.0), Vector2(36.0, 16.0)), false, Color(0.0, 0.0, 0.0, 0.16))
+		for side: float in [-1.0, 1.0]:
+			var wrist := p + s * side * 9.0 - h * (fl * 0.5 + 1.0)
+			var tip := p + s * side * 18.0 - h * (fl + 4.0)
+			_sky.draw_line(p, wrist, Color(0.96, 0.97, 0.98), 4.0, true)
+			_sky.draw_line(wrist, tip, Color(0.80, 0.82, 0.85), 3.0, true)
+			_sky.draw_line(tip - (tip - wrist) * 0.35, tip, Color(0.15, 0.15, 0.17), 2.5, true)
+		_sky.draw_texture_rect(Figure.disc_texture(), Rect2(p - h * 6.0 - Vector2(4.0, 4.0), Vector2(8.0, 8.0)), false, Color.WHITE)
+		_sky.draw_line(p - h * 7.0, p + h * 7.0, Color(0.97, 0.97, 0.98), 5.0, true)
 
 
 func _draw_glow() -> void:

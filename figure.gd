@@ -125,6 +125,12 @@ static func draw_cat(ci: CanvasItem, pos: Vector2, dir: float, t: float, col: Co
 static var _disc_tex: Texture2D
 
 
+static func disc_texture() -> Texture2D:
+	if _disc_tex == null:
+		_disc_tex = load("res://assets/art/ui/disc.png") as Texture2D
+	return _disc_tex
+
+
 static func disc(ci: CanvasItem, c: Vector2, r: float, col: Color) -> void:
 	_ellipse(ci, c, Vector2(r, r), col)
 
