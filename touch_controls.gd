@@ -23,11 +23,11 @@ const BUTTONS := [
 	# from notches, rounded corners and browser toolbars. Two small columns sit left of CAST/REEL.
 	[&"cast", "CAST", 1090.0, 360.0, 52.0],
 	[&"reel_in", "REEL", 1090.0, 535.0, 66.0],
-	[&"drag_up", "CLUTCH+", 945.0, 440.0, 36.0],
-	[&"drag_down", "CLUTCH-", 945.0, 555.0, 36.0],
-	[&"bait_deeper", "DEEP", 810.0, 440.0, 36.0],
-	[&"bait_shallower", "SHAL", 810.0, 555.0, 36.0],
-	[&"anchor", "ANCH", 945.0, 325.0, 40.0],
+	[&"drag_up", "CLUTCH+", 925.0, 440.0, 36.0],
+	[&"drag_down", "CLUTCH-", 925.0, 555.0, 36.0],
+	[&"bait_deeper", "DEEP", 790.0, 440.0, 36.0],
+	[&"bait_shallower", "SHAL", 790.0, 555.0, 36.0],
+	[&"anchor", "ANCH", 925.0, 325.0, 40.0],
 ]
 
 ## Button art: Kenney Mobile Controls (CC0), assets/kenney_mobile_controls/.
@@ -98,8 +98,8 @@ func _add_joystick() -> void:
 ## so on a wider (or taller) screen the buttons stay under the thumbs at the edges instead of
 ## drifting toward the middle. The window stretches with aspect "expand" (project.godot).
 static func _pin(c: Control, pos: Vector2, sz: Vector2) -> void:
-	var right := pos.x + sz.x * 0.5 > 640.0
-	var bottom := pos.y + sz.y * 0.5 > 360.0
+	var right := pos.x + sz.x * 0.5 >= 640.0
+	var bottom := pos.y + sz.y * 0.5 >= 360.0         # CAST sits exactly at 360: keep it with REEL
 	var ax := 1.0 if right else 0.0
 	var ay := 1.0 if bottom else 0.0
 	c.anchor_left = ax
@@ -202,7 +202,7 @@ class TouchButton extends Control:
 			draw_texture(icon, -icon.get_size() * 0.5, Color(1.0, 1.0, 1.0, 0.95))
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		var font := ThemeDB.fallback_font
-		var fs := 15
+		var fs := 18
 		var tw := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		var ty := radius * 0.62 if icon != null else fs * 0.35
 		if plate != null and icon == null:

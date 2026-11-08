@@ -38,6 +38,9 @@ var wind := Vector2(20.0, 0.0)
 ## (the world is 8000 px wide, the screen shows at most about 1900 px).
 var view_x := 0.0
 const CULL_RADIUS := 1300.0
+## Half the world width the camera shows, plus a margin; set by the shore scene each frame (it follows
+## the zoom and the screen shape). Used instead of CULL_RADIUS when set.
+var view_half := CULL_RADIUS
 var _frame := 0
 
 var _kind := ""
@@ -61,6 +64,8 @@ var _static: Node2D
 var _dyn: Node2D
 var _sky: Node2D
 var _glow: Node2D
+var _glow_layer: CanvasLayer
+var _glow_x := INF                     ## view_x at the last glow redraw
 
 
 ## Call before adding the node to the tree.
@@ -96,6 +101,7 @@ func _ready() -> void:
 	glow_layer.layer = 1
 	glow_layer.follow_viewport_enabled = true
 	add_child(glow_layer)
+	_glow_layer = glow_layer
 	_glow = Node2D.new()
 	var mat := CanvasItemMaterial.new()
 	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
@@ -206,6 +212,9 @@ func _process(delta: float) -> void:
 	time_of_day = fmod(time_of_day + delta / day_length_s, 1.0)
 	daylight = clampf(sin((time_of_day - 0.25) * TAU) * 1.6 + 0.45, 0.0, 1.0)
 
+	# A CanvasLayer does not hide with its parent: hide the night glow with the world.
+	if _glow_layer.visible != visible:
+		_glow_layer.visible = visible
 	if not visible:
 		return                      # hidden behind the first-person view: only the clock runs
 	var band := _walk_band()
@@ -251,8 +260,9 @@ func _process(delta: float) -> void:
 	_dyn.queue_redraw()
 	_sky.queue_redraw()
 	var glow := 1.0 - daylight
-	if absf(glow - _glow_level) > 0.02:
+	if absf(glow - _glow_level) > 0.02 or (glow > 0.01 and absf(view_x - _glow_x) > 200.0):
 		_glow_level = glow
+		_glow_x = view_x
 		_glow.queue_redraw()
 
 
@@ -324,7 +334,7 @@ func _draw_dyn() -> void:
 	for t in _trees:
 		var p: Vector2 = t["pos"]
 		var rad: float = t["r"]
-		if absf(p.x - view_x) > CULL_RADIUS + rad * 2.0:
+		if absf(p.x - view_x) > view_half + rad * 2.0:
 			continue
 		var sway := Vector2(sin(_time * 1.3 + float(t["phase"])) * rad * 0.10, 0.0)
 		# Three-quarter view: a shadow on the ground, a trunk standing up, the crown above it.
@@ -347,13 +357,13 @@ func _draw_dyn() -> void:
 			_dyn.draw_circle(p + sway + Vector2(-rad * 0.25, -rad * 0.3), rad * 0.55, tree_col.lightened(0.15))
 
 	for c in _cats:
-		if absf(c.pos.x - view_x) > CULL_RADIUS:
+		if absf(c.pos.x - view_x) > view_half:
 			continue
 		var col: Color = c.data["color"]
 		Figure.draw_cat(_dyn, c.pos, 1.0 if c.vel.x >= 0.0 else -1.0, _time + float(c.data["phase"]), col)
 
 	for v in _walkers:
-		if absf(v.pos.x - view_x) > CULL_RADIUS:
+		if absf(v.pos.x - view_x) > view_half:
 			continue
 		var col2: Color = v.data["color"]
 		var k := int(v.data.get("k", 0))
@@ -369,12 +379,12 @@ func _draw_sky() -> void:
 	if shade > 0.005:
 		for cl in _clouds:
 			var cp: Vector2 = cl["pos"]
-			if absf(cp.x - view_x) > CULL_RADIUS + 600.0:
+			if absf(cp.x - view_x) > view_half + 600.0:
 				continue
 			for pf: Vector3 in cl["puffs"]:
 				_sky.draw_circle(cp + Vector2(pf.x, pf.y), pf.z, Color(0.0, 0.05, 0.12, shade))
 	for g in _gulls:
-		if absf(g.pos.x - view_x) > CULL_RADIUS:
+		if absf(g.pos.x - view_x) > view_half:
 			continue
 		var fl := sin(_time * 7.0 + float(g.data["phase"])) * 7.0
 		var h: Vector2 = g.heading()
@@ -389,11 +399,17 @@ func _draw_glow() -> void:
 	var n := _glow_level
 	if n <= 0.01:
 		return
+	# Only lamps and windows near the camera; redrawn when the camera has moved 200 px (see _process).
+	var reach := view_half + 300.0
 	for l in _lamps:
+		if absf(l.x - view_x) > reach:
+			continue
 		_glow.draw_circle(l, 90.0, Color(1.0, 0.75, 0.40, 0.10 * n))
 		_glow.draw_circle(l + Vector2(0.0, -42.0), 26.0, Color(1.0, 0.85, 0.55, 0.30 * n))
 	for bd in _buildings:
 		var r: Rect2 = bd["rect"]
+		if r.end.x < view_x - reach or r.position.x > view_x + reach:
+			continue
 		var wins: Array = bd["lit"]
 		var cnt := wins.size()
 		var front_y := r.position.y + r.size.y * 0.62

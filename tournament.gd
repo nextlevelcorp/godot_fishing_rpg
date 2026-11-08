@@ -21,8 +21,22 @@ static func week_key() -> String:
 	return "w%d" % week
 
 
-## This week's spot: picked from the spots you have unlocked, the same pick all week.
+## This week's spot: picked from the spots you have unlocked and then kept (saved) for the rest of the
+## week, so a level-up mid-week does not move it.
 static func spot_this_week() -> String:
+	var wk := week_key()
+	if GameSession.tourney_spot.begins_with(wk + ":"):
+		var kept := GameSession.tourney_spot.substr(wk.length() + 1)
+		if not FishingSpots.get_spot(kept).is_empty():
+			return kept
+	var picked := _pick_spot()
+	if picked != "":
+		GameSession.tourney_spot = "%s:%s" % [wk, picked]
+		GameSession.save()
+	return picked
+
+
+static func _pick_spot() -> String:
 	var spots: Array[String] = []
 	for id: String in FishingSpots.ids():
 		if GameSession.is_unlocked(FishingSpots.get_spot(id)):

@@ -72,6 +72,9 @@ var _xp_bar: ProgressBar
 var _goal_labels: Array[Label] = []
 var _summary: PanelContainer
 var _hud_root: Control
+var _cond_label: Label                ## wind and moon, under the clock
+var _idle_ui: Array[Control] = []     ## hidden during a fight (_show_fight_ui)
+var _hud_t := 0.0                     ## the info lines are refreshed at 4 Hz, not every frame
 var _local_idx := -1                 ## index in _crowd of the spot's named local angler (locals.gd), -1 none
 var _talk_btn: Button
 var _talk_panel: PanelContainer
@@ -412,6 +415,8 @@ func _open_talk_panel() -> void:
 		var give := _tackle_button("GIVE  (+%d coins)" % Locals.reward_coins(sid), false, Vector2(300.0, 60.0))
 		give.pressed.connect(func() -> void:
 			var res := Locals.turn_in(sid)
+			if res.is_empty():
+				return
 			_update_coins()
 			_update_progress_ui()
 			_amb.play("bell", 0.4)
@@ -478,7 +483,7 @@ func _tourney_card(title: String) -> PanelContainer:
 
 ## Pays the entry and picks the three anglers nearest you (the local counts) as rivals.
 func _start_tourney() -> void:
-	if GameSession.coins < Tournament.ENTRY:
+	if GameSession.coins < Tournament.ENTRY or _state != State.AIM or _tourney_running():
 		return
 	GameSession.coins -= Tournament.ENTRY
 	GameSession.save()
@@ -569,6 +574,7 @@ func _tick_tourney(delta: float) -> void:
 	_update_progress_ui()
 	if _talk_panel != null and is_instance_valid(_talk_panel):
 		_talk_panel.queue_free()
+	_close_tackle_panels()
 	var panel := _tourney_card("Tournament over:  you are %s" % Tournament.ordinal(place))
 	var box: VBoxContainer = panel.get_child(0)
 	var rows: Array[Array] = [["You", float(_tourney["me"])]]
@@ -587,6 +593,17 @@ func _tick_tourney(delta: float) -> void:
 	box.add_child(ok)
 	_talk_panel = panel
 	_hud_root.add_child(panel)
+
+
+## Bait, hook and test panels only work with the line in: once you cast they close, so tackle cannot
+## be swapped mid-cast or mid-fight (the touch buttons sit above the panels).
+func _close_tackle_panels() -> void:
+	if _tackle_panel != null and is_instance_valid(_tackle_panel):
+		_tackle_panel.queue_free()
+		_tackle_panel = null
+	if _test_panel != null and is_instance_valid(_test_panel):
+		_test_panel.queue_free()
+		_test_panel = null
 
 
 ## Two shoals of small fish that school (boids) in the shallows.
@@ -654,33 +671,53 @@ func _build_hud() -> void:
 	_spot_label = _make_label(ui, 22, Color.WHITE)
 	_spot_label.position = Vector2(20.0, 10.0)
 	_spot_label.text = "%s  -  %s   |   %s" % [_spot["name"], _spot["region"], BiomeDB.get_rig(GameSession.rig_id).get("name", "")]
-	_clock_label = _make_label(ui, 18, Color(0.85, 0.92, 1.0))
+	# Top left: time and weather on two short lines. The rig line sits at the bottom centre.
+	_clock_label = _make_label(ui, 20, Color(0.85, 0.92, 1.0))
 	_clock_label.position = Vector2(20.0, 40.0)
-	_depth_label = _make_label(ui, 18, Color(0.75, 0.95, 1.0))
-	_depth_label.position = Vector2(20.0, 64.0)
-	var build := _make_label(ui, 14, Color(1.0, 1.0, 1.0, 0.6))
+	_cond_label = _make_label(ui, 20, Color(0.80, 0.90, 1.0))
+	_cond_label.position = Vector2(20.0, 66.0)
+	_depth_label = _make_label(ui, 20, Color(0.75, 0.95, 1.0))
+	_depth_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_depth_label.offset_left = -330.0
+	_depth_label.offset_right = 330.0
+	_depth_label.offset_top = -34.0
+	_depth_label.offset_bottom = -6.0
+	_depth_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var build := _make_label(ui, 14, Color(1.0, 1.0, 1.0, 0.35))
 	build.position = Vector2(20.0, 694.0)
 	build.text = GameSession.BUILD
 	_build_label = build
 
-	_status = _make_label(ui, 30, Color.WHITE)
-	_status.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_status.offset_top = 66.0
-	_status.offset_bottom = 110.0
+	# The one line that tells you what to do: a pill at the top centre, clear of the info lines on the
+	# left and the MAP / coins / TALK column on the right; it may wrap to two lines.
+	_status = _make_label(ui, 24, Color.WHITE)
+	_status.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_status.offset_left = -260.0
+	_status.offset_right = 260.0
+	_status.offset_top = 100.0
+	_status.offset_bottom = 164.0
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_status.add_theme_stylebox_override("normal", _pill())
 
 	_result_label = _make_label(ui, 42, Color(1.0, 0.95, 0.6))
 	_result_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_result_label.offset_top = 200.0
-	_result_label.offset_bottom = 310.0
+	_result_label.offset_top = 250.0
+	_result_label.offset_bottom = 340.0
 	_result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_result_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
-	_toast_label = _make_label(ui, 34, Color(0.8, 1.0, 1.0))
-	_toast_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_toast_label.offset_top = 330.0
-	_toast_label.offset_bottom = 380.0
+	# Short messages: low in the middle, clear of the angler and the float, fading out.
+	_toast_label = _make_label(ui, 26, Color(0.8, 1.0, 1.0))
+	_toast_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_toast_label.offset_left = -330.0
+	_toast_label.offset_right = 330.0
+	_toast_label.offset_top = -112.0
+	_toast_label.offset_bottom = -70.0
 	_toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_toast_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_toast_label.add_theme_stylebox_override("normal", _pill())
 
 	_coins_label = _make_label(ui, 22, Color(1.0, 0.9, 0.5))
 	_coins_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
@@ -707,7 +744,8 @@ func _build_hud() -> void:
 	hour_btn.text = "+1 hour"
 	hour_btn.add_theme_font_size_override("font_size", 20)
 	hour_btn.position = Vector2(20.0, 96.0)
-	hour_btn.size = Vector2(130.0, 48.0)
+	hour_btn.size = Vector2(130.0, 64.0)
+	_idle_ui.append(hour_btn)
 	hour_btn.focus_mode = Control.FOCUS_NONE
 	hour_btn.pressed.connect(func() -> void:
 		_world.time_of_day = fmod(_world.time_of_day + 1.0 / 24.0, 1.0)
@@ -717,10 +755,10 @@ func _build_hud() -> void:
 	_talk_btn = Button.new()
 	_talk_btn.add_theme_font_size_override("font_size", 22)
 	_talk_btn.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	_talk_btn.offset_left = -360.0
+	_talk_btn.offset_left = -300.0
 	_talk_btn.offset_right = -20.0
-	_talk_btn.offset_top = 118.0
-	_talk_btn.offset_bottom = 174.0
+	_talk_btn.offset_top = 116.0
+	_talk_btn.offset_bottom = 180.0
 	_talk_btn.focus_mode = Control.FOCUS_NONE
 	_talk_btn.visible = false
 	_talk_btn.pressed.connect(_open_talk_panel)
@@ -730,17 +768,17 @@ func _build_hud() -> void:
 	_tourney_btn.text = "TOURNAMENT"
 	_tourney_btn.add_theme_font_size_override("font_size", 22)
 	_tourney_btn.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	_tourney_btn.offset_left = -360.0
+	_tourney_btn.offset_left = -300.0
 	_tourney_btn.offset_right = -20.0
-	_tourney_btn.offset_top = 180.0
-	_tourney_btn.offset_bottom = 236.0
+	_tourney_btn.offset_top = 188.0
+	_tourney_btn.offset_bottom = 252.0
 	_tourney_btn.focus_mode = Control.FOCUS_NONE
 	_tourney_btn.visible = not _boat_mode and Tournament.spot_this_week() == GameSession.spot_id
 	_tourney_btn.pressed.connect(_open_tourney_panel)
 	ui.add_child(_tourney_btn)
 	_tourney_label = _plain_label(ui, 20, Color(1.0, 0.9, 0.5))
 	_tourney_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	_tourney_label.position = Vector2(20.0, 286.0)
+	_tourney_label.position = Vector2(20.0, 300.0)
 	_tourney_label.add_theme_constant_override("outline_size", 6)
 	_tourney_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.8))
 	_tourney_label.visible = false
@@ -749,7 +787,8 @@ func _build_hud() -> void:
 	bait_btn.text = "BAIT / HOOK"
 	bait_btn.add_theme_font_size_override("font_size", 20)
 	bait_btn.position = Vector2(160.0, 96.0)
-	bait_btn.size = Vector2(170.0, 48.0)
+	bait_btn.size = Vector2(170.0, 64.0)
+	_idle_ui.append(bait_btn)
 	bait_btn.focus_mode = Control.FOCUS_NONE
 	bait_btn.pressed.connect(_open_tackle_panel)
 	ui.add_child(bait_btn)
@@ -758,13 +797,13 @@ func _build_hud() -> void:
 		var test_btn := Button.new()
 		test_btn.text = "TEST"
 		test_btn.add_theme_font_size_override("font_size", 20)
-		test_btn.position = Vector2(340.0, 96.0)
-		test_btn.size = Vector2(110.0, 48.0)
+		test_btn.position = Vector2(20.0, 640.0)
+		test_btn.size = Vector2(110.0, 56.0)
 		test_btn.focus_mode = Control.FOCUS_NONE
 		test_btn.pressed.connect(_open_test_panel)
 		ui.add_child(test_btn)
 		_test_bar = HBoxContainer.new()
-		_test_bar.position = Vector2(470.0, 96.0)
+		_test_bar.position = Vector2(140.0, 640.0)
 		_test_bar.add_theme_constant_override("separation", 8)
 		for entry: Array in [["JUMP", "jump"], ["THRASH", "thrash"], ["ROLL", "roll"], ["LAND", "land"]]:
 			var b := Button.new()
@@ -782,33 +821,38 @@ func _build_hud() -> void:
 	star.texture = load("res://assets/kenney_game_icons/star.png") as Texture2D
 	star.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	star.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	star.position = Vector2(20.0, 152.0)
+	star.position = Vector2(20.0, 172.0)
 	star.size = Vector2(22.0, 22.0)
 	star.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(star)
-	_level_label = _make_label(ui, 18, Color(1.0, 0.93, 0.6))
-	_level_label.position = Vector2(48.0, 148.0)
+	_idle_ui.append(star)
+	_level_label = _make_label(ui, 20, Color(1.0, 0.93, 0.6))
+	_level_label.position = Vector2(48.0, 166.0)
+	_idle_ui.append(_level_label)
 	_xp_bar = ProgressBar.new()
 	_xp_bar.min_value = 0.0
 	_xp_bar.max_value = 1.0
 	_xp_bar.step = 0.001
 	_xp_bar.show_percentage = false
-	_xp_bar.position = Vector2(20.0, 178.0)
+	_xp_bar.position = Vector2(20.0, 198.0)
 	_xp_bar.size = Vector2(250.0, 10.0)
 	_xp_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(_xp_bar)
+	_idle_ui.append(_xp_bar)
 	var target := TextureRect.new()
 	target.texture = load("res://assets/kenney_game_icons/target.png") as Texture2D
 	target.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	target.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	target.position = Vector2(20.0, 196.0)
+	target.position = Vector2(20.0, 216.0)
 	target.size = Vector2(20.0, 20.0)
 	target.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(target)
+	_idle_ui.append(target)
 	for i in 3:
-		var gl := _make_label(ui, 16, Color(0.9, 0.97, 1.0))
-		gl.position = Vector2(46.0, 194.0 + float(i) * 24.0)
+		var gl := _make_label(ui, 18, Color(0.9, 0.97, 1.0))
+		gl.position = Vector2(46.0, 214.0 + float(i) * 26.0)
 		_goal_labels.append(gl)
+		_idle_ui.append(gl)
 	_update_progress_ui()
 	if not GameSession.tutorial_done:
 		_show_tutorial()
@@ -826,17 +870,40 @@ func _build_hud() -> void:
 	_power_bar.visible = false
 	ui.add_child(_power_bar)
 
-	_tension_bar = _make_bar(ui, 116.0, 142.0)
+	_tension_bar = _make_bar(ui, 172.0, 198.0)
 	_tension_fill = StyleBoxFlat.new()
 	_tension_fill.bg_color = Color(0.3, 0.85, 0.4)
 	_tension_bar.add_theme_stylebox_override("fill", _tension_fill)
-	_stamina_bar = _make_bar(ui, 150.0, 164.0)
+	_stamina_bar = _make_bar(ui, 204.0, 218.0)
 	_tension_label = _make_label(ui, 18, Color.WHITE)
 	_tension_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_tension_label.offset_top = 168.0
-	_tension_label.offset_bottom = 194.0
+	_tension_label.offset_top = 222.0
+	_tension_label.offset_bottom = 250.0
 	_tension_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_show_fight_ui(false)
+
+
+## Time and weather (top left), refreshed at 4 Hz: setting a label's text reshapes it.
+func _update_info_lines() -> void:
+	var a := "%s %s  ·  %s" % [Season.month_name(), _world.clock_text(), _weather.label()]
+	var b := "%s  ·  current %.1f m/s  ·  %s" % [Winds.label(String(_wind_roll["id"]), float(_wind_roll["ms"])),
+		_current.length() / PX_PER_M, Moon.phase_name()]
+	if _clock_label.text != a:
+		_clock_label.text = a
+	if _cond_label.text != b:
+		_cond_label.text = b
+
+
+## Dark rounded backing for HUD text that must read over any water or sand.
+func _pill() -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.0, 0.06, 0.12, 0.55)
+	sb.set_corner_radius_all(14)
+	sb.content_margin_left = 14.0
+	sb.content_margin_right = 14.0
+	sb.content_margin_top = 4.0
+	sb.content_margin_bottom = 4.0
+	return sb
 
 
 func _make_bar(parent: Control, top: float, bottom: float) -> ProgressBar:
@@ -866,6 +933,11 @@ func _make_label(parent: Control, size: int, color: Color) -> Label:
 
 
 func _show_fight_ui(on: bool) -> void:
+	# A fight shows only the fight: the idle buttons, level and goals step aside.
+	for c in _idle_ui:
+		c.visible = not on
+	if _tourney_btn != null:
+		_tourney_btn.visible = not on and not _boat_mode and Tournament.spot_this_week() == GameSession.spot_id
 	_tension_bar.visible = on
 	_stamina_bar.visible = on
 	_tension_label.visible = on
@@ -1396,13 +1468,18 @@ func _fish_event() -> void:
 
 func _tick_bite(delta: float) -> void:
 	_bite_t -= delta
-	if _reel_edge:
+	# A predator that hits a lure you are still winding hooks itself on the pull.
+	if _reel_edge or (Tackle.is_lure(GameSession.bait_id) and Input.is_action_pressed(&"reel_in")):
 		_hook_fish()
 		return
 	if _bite_t <= 0.0:
 		if _rng.randf() < float(_prof["self_hook_chance"]):
 			_hook_fish()
+		elif Tackle.is_lure(GameSession.bait_id):
+			_fish_leaves("Too slow. It let go of the lure")
 		else:
+			_bait_on = false
+			GameSession.use_bait(GameSession.bait_id)
 			_fish_leaves("Too slow. It got away with the bait")
 
 
@@ -1563,6 +1640,8 @@ func _update_pov() -> void:
 	var pov := v.is_open()
 	_world.visible = not pov
 	_water.visible = not pov
+	if pov != _pov_on:
+		queue_redraw()                 # clears the shore drawing under the first-person view
 	_pov_on = pov
 
 
@@ -1929,6 +2008,37 @@ func _on_map_pressed() -> void:
 	if _state == State.FIGHT:
 		_flash("Finish the fight first")
 		return
+	if _tourney_running():
+		_confirm_leave_tourney()
+		return
+	_leave_to_map()
+
+
+## Leaving mid-tournament forfeits the entry: say so before it happens.
+func _confirm_leave_tourney() -> void:
+	if _talk_panel != null and is_instance_valid(_talk_panel):
+		_talk_panel.queue_free()
+	var panel := _tourney_card("Leave the tournament?")
+	var box: VBoxContainer = panel.get_child(0)
+	_plain_label(box, 19, Color.WHITE).text = "You lose your entry and your place. %s" % _tourney_text()
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	box.add_child(row)
+	var stay := _tackle_button("KEEP FISHING", false, Vector2(260.0, 64.0))
+	stay.pressed.connect(func() -> void: panel.queue_free())
+	row.add_child(stay)
+	var leave := _tackle_button("LEAVE", false, Vector2(180.0, 64.0))
+	leave.pressed.connect(func() -> void:
+		_tourney["over"] = true
+		_tourney_label.visible = false
+		panel.queue_free()
+		_leave_to_map())
+	row.add_child(leave)
+	_talk_panel = panel
+	_hud_root.add_child(panel)
+
+
+func _leave_to_map() -> void:
 	var out := GameSession.outing
 	var goals: Array = out.get("goals", [])
 	var any_goal := false
@@ -2107,10 +2217,20 @@ func _open_tackle_panel() -> void:
 	style.set_corner_radius_all(18)
 	style.set_content_margin_all(18)
 	panel.add_theme_stylebox_override("panel", style)
+	# Everything scrolls inside the panel, so nothing falls off a 720-tall screen; DONE sits at the top.
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	panel.add_child(scroll)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
-	panel.add_child(box)
-	_plain_label(box, 26, Color(1.0, 0.92, 0.6)).text = "Bait"
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(box)
+	var head := HBoxContainer.new()
+	box.add_child(head)
+	_plain_label(head, 26, Color(1.0, 0.92, 0.6)).text = "Bait"
+	var done := _tackle_button("DONE", false, Vector2(180.0, 64.0))
+	done.pressed.connect(func() -> void: panel.queue_free())
+	head.add_child(done)
 	var grid := GridContainer.new()
 	grid.columns = 3
 	grid.add_theme_constant_override("h_separation", 8)
@@ -2146,11 +2266,8 @@ func _open_tackle_panel() -> void:
 			GameSession.set_tackle(GameSession.bait_id, hid)
 			_open_tackle_panel())
 		row.add_child(hb)
-	var hint := _plain_label(box, 16, Color(0.8, 0.9, 1.0))
+	var hint := _plain_label(box, 18, Color(0.8, 0.9, 1.0))
 	hint.text = "Bottom rig: a sinker lays the bait on the bottom for bream, whiting, scorpionfish and turbot; watch the rod tip and listen for the bell. Float rig: set the depth with DEEP/SHAL. Bream like mussel and worm, mullet bread, bluefish and seabass live bait or a spoon, horse mackerel the çapari, squid and cuttlefish a squid jig at night. Small hooks for small mouths; a big hook scares them off. A small hook can open up on a big fish. Lures catch only while you reel. Soft baits get picked off by small fish."
-	var done := _tackle_button("DONE", false, Vector2(200.0, 56.0))
-	done.pressed.connect(func() -> void: panel.queue_free())
-	box.add_child(done)
 	_tackle_panel = panel
 	_hud_root.add_child(panel)
 
@@ -2245,6 +2362,8 @@ func _process(delta: float) -> void:
 	_rod_bend = lerpf(_rod_bend, _rod_bend_target, 1.0 - exp(-10.0 * delta))
 	_update_talk_button()
 	_tick_tourney(delta)
+	if _state != State.AIM:
+		_close_tackle_panels()
 
 	for r in _ripples:
 		r["age"] = float(r["age"]) + delta
@@ -2252,6 +2371,7 @@ func _process(delta: float) -> void:
 
 	_world.wind = _wind
 	_world.view_x = _cam.position.x
+	_world.view_half = _view_half()
 	_amb.gull_rate = 0.02 + 0.08 * _world.daylight
 	_update_soundscape(delta)
 	var cranking := Input.is_action_pressed(&"reel_in") and (_state == State.FIGHT or _state == State.WAIT)
@@ -2260,14 +2380,22 @@ func _process(delta: float) -> void:
 	_fight_view.tint = _tint.color
 	_fight_view.daylight = _world.daylight
 	_water.set_daylight(_world.daylight)
-	_clock_label.text = "%s %s   |   %s, %s   |   %s" % [Season.month_name(), _world.clock_text(), _weather.label(),
-		Winds.label(String(_wind_roll["id"]), float(_wind_roll["ms"])), Moon.phase_name()]
+	_hud_t -= delta
+	if _hud_t <= 0.0:
+		_hud_t = 0.25
+		_update_info_lines()
 	var probe := _bobber_pos if (_state == State.WAIT or _state == State.BITE) else (_pred_landing if _state == State.CHARGE else _hand + _facing * 60.0)
 	var water := _water_depth(probe)
-	_depth_label.text = ("Bottom rig" if _bottom_rig() else "Float %.1f m" % _bait_depth) + "  |  Water %s  |  Clutch %.0f N  |  %s, hook %s" % [("%.1f m" % water) if water > 0.0 else "-",
-		_fishing.drag_setting_n, String(Tackle.BAITS[GameSession.bait_id]["name"]), Tackle.hook_name(GameSession.hook_id)] + "  |  Current %.1f m/s" % (_current.length() / PX_PER_M)
+	var rig_text := ("Bottom rig" if _bottom_rig() else "Float %.1f m" % _bait_depth) + "  ·  water %s  ·  %s %s  ·  drag %.0f N" % [("%.1f m" % water) if water > 0.0 else "-",
+		String(Tackle.BAITS[GameSession.bait_id]["name"]), Tackle.hook_name(GameSession.hook_id), _fishing.drag_setting_n]
+	if _depth_label.text != rig_text:
+		_depth_label.text = rig_text
 	_toast_t = maxf(0.0, _toast_t - delta)
-	_toast_label.text = _toast_text if _toast_t > 0.0 else ""
+	var toast := _toast_text if _toast_t > 0.0 else ""
+	if _toast_label.text != toast:
+		_toast_label.text = toast
+	_toast_label.visible = toast != ""
+	_toast_label.modulate.a = clampf(_toast_t / 0.4, 0.0, 1.0)
 
 	_power_bar.visible = _state == State.CHARGE
 	_power_bar.value = _power
@@ -2326,6 +2454,8 @@ func _update_camera(delta: float) -> void:
 
 # ---------------------------------------------------------------- drawing
 func _draw() -> void:
+	if _pov_on:
+		return                         # the first-person view covers the screen: draw nothing under it
 	_draw_sparkles()
 	_draw_shore()
 	if _has_pier:
@@ -2466,10 +2596,11 @@ func _draw_shore() -> void:
 
 
 func _draw_crowd() -> void:
+	var half := _view_half()
 	for ci in _crowd.size():
 		var a: Dictionary = _crowd[ci]
 		var x := float(a["x"])
-		if absf(x - _cam.position.x) > 1500.0:
+		if absf(x - _cam.position.x) > half:
 			continue
 		if ci == _local_idx:
 			_draw_local_tag(Vector2(x, float(a["y"]) - 46.0))

@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Shown on screen so a player can tell a fresh deploy from a page the browser cached.
 ## Bump it with every build that changes behaviour.
-const BUILD := "build 61"
+const BUILD := "build 62"
 const SAVE_PATH := "user://save.cfg"
 const SAVE_VERSION := 1
 const START_RIG := "shore_spinning_rig"
@@ -70,6 +70,7 @@ static var local_req: Dictionary = {}
 ## Weekly tournament (tournament.gd): the week whose prize was paid, and how many you have won.
 static var tourney_week := ""
 static var tourney_wins := 0
+static var tourney_spot := ""          ## "w<week>:<spot id>", this week's tournament spot once picked
 const NET_PRICE := 250
 const LIVE_BAIT_MAX := 12
 const LIVE_BAIT_SPECIES: Array[String] = ["mediterranean_horse_mackerel", "european_anchovy", "atlantic_mackerel"]
@@ -147,7 +148,11 @@ static func load_once() -> void:
 	var hk: Variant = cfg.get_value("tackle", "hook", "h4")
 	hook_id = String(hk) if (hk is String and Tackle.HOOKS.has(hk)) else "h4"
 	live_bait = clampi(_to_int(cfg.get_value("tackle", "live", 0)), 0, LIVE_BAIT_MAX)
-	bait_stock = _clean(cfg.get_value("tackle", "stock", {}), false)
+	bait_stock = {}
+	var raw_stock := _clean(cfg.get_value("tackle", "stock", {}), false)
+	for k: String in raw_stock:
+		if not Tackle.shop(k).is_empty():
+			bait_stock[k] = clampi(int(raw_stock[k]), 0, BAIT_STOCK_MAX)
 	rig_mode = "bottom" if cfg.get_value("tackle", "rig", "float") == "bottom" else "float"
 	has_net = cfg.get_value("tackle", "net", false) == true
 	test_tools = cfg.get_value("settings", "test_tools", false) == true
@@ -160,6 +165,8 @@ static func load_once() -> void:
 	var tw: Variant = cfg.get_value("tournament", "week", "")
 	tourney_week = String(tw) if tw is String else ""
 	tourney_wins = maxi(0, _to_int(cfg.get_value("tournament", "wins", 0)))
+	var tsp: Variant = cfg.get_value("tournament", "spot", "")
+	tourney_spot = String(tsp) if tsp is String else ""
 	for k: String in counts:
 		if not best_kg.has(k):
 			best_kg[k] = 0.0        # the journal reads best_kg for every logged species
@@ -190,6 +197,7 @@ static func save() -> void:
 	cfg.set_value("locals", "requests", local_req)
 	cfg.set_value("tournament", "week", tourney_week)
 	cfg.set_value("tournament", "wins", tourney_wins)
+	cfg.set_value("tournament", "spot", tourney_spot)
 	var err := cfg.save(SAVE_PATH)
 	if err != OK:
 		push_warning("[GameSession] save failed with error %d" % err)
