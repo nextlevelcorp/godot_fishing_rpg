@@ -880,7 +880,7 @@ func _draw_rocks(night: float) -> void:
 func _draw_neighbours(night: float) -> void:
 	if kind == "beach" or kind == "boat":
 		return
-	var col := Color(0.12, 0.12, 0.14).lerp(Color(0.05, 0.05, 0.07), night)
+	var col := Color(0.20, 0.17, 0.15, 0.85).lerp(Color(0.06, 0.06, 0.08, 0.85), night)
 	for n in _neighbours:
 		var base: Vector2 = n["base"]
 		var tip: Vector2 = n["tip"]
@@ -888,7 +888,10 @@ func _draw_neighbours(night: float) -> void:
 		var nod := sin(_time * 1.3 + float(n["phase"])) * 6.0 + bend * 40.0 * absf(sin(_time * 6.0))
 		var t2 := tip + Vector2(0.0, nod + bend * 50.0)
 		var ctrl := base.lerp(t2, 0.5) + Vector2(-10.0, 0.0) + Vector2(0.0, bend * 30.0)
-		_canvas.draw_polyline(_bezier(base, ctrl, t2, 10), col, 3.0, true)
+		# a tapering carbon blank: thick at the butt, fine at the tip, like the player's own rod
+		var rp := _bezier(base, ctrl, t2, 10)
+		for i in rp.size() - 1:
+			_canvas.draw_line(rp[i], rp[i + 1], col, lerpf(4.0, 1.2, float(i) / float(rp.size() - 2)), true)
 		var entry := Vector2(t2.x + 40.0 + bend * 20.0, HY - _pitch + 70.0 + float(n["phase"]) * 8.0)
 		_canvas.draw_line(t2, entry, Color(1.0, 1.0, 1.0, 0.25), 1.0)
 
