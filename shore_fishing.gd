@@ -44,6 +44,8 @@ const RETRIEVE_SPEED := 55.0         ## px/s the bait travels while REEL is held
 const WALK_SPEED := 150.0          ## px/s, about 1.5 m/s
 const PIER_LEN := 420.0            ## the pier reaches 42 m out
 const PIER_HALF := 26.0
+const MAX_WAIT_S := 30.0           ## longest silent wait before a fish comes by (game-design fill)
+const MIN_FISH_COINS := 3          ## no catch is worth only 1 coin
 const LOCAL_EARSHOT := 450.0       ## the local calls out about fish you land this close
 const CEPHALOPODS: Array[String] = ["european_squid", "common_cuttlefish", "common_octopus"]   ## come to the lamp on dark nights (Moon)
 const TALK_RADIUS := 130.0         ## walk this close to the named local to see TALK
@@ -1354,7 +1356,7 @@ func _tick_fly(delta: float) -> void:
 	_float_v = 0.0
 	_float_pull = 0.0
 	_state = State.WAIT
-	_wait_t = _rng.randf_range(4.0, 10.0) / _activity()
+	_wait_t = _first_wait(_rng.randf_range(4.0, 10.0) / _activity())
 	_ripple_clock = 0.0
 	_set_status("%.0f m out, bait at %.1f m. Waiting...   Hold REEL to bring the bait in" % [_cast_dist_m, _eff_depth()])
 
@@ -1483,12 +1485,20 @@ func _tick_bite(delta: float) -> void:
 			_fish_leaves("Too slow. It got away with the bait")
 
 
+## Waits are capped at MAX_WAIT_S (a 67 s silence loses a phone player), and a player who has never
+## landed a fish gets the first visit within a few seconds: the first minute must end in a catch.
+func _first_wait(t: float) -> float:
+	if GameSession.counts.is_empty():
+		return minf(t, _rng.randf_range(2.5, 4.5))
+	return minf(t, MAX_WAIT_S)
+
+
 func _fish_leaves(message: String) -> void:
 	_fish_id = ""
 	_fish_mode = "leave"
 	_float_pull = 0.0
 	_state = State.WAIT
-	_wait_t = _rng.randf_range(5.0, 12.0) / _activity()
+	_wait_t = _first_wait(_rng.randf_range(5.0, 12.0) / _activity())
 	_set_status(message)
 
 
@@ -1915,15 +1925,19 @@ func _on_caught(id: String, weight_kg: float) -> void:
 		GameSession.outing["kept_kg"] = float(GameSession.outing.get("kept_kg", 0.0)) + weight_kg
 	var for_local := Locals.on_kept(GameSession.spot_id, id)
 	var tourney_line := _tourney_player_landed(weight_kg)
-	var value := int(round(float(sp["base_price"]) * pow(maxf(weight_kg, 0.05), 0.8)))
+	var value := maxi(MIN_FISH_COINS, int(round(float(sp["base_price"]) * pow(maxf(weight_kg, 0.05), 0.8))))
 	var res := GameSession.record_catch(id, String(sp["name"]), weight_kg, value, int(sp["base_price"]))
 	_update_coins()
 	_update_progress_ui()
+	var day_bonus := GameSession.mark_fishing_day(Daily.today_key())
+	_update_coins()
 	var badge := "NEW SPECIES!  " if bool(res["first"]) else ("NEW RECORD!  " if bool(res["record"]) else "")
 	var lines := PackedStringArray(["%.2f kg, %.0f cm   +%d coins   +%d XP" % [weight_kg, cm, value, int(res["xp"])], String(sp["scientific"]),
 		"On %s, hook %s" % [String(Tackle.BAITS[GameSession.bait_id]["name"]).to_lower(), Tackle.hook_name(GameSession.hook_id)]])
 	if GameSession.LIVE_BAIT_SPECIES.has(id) and weight_kg < 0.4 and GameSession.live_bait < GameSession.LIVE_BAIT_MAX:
 		lines.append("Into the bucket as live bait  (%d)" % GameSession.add_live_bait(1))
+	if day_bonus > 0:
+		lines.append("Day %d on the water: +%d coins" % [GameSession.days_fished, day_bonus])
 	if tourney_line != "":
 		lines.append(tourney_line)
 	var shout := _local_says(id, weight_kg, false)
@@ -1943,7 +1957,7 @@ func _on_caught(id: String, weight_kg: float) -> void:
 	if bool(res["level_up"]):
 		lines.append("LEVEL UP!  Level %d%s" % [int(res["level"]), _unlock_text(int(res["level"]))])
 		_buzz(200)
-	_fight_view.show_catch(badge + String(sp["name"]), lines)
+	_fight_view.show_catch(badge + BiomeDB.display_name(id), lines)
 	_result_label.text = ""
 	_set_status("Nice one")
 	_amb.play("splash", 0.7)
@@ -1984,6 +1998,12 @@ func _make_goals() -> Array[Dictionary]:
 			best_max = wr.y
 	if best_max > 0.0:
 		var kg := snappedf(best_max * 0.45, 0.1)
+		# From a quay or a bridge a fish over line_break / (2 g) parts the line on the lift unless you
+		# own a landing net: never set a goal that needs the net you do not have.
+		var kind := String(_spot["kind"])
+		if not GameSession.has_net and not _boat_mode and (kind == "harbor" or kind == "bridge"):
+			var lift := float(BiomeDB.get_rig(GameSession.rig_id).get("line_break_force_n", 60.0)) / (9.81 * 2.0)
+			kg = minf(kg, snappedf(lift * 0.85, 0.1))
 		goals.append({"kind": "weight", "text": "Land a fish of %.1f kg or more" % kg, "target": kg, "progress": 0, "coins": 80, "xp": 0, "done": false})
 	return goals
 
@@ -2082,6 +2102,13 @@ func _show_summary() -> void:
 	lines.append("Records: " + (", ".join(PackedStringArray(recs)) if not recs.is_empty() else "none"))
 	var lv := GameSession.level()
 	lines.append("Level %d%s" % [lv, "   (was %d)" % int(out.get("start_level", lv)) if lv > int(out.get("start_level", lv)) else ""])
+	# Reasons to come back: what is still open today and this week.
+	var ch := Daily.challenge()
+	if not ch.is_empty():
+		lines.append("Daily challenge: %s" % ("done, back tomorrow" if Daily.done_today() else "%s at %s" % [String(ch["species_name"]), String(ch["spot_name"])]))
+	var tsp := Tournament.spot_this_week()
+	if tsp != "":
+		lines.append("Tournament this week: %s%s" % [String(FishingSpots.get_spot(tsp)["name"]), "" if Tournament.prize_open() else " (prize won)"])
 	for ln in lines:
 		_plain_label(box, 22, Color.WHITE).text = ln
 	var goals: Array = out.get("goals", [])

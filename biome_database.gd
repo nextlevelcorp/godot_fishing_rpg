@@ -324,6 +324,26 @@ func get_species(id: String) -> Dictionary:
 	return fish.get(id, {})
 
 
+## Common Turkish names of the shore species, as anglers and fish markets use them. Shown next to the
+## English name on the catch card and in the journal.
+const TR_NAMES := {
+	"european_seabass": "levrek", "gilthead_seabream": "çipura", "white_seabream": "sargoz (karagöz)",
+	"striped_sea_bream": "mırmır", "saddled_bream": "melanurya", "red_mullet": "barbunya",
+	"flathead_grey_mullet": "has kefal", "bluefish": "lüfer", "garfish": "zargana",
+	"atlantic_bonito": "palamut", "atlantic_mackerel": "uskumru", "mediterranean_horse_mackerel": "istavrit",
+	"european_anchovy": "hamsi", "whiting": "mezgit", "common_dentex": "sinarit", "greater_amberjack": "sarıkuyruk (avcı)",
+	"leerfish": "akya", "dusky_grouper": "orfoz (lahos)", "black_scorpionfish": "iskorpit", "greater_weever": "trakonya",
+	"ornate_wrasse": "gelin balığı", "turbot": "kalkan", "common_octopus": "ahtapot", "common_cuttlefish": "mürekkep balığı (sübye)",
+	"european_squid": "kalamar", "blue_crab": "mavi yengeç",
+}
+
+
+## "Bluefish (lüfer)", or the English name alone when no Turkish name is listed.
+func display_name(id: String) -> String:
+	var en := String(get_species(id).get("name", id))
+	return "%s (%s)" % [en, String(TR_NAMES[id])] if TR_NAMES.has(id) else en
+
+
 func get_rig(id: String) -> Dictionary:
 	return RIGS.get(id, {})
 

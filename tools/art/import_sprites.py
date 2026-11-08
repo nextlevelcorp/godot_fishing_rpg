@@ -9,7 +9,7 @@ For each picture:
      (white, off-white, light grey, a painted checkerboard) is flooded away from the edges: only pixels
      that touch the border and are bright with low colour count as background, so white highlights
      inside the animal stay. The largest piece is kept (specks drop out) and the edge is softened 1 px.
-  3. Trim to the subject, scale down to at most 1024 px wide (never up), save as
+  3. Trim to the subject, scale down to at most 768 px wide (never up), save as
      assets/art/fish/<species_id>.png. The game finds the sprite by that exact name.
   4. Contact sheet: all results on a sea-blue background, written outside the project (default
      /tmp/sprite_sheet/sheet.png) so it is never committed by mistake. Look at it before committing.
@@ -29,7 +29,7 @@ from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 OUT = os.path.join(ROOT, "assets", "art", "fish")
-MAX_W = 1024
+MAX_W = 768                     # the catch close-up is at most ~330 design px (~650 device px)
 
 
 def largest_component(mask):

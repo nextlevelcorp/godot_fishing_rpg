@@ -210,6 +210,22 @@ func _check_game_rules() -> void:
 		if float(wr["ms"]) < rng_ms.x or float(wr["ms"]) > rng_ms.y:
 			bad += 1
 	_check(bad == 0, "every rolled wind is a known one within its speed range")
+	# Days on the water: the first fish of a new day pays a bonus once; the count only grows.
+	var saved_days := GameSession.days_fished
+	var saved_last := GameSession.last_fish_day
+	var saved_c := GameSession.coins
+	GameSession.days_fished = 0
+	GameSession.last_fish_day = ""
+	GameSession.coins = 0
+	var b1 := GameSession.mark_fishing_day("2026-01-01")
+	var b2 := GameSession.mark_fishing_day("2026-01-01")
+	var b3 := GameSession.mark_fishing_day("2026-01-05")
+	_check(b1 == 20 and b2 == 0 and b3 == 30 and GameSession.days_fished == 2 and GameSession.coins == 50, "a new fishing day pays once, and a missed day costs nothing")
+	GameSession.days_fished = saved_days
+	GameSession.last_fish_day = saved_last
+	GameSession.coins = saved_c
+	# Waits: never longer than 30 s.
+	_check(float(_scene.call("_first_wait", 500.0)) <= 30.0, "no silent wait is longer than 30 s")
 	# Tournament week and spot.
 	var wk1: String = tourney.call("week_key")
 	var sp1: String = tourney.call("spot_this_week")

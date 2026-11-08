@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Shown on screen so a player can tell a fresh deploy from a page the browser cached.
 ## Bump it with every build that changes behaviour.
-const BUILD := "build 62"
+const BUILD := "build 63"
 const SAVE_PATH := "user://save.cfg"
 const SAVE_VERSION := 1
 const START_RIG := "shore_spinning_rig"
@@ -70,7 +70,10 @@ static var local_req: Dictionary = {}
 ## Weekly tournament (tournament.gd): the week whose prize was paid, and how many you have won.
 static var tourney_week := ""
 static var tourney_wins := 0
-static var tourney_spot := ""          ## "w<week>:<spot id>", this week's tournament spot once picked
+static var tourney_spot := ""
+## Days you have landed at least one fish (only ever grows; a missed day costs nothing).
+static var days_fished := 0
+static var last_fish_day := ""          ## "w<week>:<spot id>", this week's tournament spot once picked
 const NET_PRICE := 250
 const LIVE_BAIT_MAX := 12
 const LIVE_BAIT_SPECIES: Array[String] = ["mediterranean_horse_mackerel", "european_anchovy", "atlantic_mackerel"]
@@ -165,6 +168,9 @@ static func load_once() -> void:
 	var tw: Variant = cfg.get_value("tournament", "week", "")
 	tourney_week = String(tw) if tw is String else ""
 	tourney_wins = maxi(0, _to_int(cfg.get_value("tournament", "wins", 0)))
+	days_fished = maxi(0, _to_int(cfg.get_value("player", "days_fished", 0)))
+	var lfd: Variant = cfg.get_value("player", "last_fish_day", "")
+	last_fish_day = String(lfd) if lfd is String else ""
 	var tsp: Variant = cfg.get_value("tournament", "spot", "")
 	tourney_spot = String(tsp) if tsp is String else ""
 	for k: String in counts:
@@ -198,6 +204,8 @@ static func save() -> void:
 	cfg.set_value("tournament", "week", tourney_week)
 	cfg.set_value("tournament", "wins", tourney_wins)
 	cfg.set_value("tournament", "spot", tourney_spot)
+	cfg.set_value("player", "days_fished", days_fished)
+	cfg.set_value("player", "last_fish_day", last_fish_day)
 	var err := cfg.save(SAVE_PATH)
 	if err != OK:
 		push_warning("[GameSession] save failed with error %d" % err)
@@ -385,6 +393,19 @@ static func buy_bait(bait: String) -> bool:
 	bait_stock[bait] = mini(stock(bait) + int(sh["pack"]), BAIT_STOCK_MAX)
 	save()
 	return true
+
+
+## The first fish kept on a new calendar day counts one more day on the water and pays a bonus
+## that grows with the count (20, 30, ... up to 100 coins). Returns the bonus, 0 if today is counted.
+static func mark_fishing_day(today: String) -> int:
+	if today == last_fish_day:
+		return 0
+	last_fish_day = today
+	days_fished += 1
+	var bonus := 20 + 10 * mini(days_fished - 1, 8)
+	coins += bonus
+	save()
+	return bonus
 
 
 static func buy_net() -> bool:

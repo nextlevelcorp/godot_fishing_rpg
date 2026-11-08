@@ -508,7 +508,7 @@ func _open_journal() -> void:
 			var baits := ", ".join(Tackle.best_baits(fid))
 			if known:
 				var dr: Vector2 = sp["depth_m"]
-				info.text = "%s  (%s)%s\nBest %.2f kg, landed %d.  %.0f-%.0f m deep, feeds %s.\nBait: %s.  Hook %s." % [sp["name"], sp["scientific"], season_txt,
+				info.text = "%s  (%s)%s\nBest %.2f kg, landed %d.  %.0f-%.0f m deep, feeds %s.\nBait: %s.  Hook %s." % [BiomeDB.display_name(fid), sp["scientific"], season_txt,
 					float(GameSession.best_kg[fid]), int(GameSession.counts[fid]), dr.x, dr.y, _feeds_text(fid), baits, Tackle.hook_range(fid)]
 			else:
 				info.text = "???  Not caught yet.%s\nLocals say: try %s, %s." % [season_txt, baits if baits != "" else "different baits", _feeds_text(fid)]

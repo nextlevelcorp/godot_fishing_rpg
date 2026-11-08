@@ -233,6 +233,21 @@ Karayel (NW), or a calm (limanlık) day.
   bites, and every rolled wind is known and inside its speed range.
 Tuning knobs: `KINDS` (bite, ms, weight), `PX_PER_MS`.
 
+## Review pass (build 62-63)
+A five-agent review on 2026-11-08 (QA, architecture, visual, benchmark against shipped fishing
+games, retention/economy), all from reading the code; nothing measured on a device.
+- **First minute:** a player who has never landed a fish gets the first visit within 2.5-4.5 s;
+  every wait is capped at 30 s (`MAX_WAIT_S`), after the review estimated up to ~67 s.
+- **Economy:** every kept fish is worth at least 3 coins (`MIN_FISH_COINS`); the outing weight goal
+  never asks, on a quay or bridge without a landing net, for more than you can lift on the line.
+- **Coming back:** the first fish kept on a new calendar day counts a day on the water and pays
+  20 coins, +10 a day up to 100 (`GameSession.mark_fishing_day`). The count only grows: a missed day
+  costs nothing. The outing summary lists today's challenge and this week's tournament spot.
+- **Turkish names:** catch card and journal show "Bluefish (lüfer)" (`BiomeDB.TR_NAMES`).
+- **HUD, performance and bug fixes:** see the build 62 commit message.
+- **Not done, owner decisions:** Turkish UI (owner said not now), a shared theme for all panels,
+  painted ground tiles and character sprites (need art), splitting `shore_fishing.gd`.
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

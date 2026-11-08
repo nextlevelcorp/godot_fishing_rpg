@@ -1065,6 +1065,9 @@ func _draw_card() -> void:
 	_card.bg_color = Color(0.02, 0.10, 0.18, 0.82)
 	_card.draw(_canvas.get_canvas_item(), rect)
 	var font := ThemeDB.fallback_font
-	_canvas.draw_string(font, rect.position + Vector2(18.0, 38.0), _catch_title, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 36.0, 24, Color(1.0, 0.92, 0.6))
+	var tfs := 24                                     # long names ("... (istavrit)") shrink to fit
+	while tfs > 16 and font.get_string_size(_catch_title, HORIZONTAL_ALIGNMENT_LEFT, -1, tfs).x > rect.size.x - 36.0:
+		tfs -= 1
+	_canvas.draw_string(font, rect.position + Vector2(18.0, 38.0), _catch_title, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 36.0, tfs, Color(1.0, 0.92, 0.6))
 	for i in _catch_lines.size():
 		_canvas.draw_string(font, rect.position + Vector2(18.0, 66.0 + float(i) * 24.0), _catch_lines[i], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 36.0, 17, Color.WHITE)
