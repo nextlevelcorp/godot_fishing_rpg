@@ -711,15 +711,26 @@ func _draw_waves(night: float) -> void:
 			break
 		var near := clampf(6.0 / z, 0.0, 1.0)
 		var amp := (0.10 + 0.05 * wave_amp) * F / z * 0.12 * wave_amp
+		# Each row is one polyline whose alpha varies along it: broken crests that come and go, with a
+		# darker trough just below, instead of unbroken white rules across the sea (screenshot, build 67).
 		var pts := PackedVector2Array()
+		var crest := PackedColorArray()
+		var trough := PackedVector2Array()
+		var tcol := PackedColorArray()
+		var a := (0.18 + 0.38 * near) * (1.0 - 0.6 * night)
+		var dark := Color(0.0, 0.08, 0.16)
 		var x := -20.0 - pad().x
 		while x <= W + 20.0 + pad().x:
 			var wx := (x - CX) * z / F
 			var y := base + sin(wx * 0.9 + z * 0.8 - _time * 1.6) * amp + sin(wx * 0.37 - _time * 0.9 + float(row)) * amp * 0.7
+			var k := smoothstep(0.35, 0.85, 0.5 + 0.5 * sin(wx * 0.55 + float(row) * 1.7 - _time * 0.35) * cos(wx * 0.21 + float(row)))
 			pts.append(Vector2(x, y))
-			x += 64.0
-		var a := (0.10 + 0.25 * near) * (1.0 - 0.6 * night)
-		_canvas.draw_polyline(pts, Color(1.0, 1.0, 1.0, a), 1.0 + 2.5 * near)
+			crest.append(Color(1.0, 1.0, 1.0, a * k))
+			trough.append(Vector2(x, y + 1.5 + 3.0 * near))
+			tcol.append(Color(dark.r, dark.g, dark.b, 0.16 * near * (0.4 + 0.6 * k) * (1.0 - 0.5 * night)))
+			x += 40.0
+		_canvas.draw_polyline_colors(trough, tcol, 1.0 + 3.0 * near)
+		_canvas.draw_polyline_colors(pts, crest, 1.0 + 2.5 * near)
 		if wave_amp > 1.4 and row > 2 and row % 2 == 0:
 			for j in 4:
 				var cx := fmod(float(j) * 337.0 + _time * 20.0 + float(row) * 91.0, W)
