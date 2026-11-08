@@ -6,13 +6,17 @@ extends Control
 const SEA_TOP := Color(0.02, 0.20, 0.36)
 const SEA_BOTTOM := Color(0.03, 0.55, 0.70)
 const WAVE_LAYERS := 5
-const FISH_COUNT := 7
+const FISH_COUNT := 9
 const MAP_SCENE := "res://turkey_map.tscn"
 const CREDITS := "Shore Fishing Türkiye\n\nArt: Kenney (kenney.nl), CC0 - Fish Pack, Game Icons, Mobile Controls.\nFish, spot and tackle facts: see the sources listed for each spot on the map.\nMotion ideas: The Nature of Code, Daniel Shiffman (natureofcode.com).\nMade with Godot 4.4.\n\nEvery spot is a real place where people fish in Türkiye. Game-design fill is labelled in the data."
 
 var _time := 0.0
 var _noise := FastNoiseLite.new()
 var _fish: Array[Dictionary] = []   ## {pos, vel, wander, size, hue}
+## The painted species that swim under the title (assets/art/fish), so the first screen shows the
+## game's real fish instead of flat silhouettes.
+const TITLE_FISH: Array[String] = ["bluefish", "saddled_bream", "white_seabream", "striped_sea_bream",
+	"garfish", "whiting", "common_dentex", "greater_amberjack"]
 var _overlay: PanelContainer
 var _overlay_title: Label
 var _overlay_body: VBoxContainer
@@ -33,11 +37,12 @@ func _ready() -> void:
 	_noise.seed = 7
 	for i in FISH_COUNT:
 		_fish.append({
-			"pos": Vector2(randf_range(100.0, 1180.0), randf_range(300.0, 660.0)),
+			"pos": Vector2(randf_range(100.0, maxf(size.x, 1280.0) - 100.0), randf_range(300.0, 660.0)),
 			"vel": Vector2(randf_range(-30.0, 30.0), 0.0),
 			"wander": randf() * TAU,
 			"size": randf_range(14.0, 30.0),
 			"hue": randf_range(0.5, 0.62),
+			"sp": TITLE_FISH[i % TITLE_FISH.size()],
 		})
 	_build_menu()
 	_build_overlay()
@@ -231,7 +236,7 @@ func _process(delta: float) -> void:
 		# contain: push back from the edges of the water band
 		if pos.x < 80.0:
 			steer.x += 140.0
-		elif pos.x > 1200.0:
+		elif pos.x > size.x - 80.0:              # the whole screen width (aspect "expand")
 			steer.x -= 140.0
 		if pos.y < 280.0:
 			steer.y += 120.0
@@ -277,6 +282,12 @@ func _draw_fish(f: Dictionary) -> void:
 	var vel: Vector2 = f["vel"]
 	var s: float = f["size"]
 	var dir := 1.0 if vel.x >= 0.0 else -1.0
+	var sp := String(f.get("sp", ""))
+	if sp != "" and RealFish.sprite(sp) != null:
+		# a painted fish a little below the surface: slightly dim, swimming with a gentle bend
+		var tilt := clampf(vel.y / maxf(absf(vel.x), 20.0), -0.4, 0.4) * dir
+		RealFish.draw(self, sp, pos, s * 4.4, tilt, dir, _time * 6.0 + pos.y * 0.05, 0.7, 0.82, 0.3)
+		return
 	var col := Color.from_hsv(float(f["hue"]), 0.35, 0.95, 0.55)
 	var wag := sin(_time * 6.0 + pos.x * 0.05) * s * 0.25
 	var body := PackedVector2Array([
