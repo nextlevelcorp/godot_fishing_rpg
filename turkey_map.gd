@@ -509,11 +509,23 @@ func _open_journal() -> void:
 			var baits := ", ".join(Tackle.best_baits(fid))
 			if known:
 				var dr: Vector2 = sp["depth_m"]
-				info.text = "%s  (%s)%s\nBest %.2f kg, landed %d.  %.0f-%.0f m deep, feeds %s.\nBait: %s.  Hook %s." % [BiomeDB.display_name(fid), sp["scientific"], season_txt,
-					float(GameSession.best_kg[fid]), int(GameSession.counts[fid]), dr.x, dr.y, _feeds_text(fid), baits, Tackle.hook_range(fid)]
+				info.text = "%s  (%s)%s\nBest %.2f kg %s, landed %d.  %.0f-%.0f m deep, feeds %s.\nBait: %s.  Hook %s." % [BiomeDB.display_name(fid), sp["scientific"], season_txt,
+					float(GameSession.best_kg[fid]), _size_medal(fid, float(GameSession.best_kg[fid])), int(GameSession.counts[fid]), dr.x, dr.y, _feeds_text(fid), baits, Tackle.hook_range(fid)]
 			else:
 				info.text = "???  Not caught yet.%s\nLocals say: try %s, %s." % [season_txt, baits if baits != "" else "different baits", _feeds_text(fid)]
 	_overlay.visible = true
+
+
+## Bronze, silver or gold for your best fish of a species, by where it falls in the species' weight
+## range: a goal to come back for once a species is logged (the thresholds are game-design fill).
+func _size_medal(fid: String, kg: float) -> String:
+	var wr: Vector2 = BiomeDB.get_species(fid)["weight_kg"]
+	var f := (kg - wr.x) / maxf(wr.y - wr.x, 0.001)
+	if f >= 0.6:
+		return "[GOLD]"
+	if f >= 0.3:
+		return "[SILVER]"
+	return "[BRONZE]"
 
 
 ## When a species feeds, in words (see BiomeDB.ACTIVITY).

@@ -244,6 +244,9 @@ games, retention/economy), all from reading the code; nothing measured on a devi
   20 coins, +10 a day up to 100 (`GameSession.mark_fishing_day`). The count only grows: a missed day
   costs nothing. The outing summary lists today's challenge and this week's tournament spot.
 - **Turkish names:** catch card and journal show "Bluefish (lüfer)" (`BiomeDB.TR_NAMES`).
+- **Size medals (build 65):** the journal marks your best fish of each species BRONZE, SILVER or
+  GOLD by where it falls in the species' weight range (30% and 60%; with the game's weight roll
+  about 21% of fish reach gold). A reason to fish a logged species again.
 - **HUD, performance and bug fixes:** see the build 62 commit message.
 - **Not done, owner decisions:** Turkish UI (owner said not now), a shared theme for all panels,
   painted ground tiles and character sprites (need art), splitting `shore_fishing.gd`.
