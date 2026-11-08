@@ -13,7 +13,8 @@ var _hour := 0.35
 var _species := "bluefish"
 var _params := {}          ## water shader overrides, "p:name=value" on the command line
 var _shore_only := false
-var _other := ""           ## scene=title|map: just that screen
+var _other := ""
+var _x := INF              ## x=<px>: stand the angler at this x on the shore (e.g. the pier)           ## scene=title|map: just that screen
 
 
 func _initialize() -> void:
@@ -29,6 +30,7 @@ func _initialize() -> void:
 			"fish": _species = kv[1]
 			"shore_only": _shore_only = kv[1] == "1"
 			"scene": _other = kv[1]
+			"x": _x = float(kv[1])
 			_:
 				if kv[0].begins_with("p:"):
 					_params[kv[0].substr(2)] = float(kv[1])
@@ -58,6 +60,11 @@ func _process(_delta: float) -> bool:
 		3:
 			var w: Node = _scene.get("_world")
 			w.set("time_of_day", _hour)
+			if _x != INF:
+				var px: float = _x
+				if px == 0.0:
+					px = float(_scene.get("_pier_x"))
+				_scene.set("_hand", Vector2(px, -60.0))
 			var water: CanvasItem = _scene.get("_water")
 			var mat := water.material as ShaderMaterial
 			for k: String in _params:
