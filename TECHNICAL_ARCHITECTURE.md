@@ -1,12 +1,15 @@
 # Technical Architecture
 
-Last updated 2026-11-04 (build 11). Supersedes `ARCHITECTURE.md`, which describes the legacy
+Last updated 2026-11-08 (build 64). Supersedes `ARCHITECTURE.md`, which describes the legacy
 boat prototype.
 
 ## Stack
 - **Engine:** Godot 4.4, GDScript. **Renderer:** Compatibility (WebGL 2 on the web).
-- **Design space:** 1280x720, `window/stretch/mode = canvas_items`, aspect `keep` (default),
-  landscape. Portrait phones letterbox; no safe-area handling yet.
+- **Design space:** 1280x720, `window/stretch/mode = canvas_items`, aspect `expand` (build 51):
+  wider phones see more; touch controls pin to the screen corners; the first-person view keeps a
+  centred 1280x720 design rect and draws its backgrounds to the edges. Portrait shows a "turn your
+  phone" screen (`device_guard.gd`). Safe areas are left to Safari's own insets.
+- **UI theme:** one code-built Theme (`ui_theme.gd`) on each screen's root Control (build 64).
 - **Web:** single-threaded export, deployed to GitHub Pages by CI.
 - **Native (planned):** Godot's own iOS and Android export. Capacitor is **not** recommended:
   it wraps a web build, adds a JS layer, and gives up native performance, native ad and store
@@ -44,7 +47,9 @@ fight view and the touch controls. A CanvasModulate grades day and night; lights
 CanvasLayer the grade does not darken.
 
 ## Audio
-Per-sample synthesis in GDScript at 22 050 Hz, 0.2 s buffer. No files, no buses, no music.
+Offline-rendered WAV samples (`tools/audio/render_sfx.py`, 37 files, about 4 MB) played by
+`ambience.gd` from a pool of 10 AudioStreamPlayers, plus looping beds (surf, engine, cicada,
+cricket, rain, wind). One bus, no music. Nothing is synthesised on the phone.
 
 ## Persistence
 `ConfigFile` at `user://save.cfg` (IndexedDB on the web): coins, rigs, equipped rig, journal.

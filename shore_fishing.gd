@@ -321,7 +321,16 @@ func _build_land() -> void:
 				var a := TAU * float(i) / 9.0
 				pts.append(c + Vector2(cos(a) * r * rng.randf_range(0.75, 1.1), sin(a) * r * rng.randf_range(0.6, 0.95)))
 			var shade := rng.randf_range(0.85, 1.15)
-			_rocks.append({"pts": pts, "color": Color(base.r * shade, base.g * shade, base.b * shade), "c": c, "r": r})
+			# Light from the top left (art brief): a soft shadow down-right, a lit face up-left, a dark rim.
+			var shadow := PackedVector2Array()
+			var lit := PackedVector2Array()
+			for q in pts:
+				shadow.append(q + Vector2(7.0, 9.0))
+				lit.append(c + (q - c) * 0.62 + Vector2(-0.16, -0.20) * r)
+			var edge := pts.duplicate()
+			edge.append(pts[0])
+			_rocks.append({"pts": pts, "color": Color(base.r * shade, base.g * shade, base.b * shade), "c": c, "r": r,
+				"shadow": shadow, "lit": lit, "edge": edge})
 			x += rng.randf_range(46.0, 80.0)
 	elif kind == "beach":
 		var x2 := -HALF_WIDTH
@@ -664,6 +673,7 @@ func _build_hud() -> void:
 	var ui := Control.new()
 	ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.theme = UiTheme.get_theme()
 	layer.add_child(ui)
 	_hud_root = ui
 	_weather = WeatherFx.new()
@@ -2610,10 +2620,10 @@ func _draw_shore() -> void:
 				continue
 			var pts: PackedVector2Array = rock["pts"]
 			var col: Color = rock["color"]
+			draw_colored_polygon(rock["shadow"], Color(0.04, 0.08, 0.12, 0.28))
 			draw_colored_polygon(pts, col)
-			var edge := pts.duplicate()
-			edge.append(pts[0])
-			draw_polyline(edge, col.lightened(0.18), 2.0)
+			draw_colored_polygon(rock["lit"], col.lightened(0.14))
+			draw_polyline(rock["edge"], Color(0.22, 0.15, 0.10, 0.8), 2.0)
 			var rc: Vector2 = rock["c"]
 			if rc.y < 25.0:
 				var rr: float = rock["r"]

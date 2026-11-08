@@ -26,6 +26,7 @@ var _menu: VBoxContainer
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	GameSession.load_once()
+	theme = UiTheme.get_theme()
 	add_child(DeviceGuard.new())
 	_noise.noise_type = FastNoiseLite.TYPE_PERLIN
 	_noise.frequency = 0.4
