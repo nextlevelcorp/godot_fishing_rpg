@@ -19,7 +19,8 @@ const HALF := 4000.0
 const PANTS := [Color(0.20, 0.22, 0.30), Color(0.35, 0.30, 0.25), Color(0.15, 0.15, 0.17), Color(0.45, 0.42, 0.38)]
 const HAIR := [Color(0.15, 0.10, 0.08), Color(0.35, 0.22, 0.12), Color(0.55, 0.50, 0.45), Color(0.08, 0.07, 0.07)]
 const SKIN := [Color(0.92, 0.74, 0.58), Color(0.80, 0.60, 0.45), Color(0.65, 0.47, 0.33)]
-const NIGHT := Color(0.30, 0.36, 0.60)
+const NIGHT := Color(0.36, 0.42, 0.66)
+const MOONLIT := Color(0.50, 0.56, 0.78)
 const DUSK := Color(1.0, 0.70, 0.52)
 const CLOTHES := [
 	Color(0.85, 0.25, 0.22), Color(0.20, 0.45, 0.80), Color(0.95, 0.75, 0.20), Color(0.25, 0.65, 0.40),
@@ -65,6 +66,7 @@ var _dyn: Node2D
 var _sky: Node2D
 var _glow: Node2D
 var _glow_layer: CanvasLayer
+var _soft_disc: Texture2D = preload("res://assets/art/ui/soft_disc.png")
 var _glow_x := INF                     ## view_x at the last glow redraw
 
 
@@ -114,7 +116,10 @@ func _ready() -> void:
 func tint(day_color: Color) -> Color:
 	var sun := sin((time_of_day - 0.25) * TAU)
 	var dusk := clampf(1.0 - absf(sun) * 3.0, 0.0, 1.0)
-	return NIGHT.lerp(day_color, daylight).lerp(DUSK, dusk * 0.35)
+	# Nights are lit by the real moon: a full moon lifts the darkness (readable on a phone), a new moon
+	# leaves it deep blue.
+	var night := NIGHT.lerp(MOONLIT, Moon.illumination())
+	return night.lerp(day_color, daylight).lerp(DUSK, dusk * 0.35)
 
 
 ## "HH:MM" for the HUD.
@@ -375,14 +380,17 @@ func _draw_dyn() -> void:
 
 
 func _draw_sky() -> void:
-	var shade := 0.07 * daylight
+	var shade := 0.06 * daylight
 	if shade > 0.005:
 		for cl in _clouds:
 			var cp: Vector2 = cl["pos"]
 			if absf(cp.x - view_x) > view_half + 600.0:
 				continue
+			# Soft-edged shadows (a radial falloff texture), so overlapping puffs blend into one cloud
+			# shadow instead of stacking hard-edged dark circles.
 			for pf: Vector3 in cl["puffs"]:
-				_sky.draw_circle(cp + Vector2(pf.x, pf.y), pf.z, Color(0.0, 0.05, 0.12, shade))
+				var r := pf.z * 1.35
+				_sky.draw_texture_rect(_soft_disc, Rect2(cp + Vector2(pf.x, pf.y) - Vector2(r, r), Vector2(r, r) * 2.0), false, Color(0.0, 0.05, 0.12, shade * 1.4))
 	for g in _gulls:
 		if absf(g.pos.x - view_x) > view_half:
 			continue
@@ -404,8 +412,9 @@ func _draw_glow() -> void:
 	for l in _lamps:
 		if absf(l.x - view_x) > reach:
 			continue
-		_glow.draw_circle(l, 90.0, Color(1.0, 0.75, 0.40, 0.10 * n))
-		_glow.draw_circle(l + Vector2(0.0, -42.0), 26.0, Color(1.0, 0.85, 0.55, 0.30 * n))
+		# soft pools of light (radial falloff texture), not hard-edged discs
+		_glow.draw_texture_rect(_soft_disc, Rect2(l - Vector2(130.0, 110.0), Vector2(260.0, 220.0)), false, Color(1.0, 0.75, 0.40, 0.30 * n))
+		_glow.draw_texture_rect(_soft_disc, Rect2(l + Vector2(-34.0, -76.0), Vector2(68.0, 68.0)), false, Color(1.0, 0.85, 0.55, 0.65 * n))
 	for bd in _buildings:
 		var r: Rect2 = bd["rect"]
 		if r.end.x < view_x - reach or r.position.x > view_x + reach:
@@ -417,4 +426,4 @@ func _draw_glow() -> void:
 			if wins[i]:
 				var wx := r.position.x + (float(i) + 0.5) * r.size.x / float(cnt) - 7.0
 				_glow.draw_rect(Rect2(wx, front_y + 7.0, 14.0, 14.0), Color(1.0, 0.80, 0.42, 0.75 * n))
-				_glow.draw_circle(Vector2(wx + 7.0, front_y + 14.0), 22.0, Color(1.0, 0.75, 0.40, 0.08 * n))
+				_glow.draw_texture_rect(_soft_disc, Rect2(Vector2(wx - 26.0, front_y - 19.0), Vector2(66.0, 66.0)), false, Color(1.0, 0.75, 0.40, 0.30 * n))

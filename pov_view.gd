@@ -1058,16 +1058,21 @@ func _draw_caught_fish() -> void:
 
 ## Catch card, with the species drawn as it looks (not a sprite).
 func _draw_card() -> void:
-	# Compact, upper right, clear of the HUD text, the touch buttons and the fish held up on the left.
+	# Upper left, beside the fish held up in the middle: clear of the coins and MAP (top right), the
+	# right-hand touch cluster and the joystick (bottom left). The shore hides its goal list meanwhile.
 	var appear := clampf((3.4 - _catch_t) * 4.0, 0.0, 1.0)
 	var h := 60.0 + float(_catch_lines.size()) * 24.0
-	var rect := Rect2(Vector2(700.0, 76.0 - (1.0 - appear) * 30.0), Vector2(540.0, h))
+	var rect := Rect2(Vector2(20.0 - pad().x, 100.0 - (1.0 - appear) * 30.0), Vector2(470.0, h))
 	_card.bg_color = Color(0.02, 0.10, 0.18, 0.82)
 	_card.draw(_canvas.get_canvas_item(), rect)
 	var font := ThemeDB.fallback_font
+	var room := rect.size.x - 36.0
 	var tfs := 24                                     # long names ("... (istavrit)") shrink to fit
-	while tfs > 16 and font.get_string_size(_catch_title, HORIZONTAL_ALIGNMENT_LEFT, -1, tfs).x > rect.size.x - 36.0:
+	while tfs > 16 and font.get_string_size(_catch_title, HORIZONTAL_ALIGNMENT_LEFT, -1, tfs).x > room:
 		tfs -= 1
-	_canvas.draw_string(font, rect.position + Vector2(18.0, 38.0), _catch_title, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 36.0, tfs, Color(1.0, 0.92, 0.6))
+	_canvas.draw_string(font, rect.position + Vector2(18.0, 38.0), _catch_title, HORIZONTAL_ALIGNMENT_LEFT, room, tfs, Color(1.0, 0.92, 0.6))
 	for i in _catch_lines.size():
-		_canvas.draw_string(font, rect.position + Vector2(18.0, 66.0 + float(i) * 24.0), _catch_lines[i], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 36.0, 17, Color.WHITE)
+		var fs := 17
+		while fs > 12 and font.get_string_size(_catch_lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > room:
+			fs -= 1
+		_canvas.draw_string(font, rect.position + Vector2(18.0, 66.0 + float(i) * 24.0), _catch_lines[i], HORIZONTAL_ALIGNMENT_LEFT, room, fs, Color.WHITE)

@@ -341,7 +341,12 @@ const TR_NAMES := {
 ## "Bluefish (lüfer)", or the English name alone when no Turkish name is listed.
 func display_name(id: String) -> String:
 	var en := String(get_species(id).get("name", id))
-	return "%s (%s)" % [en, String(TR_NAMES[id])] if TR_NAMES.has(id) else en
+	if not TR_NAMES.has(id):
+		return en
+	var paren := en.find(" (")              # older names carry an ASCII Turkish name: replace it
+	if paren > 0:
+		en = en.substr(0, paren)
+	return "%s (%s)" % [en, String(TR_NAMES[id])]
 
 
 func get_rig(id: String) -> Dictionary:

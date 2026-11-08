@@ -251,6 +251,21 @@ games, retention/economy), all from reading the code; nothing measured on a devi
 - **Not done, owner decisions:** Turkish UI (owner said not now), a shared theme for all panels,
   painted ground tiles and character sprites (need art), splitting `shore_fishing.gd`.
 
+## Graphics pass (build 67)
+First pass made with real screenshots: Godot 4.4 runs in the cloud session under a virtual display
+(`tools/shots/shot.gd` saves the shore, the fight and the catch at any spot and hour).
+- **Water:** the top-down sea read as white static: per-pixel sun glints from a strong, fine normal
+  map. Now broad, soft highlights (`nightshoal_water.gdshader`: normal_strength 40 to 8, glint and
+  sky-reflection strength as uniforms, gentler caustics). The "+" sparkles were removed.
+- **Soft light and shade:** cloud shadows, street-lamp and window glows and the angler's night lamp
+  use one radial falloff texture (`assets/art/ui/soft_disc.png`) instead of stacked hard discs.
+- **Nights** follow the real moon: a full moon lifts the darkness, a new moon leaves it deep blue.
+- **Rocky shore:** the surf line runs under the rocks, not across them; the swell wash is a short arc
+  on rocks that stand in the water.
+- **Catch card:** top left beside the hanging fish, clear of the coins, the status line and the
+  touch buttons; the goal list steps aside while it shows; long lines shrink to fit; species shows
+  as "Bluefish (lüfer)" (the old ASCII Turkish name is replaced).
+
 ## Content
 42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
 crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).

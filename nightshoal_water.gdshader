@@ -17,12 +17,14 @@ uniform float depth_bias : hint_range(-0.5, 0.5) = 0.0;   // per-biome: Aegean s
 uniform float depth_contrast = 1.6;
 uniform float wave_frequency = 0.018;
 uniform float wave_speed = 0.35;
-uniform float normal_strength = 40.0;
-uniform float shininess = 70.0;
+uniform float normal_strength = 8.0;     // was 40: per-pixel glints read as static on a phone
+uniform float shininess = 90.0;
+uniform float spec_strength = 0.9;                  // sun glint brightness
+uniform float fresnel_strength = 0.3;               // sky reflection on wave flanks
 uniform vec2 sun_direction = vec2(0.6, -0.5);
 uniform float sun_elevation : hint_range(0.05, 1.0) = 0.55;
 uniform float daylight : hint_range(0.0, 1.0) = 1.0;     // driven by DayNightCycle
-uniform float caustic_strength : hint_range(0.0, 1.5) = 0.55;
+uniform float caustic_strength : hint_range(0.0, 1.5) = 0.4;
 uniform float caustic_scale = 0.012;
 uniform float storm : hint_range(0.0, 1.0) = 0.0;         // sea roughness, driven by WeatherManager
 uniform vec2 wind_dir = vec2(1.0, 0.0);                   // the way the wind blows, waves travel with it
@@ -151,9 +153,9 @@ void fragment() {
 	vec3 L = normalize(vec3(normalize(sun_direction) * (1.0 - sun_elevation), sun_elevation));
 	vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));
 	float spec = pow(max(dot(n, H), 0.0), shininess);
-	col += sun_color.rgb * spec * daylight * 1.6;
+	col += sun_color.rgb * spec * daylight * spec_strength;
 	float fres = pow(1.0 - max(n.z, 0.0), 2.0);
-	col += vec3(0.50, 0.70, 0.90) * fres * 0.8 * daylight;
+	col += vec3(0.50, 0.70, 0.90) * fres * fresnel_strength * daylight;
 
 	// caustics only on the shallows
 	float shallow_mask = 1.0 - smoothstep(0.05, 0.55, depth);

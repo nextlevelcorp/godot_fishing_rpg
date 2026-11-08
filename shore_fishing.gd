@@ -76,6 +76,8 @@ var _summary: PanelContainer
 var _hud_root: Control
 var _cond_label: Label                ## wind and moon, under the clock
 var _idle_ui: Array[Control] = []     ## hidden during a fight (_show_fight_ui)
+var _idle_hidden := false
+var _soft_disc: Texture2D = preload("res://assets/art/ui/soft_disc.png")
 var _hud_t := 0.0                     ## the info lines are refreshed at 4 Hz, not every frame
 var _local_idx := -1                 ## index in _crowd of the spot's named local angler (locals.gd), -1 none
 var _talk_btn: Button
@@ -945,9 +947,8 @@ func _make_label(parent: Control, size: int, color: Color) -> Label:
 
 
 func _show_fight_ui(on: bool) -> void:
-	# A fight shows only the fight: the idle buttons, level and goals step aside.
-	for c in _idle_ui:
-		c.visible = not on
+	# A fight shows only the fight: the idle buttons, level and goals step aside (done each frame in
+	# _process, which also covers the catch card).
 	if _tourney_btn != null:
 		_tourney_btn.visible = not on and not _boat_mode and Tournament.spot_this_week() == GameSession.spot_id
 	_tension_bar.visible = on
@@ -969,6 +970,7 @@ func _rod_tip() -> Vector2:
 
 func _set_status(text: String) -> void:
 	_status.text = text
+	_status.visible = text != ""
 
 
 ## Short vibration on phones that support it (Android browsers). iOS Safari ignores it.
@@ -1885,9 +1887,9 @@ func _on_caught(id: String, weight_kg: float) -> void:
 	if _test_fish:
 		_test_fish = false
 		var tcm := Regulations.length_cm(id, weight_kg)
-		_fight_view.show_catch("TEST: " + String(sp["name"]), PackedStringArray(["%.2f kg, %.0f cm" % [weight_kg, tcm], String(sp["scientific"]), "Test catch: no coins, no XP, not in the journal"]))
+		_fight_view.show_catch("TEST: " + BiomeDB.display_name(id), PackedStringArray(["%.2f kg, %.0f cm" % [weight_kg, tcm], String(sp["scientific"]), "Test catch: no coins, no XP, not in the journal"]))
 		_result_label.text = ""
-		_set_status("Test catch")
+		_set_status("")
 		_amb.play("splash", 0.7)
 		_amb.play("drips", 0.8)
 		_end_fight(true)
@@ -1925,7 +1927,7 @@ func _on_caught(id: String, weight_kg: float) -> void:
 			rel_lines.append(nod)
 		_fight_view.show_catch("Released: " + String(sp["name"]), rel_lines)
 		_result_label.text = ""
-		_set_status("Released. Good practice keeps the fish coming")
+		_set_status("")
 		_amb.play("splash", 0.5)
 		_end_fight(true)
 		return
@@ -1969,7 +1971,7 @@ func _on_caught(id: String, weight_kg: float) -> void:
 		_buzz(200)
 	_fight_view.show_catch(badge + BiomeDB.display_name(id), lines)
 	_result_label.text = ""
-	_set_status("Nice one")
+	_set_status("")
 	_amb.play("splash", 0.7)
 	_amb.play("drips", 0.8)
 	_amb.play_later("flop", 0.5, 0.9)            # it lands on the planks or the rocks and thrashes
@@ -2399,6 +2401,13 @@ func _process(delta: float) -> void:
 	_rod_bend = lerpf(_rod_bend, _rod_bend_target, 1.0 - exp(-10.0 * delta))
 	_update_talk_button()
 	_tick_tourney(delta)
+	# The catch card sits top left over the first-person view: the goal list and idle buttons step
+	# aside while it shows, as they do in a fight.
+	var hide_idle := _state == State.FIGHT or (_pov_on and _state == State.RESULT)
+	if hide_idle != _idle_hidden:
+		_idle_hidden = hide_idle
+		for c in _idle_ui:
+			c.visible = not hide_idle
 	if _state != State.AIM:
 		_close_tackle_panels()
 
@@ -2493,7 +2502,7 @@ func _update_camera(delta: float) -> void:
 func _draw() -> void:
 	if _pov_on:
 		return                         # the first-person view covers the screen: draw nothing under it
-	_draw_sparkles()
+	# (the "+" sparkles are gone: the water shader draws its own sun glints, build 67)
 	_draw_shore()
 	if _has_pier:
 		_draw_pier()
@@ -2614,6 +2623,7 @@ func _draw_shore() -> void:
 		_draw_foam()
 	else:
 		draw_rect(Rect2(-w, 40.0, w * 2.0, 260.0), base.darkened(0.2))
+		_draw_foam()                   # under the rocks: the surf breaks against them, not across them
 		for rock: Dictionary in _rocks:
 			var rc0: Vector2 = rock["c"]
 			if absf(rc0.x - cx) > half + float(rock["r"]):
@@ -2625,11 +2635,11 @@ func _draw_shore() -> void:
 			draw_colored_polygon(rock["lit"], col.lightened(0.14))
 			draw_polyline(rock["edge"], Color(0.22, 0.15, 0.10, 0.8), 2.0)
 			var rc: Vector2 = rock["c"]
-			if rc.y < 25.0:
+			if rc.y < 12.0:
+				# a little wash of foam on the seaward face of rocks that stand in the water
 				var rr: float = rock["r"]
 				var swell := sin(_time * 2.0 + rc.x * 0.05) * 3.0
-				draw_arc(rc, rr * 0.95 + 6.0 + swell, PI, TAU, 20, Color(1.0, 1.0, 1.0, 0.35), 2.5)
-		_draw_foam()
+				draw_arc(rc, rr * 0.9 + 4.0 + swell, PI * 1.25, PI * 1.75, 10, Color(1.0, 1.0, 1.0, 0.22), 2.0)
 
 
 func _draw_crowd() -> void:
@@ -2854,10 +2864,8 @@ func _draw_lamp() -> void:
 	if night < 0.05:
 		return
 	var flicker := 1.0 + 0.04 * sin(_time * 9.0) + 0.03 * sin(_time * 5.3 + 1.0) + 0.05 * _lamp_noise.get_noise_1d(_time * 3.0)
-	for i in 6:
-		var k := float(i) / 5.0
-		var rad := (150.0 - 110.0 * k) * flicker
-		draw_circle(_hand + Vector2(0.0, 10.0), rad, Color(1.0, 0.82, 0.45, 0.05 * night))
+	var rad := 160.0 * flicker            # one soft pool of lamplight around the angler
+	draw_texture_rect(_soft_disc, Rect2(_hand + Vector2(-rad, 10.0 - rad), Vector2(rad, rad) * 2.0), false, Color(1.0, 0.82, 0.45, 0.32 * night))
 
 
 func _draw_angler() -> void:
