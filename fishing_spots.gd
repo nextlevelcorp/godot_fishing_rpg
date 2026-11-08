@@ -25,7 +25,7 @@ const RULES_NOTE := "Game data only. Check current Turkish Ministry of Agricultu
 
 const SPOTS := {
 	"galata_bridge": {
-		"name": "Galata Bridge", "local_name": "Galata Köprüsü", "region": "Istanbul / Marmara",
+		"name": "Galata Bridge", "local_name": "Galata Köprüsü", "region": "İstanbul / Marmara",
 		"lat_lon": Vector2(41.0204, 28.9740), "kind": "bridge",
 		"slope": 0.25, "max_depth_m": 12.0,
 		"unlock_level": 4,
@@ -44,7 +44,7 @@ const SPOTS := {
 		"shore_color": Color(0.30, 0.31, 0.34),
 	},
 	"teos_harbor": {
-		"name": "Teos Harbor", "local_name": "Teos Limanı", "region": "Izmir / Aegean",
+		"name": "Teos Harbor", "local_name": "Teos Limanı", "region": "İzmir / Aegean",
 		"lat_lon": Vector2(38.1747, 26.7853), "kind": "harbor",
 		"slope": 0.15, "max_depth_m": 10.0,
 		"unlock_level": 2,
@@ -59,7 +59,7 @@ const SPOTS := {
 		"shore_color": Color(0.62, 0.62, 0.60),
 	},
 	"dikili_bay": {
-		"name": "Dikili Bay", "local_name": "Dikili Körfezi", "region": "Izmir / Aegean",
+		"name": "Dikili Bay", "local_name": "Dikili Körfezi", "region": "İzmir / Aegean",
 		"lat_lon": Vector2(39.0700, 26.8900), "kind": "beach",
 		"slope": 0.06, "max_depth_m": 6.0,
 		"unlock_level": 1,
@@ -74,7 +74,7 @@ const SPOTS := {
 		"shore_color": Color(0.90, 0.80, 0.58),
 	},
 	"cesme_cove": {
-		"name": "Cesme Cove", "local_name": "Çeşme Koyu", "region": "Izmir / Aegean",
+		"name": "Çeşme Cove", "local_name": "Çeşme Koyu", "region": "İzmir / Aegean",
 		"lat_lon": Vector2(38.3200, 26.3000), "kind": "rocky",
 		"slope": 0.35, "max_depth_m": 18.0,
 		"unlock_level": 3,
@@ -125,7 +125,7 @@ const SPOTS := {
 		"shore_color": Color(0.62, 0.62, 0.60),
 	},
 	"canakkale_kordon": {
-		"name": "Canakkale Waterfront", "local_name": "Çanakkale Kordonu", "region": "Çanakkale / Dardanelles",
+		"name": "Çanakkale Waterfront", "local_name": "Çanakkale Kordonu", "region": "Çanakkale / Dardanelles",
 		"lat_lon": Vector2(40.1553, 26.4142), "kind": "harbor",
 		"slope": 0.30, "max_depth_m": 14.0,
 		"unlock_level": 7,
@@ -164,7 +164,7 @@ const SPOTS := {
 		"shore_color": Color(0.40, 0.34, 0.28),
 	},
 	"kas_coast": {
-		"name": "Kas Coast", "local_name": "Kaş", "region": "Mediterranean",
+		"name": "Kaş Coast", "local_name": "Kaş", "region": "Mediterranean",
 		"lat_lon": Vector2(36.2000, 29.6400), "kind": "rocky",
 		"slope": 0.7, "max_depth_m": 40.0,
 		"unlock_level": 10,
