@@ -296,7 +296,7 @@ func _ready() -> void:
 	touch.joystick = true
 	add_child(touch)
 	add_child(DeviceGuard.new())
-	_set_status("Walk with the stick. At the water's edge, hold CAST to throw")
+	_set_status(_idle_hint())
 
 
 # ---------------------------------------------------------------- setup
@@ -970,6 +970,13 @@ func _rod_tip() -> Vector2:
 	return _hand + d * ROD_LEN + d.orthogonal() * _rod_bend * ROD_BEND_PX
 
 
+## What to do while aiming: walk to the edge on the shore, row (and anchor) in the boat.
+func _idle_hint() -> String:
+	if _boat_mode:
+		return "Row with the stick, ANCH to hold still. Hold CAST to throw"
+	return "Walk with the stick. At the water's edge, hold CAST to throw"
+
+
 func _set_status(text: String) -> void:
 	_status.text = text
 	_status.visible = text != ""
@@ -1096,7 +1103,7 @@ func _physics_process(delta: float) -> void:
 				_result_label.text = ""
 				_state = State.AIM
 				_fight_view.end()
-				_set_status("Walk with the stick. At the water's edge, hold CAST to throw")
+				_set_status(_idle_hint())
 	_update_boat(delta)
 	_update_float(delta)
 	_update_fish_agent(delta)

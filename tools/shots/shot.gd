@@ -14,7 +14,8 @@ var _species := "bluefish"
 var _params := {}          ## water shader overrides, "p:name=value" on the command line
 var _shore_only := false
 var _other := ""
-var _x := INF              ## x=<px>: stand the angler at this x on the shore (e.g. the pier)           ## scene=title|map: just that screen
+var _x := INF
+var _mode := "shore"       ## mode=boat: the rowing-boat outing              ## x=<px>: stand the angler at this x on the shore (e.g. the pier)           ## scene=title|map: just that screen
 
 
 func _initialize() -> void:
@@ -31,6 +32,7 @@ func _initialize() -> void:
 			"shore_only": _shore_only = kv[1] == "1"
 			"scene": _other = kv[1]
 			"x": _x = float(kv[1])
+			"mode": _mode = kv[1]
 			_:
 				if kv[0].begins_with("p:"):
 					_params[kv[0].substr(2)] = float(kv[1])
@@ -38,7 +40,7 @@ func _initialize() -> void:
 	GameSession.tutorial_done = true
 	GameSession.test_tools = true
 	GameSession.spot_id = spot
-	GameSession.mode = "shore"
+	GameSession.mode = _mode
 	var path := "res://shore_fishing.tscn"
 	if _other != "":
 		path = "res://title_screen.tscn" if _other == "title" else "res://turkey_map.tscn"
