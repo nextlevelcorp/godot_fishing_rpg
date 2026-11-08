@@ -686,7 +686,7 @@ func _draw_glitter(day: float, night: float, dusk: float) -> void:
 		if melev <= 0.0 or night < 0.5:
 			return
 		sx = CX + (mt - 0.5) * 2.0 * 820.0
-		bright = 0.5
+		bright = 0.7 * Moon.illumination()      # the real moon: a silver path at full moon, none at new
 		col = Color(0.85, 0.9, 1.0)
 	if bright < 0.05:
 		return
