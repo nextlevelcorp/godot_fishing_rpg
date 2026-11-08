@@ -338,7 +338,7 @@ func _draw_dyn() -> void:
 			continue
 		var sway := Vector2(sin(_time * 1.3 + float(t["phase"])) * rad * 0.10, 0.0)
 		# Three-quarter view: a shadow on the ground, a trunk standing up, the crown above it.
-		_dyn.draw_circle(p + Vector2(rad * 0.4, rad * 0.25), rad * 0.9, Color(0.0, 0.0, 0.0, 0.16))
+		Figure.disc(_dyn, p + Vector2(rad * 0.4, rad * 0.25), rad * 0.9, Color(0.0, 0.0, 0.0, 0.16))
 		_dyn.draw_line(p, p + Vector2(0.0, -rad * 1.1), Color(0.40, 0.27, 0.16), maxf(4.0, rad * 0.22))
 		p = p + Vector2(0.0, -rad * 1.3)
 		if kind == "palm":
@@ -350,11 +350,11 @@ func _draw_dyn() -> void:
 		elif kind == "olive":
 			for i in 3:
 				var off := Vector2.from_angle(TAU * float(i) / 3.0 + float(t["phase"])) * rad * 0.35
-				_dyn.draw_circle(p + sway + off, rad * 0.62, tree_col.darkened(0.05 * float(i)))
-			_dyn.draw_circle(p + sway + Vector2(-rad * 0.2, -rad * 0.25), rad * 0.3, tree_col.lightened(0.18))
+				Figure.disc(_dyn, p + sway + off, rad * 0.62, tree_col.darkened(0.05 * float(i)))
+			Figure.disc(_dyn, p + sway + Vector2(-rad * 0.2, -rad * 0.25), rad * 0.3, tree_col.lightened(0.18))
 		else:
-			_dyn.draw_circle(p + sway, rad, tree_col)
-			_dyn.draw_circle(p + sway + Vector2(-rad * 0.25, -rad * 0.3), rad * 0.55, tree_col.lightened(0.15))
+			Figure.disc(_dyn, p + sway, rad, tree_col)
+			Figure.disc(_dyn, p + sway + Vector2(-rad * 0.25, -rad * 0.3), rad * 0.55, tree_col.lightened(0.15))
 
 	for c in _cats:
 		if absf(c.pos.x - view_x) > view_half:

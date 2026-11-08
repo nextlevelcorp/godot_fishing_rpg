@@ -42,19 +42,19 @@ static func draw_person(ci: CanvasItem, feet: Vector2, facing: Vector2, step: fl
 			var hand := shoulder + Vector2(-dir * 5.0 * s * swing, 11.0 * s)
 			_arm(ci, shoulder, hand, shirt, skin, s)
 		var head := chest + Vector2(dir * 1.0 * s, -8.0 * s)
-		ci.draw_circle(head, 6.2 * s, skin)
-		ci.draw_circle(head + Vector2(-dir * 1.6 * s, -1.2 * s), 5.8 * s, hair)
-		ci.draw_circle(head + Vector2(dir * 2.2 * s, 0.8 * s), 4.2 * s, skin)
-		ci.draw_circle(head + Vector2(dir * 6.0 * s, 1.0 * s), 1.4 * s, skin.darkened(0.08))     # nose
-		ci.draw_circle(head + Vector2(dir * 3.2 * s, -0.6 * s), 0.9 * s, Color(0.1, 0.08, 0.08))
+		disc(ci, head, 6.2 * s, skin)
+		disc(ci, head + Vector2(-dir * 1.6 * s, -1.2 * s), 5.8 * s, hair)
+		disc(ci, head + Vector2(dir * 2.2 * s, 0.8 * s), 4.2 * s, skin)
+		disc(ci, head + Vector2(dir * 6.0 * s, 1.0 * s), 1.4 * s, skin.darkened(0.08))     # nose
+		disc(ci, head + Vector2(dir * 3.2 * s, -0.6 * s), 0.9 * s, Color(0.1, 0.08, 0.08))
 		_hat(ci, look, head, dir, s, true)
 		return
 	# Front or back view.
 	var spread := 5.0 * s * swing
 	ci.draw_line(hip + Vector2(-3.0 * s, 0.0), feet + Vector2(-3.0 * s, -absf(spread) * 0.3), pants, 4.5 * s)
 	ci.draw_line(hip + Vector2(3.0 * s, 0.0), feet + Vector2(3.0 * s, -absf(spread) * 0.3), pants, 4.5 * s)
-	ci.draw_circle(feet + Vector2(-3.0 * s, -maxf(spread, 0.0) * 0.6), 2.4 * s, shoe)
-	ci.draw_circle(feet + Vector2(3.0 * s, minf(spread, 0.0) * 0.6), 2.4 * s, shoe)
+	disc(ci, feet + Vector2(-3.0 * s, -maxf(spread, 0.0) * 0.6), 2.4 * s, shoe)
+	disc(ci, feet + Vector2(3.0 * s, minf(spread, 0.0) * 0.6), 2.4 * s, shoe)
 	var back_view := not toward
 	if holding and back_view:
 		_arm(ci, chest + Vector2(-7.0 * s, -2.0 * s), hold, shirt, skin, s)
@@ -68,14 +68,14 @@ static func draw_person(ci: CanvasItem, feet: Vector2, facing: Vector2, step: fl
 		_arm(ci, chest + Vector2(-7.0 * s, -2.0 * s), hold, shirt, skin, s)
 		_arm(ci, chest + Vector2(7.0 * s, -2.0 * s), hold + Vector2(2.0 * s, 4.0 * s), shirt, skin, s)
 	var head := chest + Vector2(0.0, -8.0 * s)
-	ci.draw_circle(head, 6.5 * s, skin)
+	disc(ci, head, 6.5 * s, skin)
 	if toward:
-		ci.draw_circle(head + Vector2(0.0, -2.5 * s), 6.6 * s, hair)
-		ci.draw_circle(head + Vector2(0.0, 1.2 * s), 5.6 * s, skin)
-		ci.draw_circle(head + Vector2(-2.2 * s, 0.8 * s), 0.9 * s, Color(0.1, 0.08, 0.08))
-		ci.draw_circle(head + Vector2(2.2 * s, 0.8 * s), 0.9 * s, Color(0.1, 0.08, 0.08))
+		disc(ci, head + Vector2(0.0, -2.5 * s), 6.6 * s, hair)
+		disc(ci, head + Vector2(0.0, 1.2 * s), 5.6 * s, skin)
+		disc(ci, head + Vector2(-2.2 * s, 0.8 * s), 0.9 * s, Color(0.1, 0.08, 0.08))
+		disc(ci, head + Vector2(2.2 * s, 0.8 * s), 0.9 * s, Color(0.1, 0.08, 0.08))
 	else:
-		ci.draw_circle(head + Vector2(0.0, -0.5 * s), 6.4 * s, hair)
+		disc(ci, head + Vector2(0.0, -0.5 * s), 6.4 * s, hair)
 	_hat(ci, look, head, 0.0, s, false)
 
 
@@ -84,7 +84,7 @@ static func _arm(ci: CanvasItem, shoulder: Vector2, hand: Vector2, shirt: Color,
 	var elbow := shoulder.lerp(hand, 0.5) + Vector2(0.0, 3.0 * s)
 	ci.draw_line(shoulder, elbow, shirt.darkened(0.12), 3.6 * s)
 	ci.draw_line(elbow, hand, shirt.darkened(0.05), 3.2 * s)
-	ci.draw_circle(hand, 2.2 * s, skin)
+	disc(ci, hand, 2.2 * s, skin)
 
 
 static func _foot(ci: CanvasItem, at: Vector2, dir: float, s: float, col: Color) -> void:
@@ -100,7 +100,7 @@ static func _hat(ci: CanvasItem, look: Dictionary, head: Vector2, dir: float, s:
 		ci.draw_line(head + Vector2(-dir * 4.0 * s, -4.0 * s), head + Vector2(dir * 9.0 * s, -3.0 * s), hc.darkened(0.15), 2.2 * s)
 	else:
 		_ellipse(ci, head + Vector2(0.0, -4.0 * s), Vector2(8.5 * s, 2.6 * s), hc.darkened(0.15))
-	ci.draw_circle(head + Vector2(0.0, -5.0 * s), 5.2 * s, hc)
+	disc(ci, head + Vector2(0.0, -5.0 * s), 5.2 * s, hc)
 
 
 ## A cat seen from the side: body, head with ears, tail curling on an oscillator.
@@ -111,7 +111,7 @@ static func draw_cat(ci: CanvasItem, pos: Vector2, dir: float, t: float, col: Co
 	ci.draw_line(body + Vector2(-5.0, 2.0), pos + Vector2(-5.0, 0.0), col.darkened(0.1), 2.0)
 	ci.draw_line(body + Vector2(5.0, 2.0), pos + Vector2(5.0, 0.0), col.darkened(0.1), 2.0)
 	var head := body + Vector2(dir * 8.0, -3.0)
-	ci.draw_circle(head, 4.0, col)
+	disc(ci, head, 4.0, col)
 	ci.draw_colored_polygon(PackedVector2Array([head + Vector2(-3.0, -2.0), head + Vector2(-2.0, -6.0), head + Vector2(0.0, -3.0)]), col)
 	ci.draw_colored_polygon(PackedVector2Array([head + Vector2(3.0, -2.0), head + Vector2(2.0, -6.0), head + Vector2(0.0, -3.0)]), col)
 	var tail_base := body + Vector2(-dir * 7.0, -1.0)
@@ -119,9 +119,24 @@ static func draw_cat(ci: CanvasItem, pos: Vector2, dir: float, t: float, col: Co
 	ci.draw_line(tail_base, tail_tip, col.darkened(0.15), 2.0)
 
 
+## Circles and ellipses are one white disc texture stretched and tinted: a textured rect instead of a
+## 12-64 point polygon. Rects that share a texture can be batched by the renderer, and the disc has a
+## soft 1 px edge, so heads and shadows look smoother too. (Performance review, 2026-11-08.)
+static var _disc_tex: Texture2D
+
+
+static func disc(ci: CanvasItem, c: Vector2, r: float, col: Color) -> void:
+	_ellipse(ci, c, Vector2(r, r), col)
+
+
 static func _ellipse(ci: CanvasItem, c: Vector2, r: Vector2, col: Color) -> void:
-	var pts := PackedVector2Array()
-	for i in 12:
-		var a := TAU * float(i) / 12.0
-		pts.append(c + Vector2(cos(a) * r.x, sin(a) * r.y))
-	ci.draw_colored_polygon(pts, col)
+	if _disc_tex == null:
+		_disc_tex = load("res://assets/art/ui/disc.png") as Texture2D
+	if _disc_tex == null:
+		var pts := PackedVector2Array()
+		for i in 12:
+			var a := TAU * float(i) / 12.0
+			pts.append(c + Vector2(cos(a) * r.x, sin(a) * r.y))
+		ci.draw_colored_polygon(pts, col)
+		return
+	ci.draw_texture_rect(_disc_tex, Rect2(c - r, r * 2.0), false, col)
