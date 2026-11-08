@@ -43,7 +43,7 @@ static func challenge() -> Dictionary:
 	# About half of the fish of this species that bite reach this weight (median of roll_weight_kg).
 	var min_kg := maxf(snappedf(wr.x + 0.22 * (wr.y - wr.x), 0.05), 0.05)
 	return {"spot": spot_id, "spot_name": String(spot["name"]), "species": species,
-		"species_name": String(sp["name"]), "min_kg": min_kg, "coins": 120 + int(sp["base_price"])}
+		"species_name": BiomeDB.display_name(species), "min_kg": min_kg, "coins": 120 + int(sp["base_price"])}
 
 
 static func done_today() -> bool:

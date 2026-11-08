@@ -136,7 +136,7 @@ static func turn_in(spot_id: String) -> Dictionary:
 
 
 static func species_name(id: String) -> String:
-	return String(BiomeDB.get_species(id).get("name", id))
+	return BiomeDB.display_name(id)
 
 
 ## What the person says now: a greeting for the tier, the request, and from Friend on a secret.

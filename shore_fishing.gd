@@ -78,6 +78,7 @@ var _cond_label: Label                ## wind and moon, under the clock
 var _idle_ui: Array[Control] = []     ## hidden during a fight (_show_fight_ui)
 var _idle_hidden := false
 var _soft_disc: Texture2D = preload("res://assets/art/ui/soft_disc.png")
+var _ground_tex: Dictionary = {}       ## painted ground tiles by name (assets/art/ground), loaded on first use
 var _hud_t := 0.0                     ## the info lines are refreshed at 4 Hz, not every frame
 var _local_idx := -1                 ## index in _crowd of the spot's named local angler (locals.gd), -1 none
 var _talk_btn: Button
@@ -213,6 +214,7 @@ var _depth_label: Label
 
 
 func _ready() -> void:
+	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED     # painted ground tiles repeat
 	_rng.randomize()
 	_lamp_noise.noise_type = FastNoiseLite.TYPE_PERLIN
 	InputDefaults.ensure_all()
@@ -2522,9 +2524,10 @@ func _draw_pier() -> void:
 	draw_rect(Rect2(r.position + Vector2(8.0, 10.0), r.size), Color(0.0, 0.05, 0.1, 0.25))
 	draw_rect(r, Color(0.56, 0.41, 0.27))
 	var y := r.position.y
-	while y < r.end.y:
-		draw_line(Vector2(r.position.x, y), Vector2(r.end.x, y), Color(0.42, 0.30, 0.19), 2.0)
-		y += 16.0
+	if not _tiled("planks", r, Color(0.56, 0.41, 0.27)):
+		while y < r.end.y:
+			draw_line(Vector2(r.position.x, y), Vector2(r.end.x, y), Color(0.42, 0.30, 0.19), 2.0)
+			y += 16.0
 	y = r.position.y + 6.0
 	while y < -10.0:
 		for px in [r.position.x - 3.0, r.end.x + 3.0]:
@@ -2556,6 +2559,34 @@ func _view_half() -> float:
 	return get_viewport_rect().size.x * 0.5 / maxf(_cam.zoom.x, 0.1) + 100.0
 
 
+## A painted ground tile (assets/art/ground/<name>.png), or null if it is missing.
+func _ground(tile: String) -> Texture2D:
+	if not _ground_tex.has(tile):
+		var path := "res://assets/art/ground/%s.png" % tile
+		_ground_tex[tile] = load(path) as Texture2D if ResourceLoader.exists(path) else null
+	return _ground_tex[tile]
+
+
+## Fills rect with a repeating painted ground tile tinted toward `base`, only where the camera looks.
+## The tiles are mid-grey-warm (about 0.65 luminance), so the tint is lifted to keep the spot's colour.
+## The drawn rect starts on the tile grid, so the texture stays put while the camera moves.
+## Returns false when the tile is missing, so the caller can draw its flat colour instead.
+func _tiled(tile: String, rect: Rect2, base: Color) -> bool:
+	var tex := _ground(tile)
+	if tex == null:
+		return false
+	var half := _view_half()
+	var x0 := maxf(rect.position.x, _cam.position.x - half)
+	var x1 := minf(rect.end.x, _cam.position.x + half)
+	if x1 <= x0:
+		return true
+	var ts := float(tex.get_width())
+	var ax := maxf(floorf(x0 / ts) * ts, rect.position.x)
+	var tint := Color(base.r / 0.65, base.g / 0.65, base.b / 0.65, base.a)
+	draw_texture_rect(tex, Rect2(ax, rect.position.y, x1 - ax, rect.size.y), true, tint)
+	return true
+
+
 func _draw_sparkles() -> void:
 	var day := _world.daylight
 	var cx := _cam.position.x
@@ -2585,6 +2616,7 @@ func _draw_shore() -> void:
 
 	if kind == "bridge":
 		draw_rect(Rect2(-w, 0.0, w * 2.0, 120.0), base)
+		_tiled("concrete", Rect2(-w, 10.0, w * 2.0, 102.0), base)
 		draw_rect(Rect2(-w, 0.0, w * 2.0, 10.0), base.darkened(0.35))
 		draw_rect(Rect2(-w, 112.0, w * 2.0, 8.0), base.lightened(0.18))
 		draw_rect(Rect2(-w, 40.0, w * 2.0, 4.0), base.lightened(0.08))
@@ -2596,6 +2628,7 @@ func _draw_shore() -> void:
 			lx += 240.0
 	elif kind == "harbor":
 		draw_rect(Rect2(-w, 0.0, w * 2.0, 150.0), base)
+		_tiled("cobble", Rect2(-w, 8.0, w * 2.0, 142.0), base)
 		draw_rect(Rect2(-w, 0.0, w * 2.0, 8.0), base.darkened(0.4))
 		var bx := -HALF_WIDTH + 200.0
 		while bx <= HALF_WIDTH - 200.0:
@@ -2613,6 +2646,7 @@ func _draw_shore() -> void:
 		poly.append(Vector2(w, 300.0))
 		poly.append(Vector2(-w, 300.0))
 		draw_colored_polygon(poly, base)
+		_tiled("sand", Rect2(-w, 14.0, w * 2.0, 286.0), base)
 		var wet := PackedVector2Array()
 		for p in _edge_pts:
 			wet.append(p + Vector2(0.0, 12.0))
@@ -2622,7 +2656,8 @@ func _draw_shore() -> void:
 				draw_circle(Vector2(pb.x, pb.y), pb.z, base.darkened(0.25))
 		_draw_foam()
 	else:
-		draw_rect(Rect2(-w, 40.0, w * 2.0, 260.0), base.darkened(0.2))
+		if not _tiled("pebbles", Rect2(-w, 40.0, w * 2.0, 260.0), base.darkened(0.2)):
+			draw_rect(Rect2(-w, 40.0, w * 2.0, 260.0), base.darkened(0.2))
 		_draw_foam()                   # under the rocks: the surf breaks against them, not across them
 		for rock: Dictionary in _rocks:
 			var rc0: Vector2 = rock["c"]

@@ -13,6 +13,7 @@ var _hour := 0.35
 var _species := "bluefish"
 var _params := {}          ## water shader overrides, "p:name=value" on the command line
 var _shore_only := false
+var _other := ""           ## scene=title|map: just that screen
 
 
 func _initialize() -> void:
@@ -27,6 +28,7 @@ func _initialize() -> void:
 			"hour": _hour = float(kv[1])
 			"fish": _species = kv[1]
 			"shore_only": _shore_only = kv[1] == "1"
+			"scene": _other = kv[1]
 			_:
 				if kv[0].begins_with("p:"):
 					_params[kv[0].substr(2)] = float(kv[1])
@@ -35,12 +37,23 @@ func _initialize() -> void:
 	GameSession.test_tools = true
 	GameSession.spot_id = spot
 	GameSession.mode = "shore"
-	_scene = (load("res://shore_fishing.tscn") as PackedScene).instantiate()
+	var path := "res://shore_fishing.tscn"
+	if _other != "":
+		path = "res://title_screen.tscn" if _other == "title" else "res://turkey_map.tscn"
+	_scene = (load(path) as PackedScene).instantiate()
 	root.add_child(_scene)
 
 
 func _process(_delta: float) -> bool:
 	_frame += 1
+	if _other != "":
+		if _frame == 60:
+			if _other == "map" and _scene.has_method("_select"):
+				_scene.call("_select", "canakkale_kordon")
+		if _frame == 90:
+			_save(_other)
+			quit(0)
+		return false
 	match _frame:
 		3:
 			var w: Node = _scene.get("_world")

@@ -89,6 +89,7 @@ func setup(p_spot: Dictionary, seed_value: int) -> void:
 
 func _ready() -> void:
 	_static = Node2D.new()
+	_static.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED      # painted ground tiles repeat
 	_static.draw.connect(_draw_static)
 	add_child(_static)
 	_dyn = Node2D.new()
@@ -276,11 +277,20 @@ func _draw_static() -> void:
 	var ground: Color = _pal["ground"]
 	var path: Color = _pal["path"]
 	_static.draw_rect(Rect2(-HALF - 200.0, _town_y0, HALF * 2.0 + 400.0, 1100.0), ground)
+	# Painted tiles (assets/art/ground) tinted to the spot's palette; flat colour if they are missing.
+	# Drawn once: this node only redraws when the scene starts.
+	var grass := _tile("grass")
+	if grass != null:
+		_static.draw_texture_rect(grass, Rect2(-HALF - 256.0, _town_y0 + 56.0, HALF * 2.0 + 512.0, 1044.0), true, _lift(ground))
 	_static.draw_rect(Rect2(-HALF - 200.0, _town_y0, HALF * 2.0 + 400.0, 56.0), path)
-	var tx := -HALF - 200.0
-	while tx < HALF + 200.0:
-		_static.draw_line(Vector2(tx, _town_y0), Vector2(tx, _town_y0 + 56.0), path.darkened(0.08), 1.0)
-		tx += 40.0
+	var cob := _tile("cobble")
+	if cob != null:
+		_static.draw_texture_rect(cob, Rect2(-HALF - 256.0, _town_y0, HALF * 2.0 + 512.0, 56.0), true, _lift(path))
+	else:
+		var tx := -HALF - 200.0
+		while tx < HALF + 200.0:
+			_static.draw_line(Vector2(tx, _town_y0), Vector2(tx, _town_y0 + 56.0), path.darkened(0.08), 1.0)
+			tx += 40.0
 	_static.draw_line(Vector2(-HALF - 200.0, _town_y0 + 56.0), Vector2(HALF + 200.0, _town_y0 + 56.0), path.darkened(0.2), 3.0)
 	for b in _benches:
 		_static.draw_rect(Rect2(b + Vector2(3.0, 4.0), Vector2(46.0, 12.0)), Color(0.0, 0.0, 0.0, 0.2))
@@ -297,6 +307,16 @@ func _draw_static() -> void:
 		_static.draw_line(l, l + Vector2(0.0, -38.0), trim.darkened(0.4), 3.0)
 		_static.draw_rect(Rect2(l + Vector2(-5.0, -48.0), Vector2(10.0, 11.0)), trim.darkened(0.3))
 		_static.draw_rect(Rect2(l + Vector2(-3.0, -46.0), Vector2(6.0, 7.0)), Color(1.0, 0.95, 0.75))
+
+
+static func _tile(tile: String) -> Texture2D:
+	var path := "res://assets/art/ground/%s.png" % tile
+	return load(path) as Texture2D if ResourceLoader.exists(path) else null
+
+
+## The tiles average about 0.65 luminance: lift the tint so the result keeps the palette colour.
+static func _lift(c: Color) -> Color:
+	return Color(c.r / 0.65, c.g / 0.65, c.b / 0.65, c.a)
 
 
 func _draw_building(bd: Dictionary) -> void:

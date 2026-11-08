@@ -125,6 +125,7 @@ func _build_header() -> void:
 	bar.offset_top = 6.0
 	bar.offset_bottom = 60.0
 	bar.alignment = BoxContainer.ALIGNMENT_END
+	bar.grow_horizontal = Control.GROW_DIRECTION_BEGIN     # wider buttons push left, never off the right edge
 	bar.add_theme_constant_override("separation", 10)
 	add_child(bar)
 	_coins_label = _make_label(bar, 22, Color(1.0, 0.9, 0.5))
@@ -182,15 +183,16 @@ func _build_panel() -> void:
 	_panel.add_child(box)
 
 	_title = _make_label(box, 26, Color.WHITE)
+	# The buttons come right under the title, so a long spot description can never push them off
+	# the bottom of the screen (seen on a 720-tall screenshot, build 67).
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	box.add_child(row)
 	_sub = _make_label(box, 17, Color(0.8, 0.9, 1.0))
 	_fish_label = _make_label(box, 18, Color(1.0, 0.9, 0.6))
 	_note_label = _make_label(box, 14, Color(0.7, 0.8, 0.9))
 	_title.text = "Tap a pin to pick a spot"
 	_sub.text = "Each pin is a real place where people fish in Türkiye."
-
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	box.add_child(row)
 
 	_go_button = Button.new()
 	_go_button.text = "FISH HERE"
@@ -298,7 +300,7 @@ func _select(id: String) -> void:
 	_sub.text = "%s  -  %s" % [s["region"], s["blurb"]]
 	var names: Array[String] = []
 	for sid: String in s["species"]:
-		names.append(String(BiomeDB.get_species(sid).get("name", sid)))
+		names.append(BiomeDB.display_name(sid))
 	var ids: Array = s["species"]
 	_fish_label.text = "Fish here (%d/%d caught): %s" % [_caught_count(ids), ids.size(), ", ".join(names)]
 	_note_label.text = "Evidence: %s (%d sources). %s Pin is town-level, not the exact mark." % [s["evidence"], s["sources"].size(), s["species_note"]]
