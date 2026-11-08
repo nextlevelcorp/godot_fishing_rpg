@@ -260,6 +260,11 @@ First pass made with real screenshots: Godot 4.4 runs in the cloud session under
 - **Soft light and shade:** cloud shadows, street-lamp and window glows and the angler's night lamp
   use one radial falloff texture (`assets/art/ui/soft_disc.png`) instead of stacked hard discs.
 - **Nights** follow the real moon: a full moon lifts the darkness, a new moon leaves it deep blue.
+- **Painted ground (build 70):** seamless 256 px tiles made by `tools/art/make_ground_textures.py`
+  (sand, pebbles, rock, cobble, planks, concrete, grass; no third-party art) replace the flat fills:
+  pebbles behind the rocks, sand on beaches, cobbles on quays, concrete on the bridge, planks on the
+  pier, grass and cobbles in the town. Tinted to each spot's palette (`ShoreWorld.tile_tint`, capped
+  so pale palettes do not wash out), drawn only where the camera looks.
 - **Rocky shore:** the surf line runs under the rocks, not across them; the swell wash is a short arc
   on rocks that stand in the water.
 - **Catch card:** top left beside the hanging fish, clear of the coins, the status line and the

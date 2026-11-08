@@ -281,11 +281,11 @@ func _draw_static() -> void:
 	# Drawn once: this node only redraws when the scene starts.
 	var grass := _tile("grass")
 	if grass != null:
-		_static.draw_texture_rect(grass, Rect2(-HALF - 256.0, _town_y0 + 56.0, HALF * 2.0 + 512.0, 1044.0), true, _lift(ground))
+		_static.draw_texture_rect(grass, Rect2(-HALF - 256.0, _town_y0 + 56.0, HALF * 2.0 + 512.0, 1044.0), true, tile_tint(ground, 0.85))
 	_static.draw_rect(Rect2(-HALF - 200.0, _town_y0, HALF * 2.0 + 400.0, 56.0), path)
 	var cob := _tile("cobble")
 	if cob != null:
-		_static.draw_texture_rect(cob, Rect2(-HALF - 256.0, _town_y0, HALF * 2.0 + 512.0, 56.0), true, _lift(path))
+		_static.draw_texture_rect(cob, Rect2(-HALF - 256.0, _town_y0, HALF * 2.0 + 512.0, 56.0), true, tile_tint(path, 0.7))
 	else:
 		var tx := -HALF - 200.0
 		while tx < HALF + 200.0:
@@ -314,9 +314,12 @@ static func _tile(tile: String) -> Texture2D:
 	return load(path) as Texture2D if ResourceLoader.exists(path) else null
 
 
-## The tiles average about 0.65 luminance: lift the tint so the result keeps the palette colour.
-static func _lift(c: Color) -> Color:
-	return Color(c.r / 0.65, c.g / 0.65, c.b / 0.65, c.a)
+## Tint for a painted ground tile (they average about 0.63 luminance): lifted so the result keeps the
+## palette colour, but never past ~1.0 on the brightest channel, or a pale palette (promenade, sand)
+## washes the texture out to flat white. `strength` < 1 lets the flat colour show through (busy tiles).
+static func tile_tint(c: Color, strength: float = 1.0) -> Color:
+	var lift := minf(1.0 / 0.63, 1.02 / maxf(maxf(c.r, c.g), maxf(c.b, 0.01)))
+	return Color(c.r * lift, c.g * lift, c.b * lift, c.a * strength)
 
 
 func _draw_building(bd: Dictionary) -> void:

@@ -2571,7 +2571,7 @@ func _ground(tile: String) -> Texture2D:
 ## The tiles are mid-grey-warm (about 0.65 luminance), so the tint is lifted to keep the spot's colour.
 ## The drawn rect starts on the tile grid, so the texture stays put while the camera moves.
 ## Returns false when the tile is missing, so the caller can draw its flat colour instead.
-func _tiled(tile: String, rect: Rect2, base: Color) -> bool:
+func _tiled(tile: String, rect: Rect2, base: Color, strength: float = 1.0) -> bool:
 	var tex := _ground(tile)
 	if tex == null:
 		return false
@@ -2582,8 +2582,7 @@ func _tiled(tile: String, rect: Rect2, base: Color) -> bool:
 		return true
 	var ts := float(tex.get_width())
 	var ax := maxf(floorf(x0 / ts) * ts, rect.position.x)
-	var tint := Color(base.r / 0.65, base.g / 0.65, base.b / 0.65, base.a)
-	draw_texture_rect(tex, Rect2(ax, rect.position.y, x1 - ax, rect.size.y), true, tint)
+	draw_texture_rect(tex, Rect2(ax, rect.position.y, x1 - ax, rect.size.y), true, ShoreWorld.tile_tint(base, strength))
 	return true
 
 
@@ -2628,7 +2627,7 @@ func _draw_shore() -> void:
 			lx += 240.0
 	elif kind == "harbor":
 		draw_rect(Rect2(-w, 0.0, w * 2.0, 150.0), base)
-		_tiled("cobble", Rect2(-w, 8.0, w * 2.0, 142.0), base)
+		_tiled("cobble", Rect2(-w, 8.0, w * 2.0, 142.0), base, 0.55)
 		draw_rect(Rect2(-w, 0.0, w * 2.0, 8.0), base.darkened(0.4))
 		var bx := -HALF_WIDTH + 200.0
 		while bx <= HALF_WIDTH - 200.0:
@@ -2646,7 +2645,7 @@ func _draw_shore() -> void:
 		poly.append(Vector2(w, 300.0))
 		poly.append(Vector2(-w, 300.0))
 		draw_colored_polygon(poly, base)
-		_tiled("sand", Rect2(-w, 14.0, w * 2.0, 286.0), base)
+		_tiled("sand", Rect2(-w, 14.0, w * 2.0, 286.0), base, 0.8)
 		var wet := PackedVector2Array()
 		for p in _edge_pts:
 			wet.append(p + Vector2(0.0, 12.0))
