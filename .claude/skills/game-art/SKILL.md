@@ -33,6 +33,23 @@ and writes `assets/art/fish/<species id>.png`. Then:
 5. With TEST TOOLS on (title Settings) the shore has a TEST button: hook the species at once and use
    JUMP, THRASH, ROLL and LAND to see the picture on the phone in seconds.
 
+## Seeing the game (screenshots in the cloud session)
+Godot runs in the cloud container under a virtual display; check every visual change by eye:
+```
+curl -sSL -o /tmp/g.zip https://github.com/godotengine/godot/releases/download/4.4-stable/Godot_v4.4-stable_linux.x86_64.zip && unzip -oq /tmp/g.zip -d /tmp/godot
+/tmp/godot/Godot_v4.4-stable_linux.x86_64 --headless --path . --import
+xvfb-run -a -s "-screen 0 1560x720x24" /tmp/godot/Godot_v4.4-stable_linux.x86_64 --path . --rendering-driver opengl3 --resolution 1560x720 -s res://tools/shots/shot.gd -- spot=cesme_cove hour=0.35 out=/tmp/shots/x
+```
+`tools/shots/shot.gd` writes `<out>_shore.png`, `_fight.png` and `_catch.png` (or `scene=title|map`,
+`shore_only=1`, `fish=<id>`, water shader overrides `p:<uniform>=<value>`). Read the PNGs. The same
+binary runs `tests/smoke_features.gd` locally before a push. Rendering is software (llvmpipe), so the
+fps shown is not the phone's. Re-import after adding a PNG.
+
+## Painted ground tiles
+`assets/art/ground/*.png` come from `tools/art/make_ground_textures.py` (seamless, procedural, no
+third-party art). Draw them with `draw_texture_rect(tex, rect, true, ShoreWorld.tile_tint(colour))`
+on a node with `texture_repeat` enabled, only where the camera looks (`ShoreFishing._tiled`).
+
 ## Sourcing assets
 1. Prefer CC0. Record every pack in `assets/<pack>/SOURCE.md` (author, version, licence, where
    it came from, archive checksum) and keep the pack's own `License.txt` unchanged.
