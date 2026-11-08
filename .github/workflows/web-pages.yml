@@ -28,8 +28,8 @@ jobs:
         run: |
           mkdir -p "$HOME/godot" && cd "$HOME/godot"
           # --retry: a download cut short once (build 71) and broke the build with a corrupt zip
-          curl -sSL --fail --retry 4 --retry-delay 5 --retry-all-errors -o godot.zip "$GODOT_BASE/Godot_v4.4-stable_linux.x86_64.zip"
-          curl -sSL --fail --retry 4 --retry-delay 5 --retry-all-errors -o templates.tpz "$GODOT_BASE/Godot_v4.4-stable_export_templates.tpz"
+          curl -sSL --fail --retry 8 --retry-delay 20 --retry-all-errors -o godot.zip "$GODOT_BASE/Godot_v4.4-stable_linux.x86_64.zip"
+          curl -sSL --fail --retry 8 --retry-delay 20 --retry-all-errors -o templates.tpz "$GODOT_BASE/Godot_v4.4-stable_export_templates.tpz"
           unzip -q godot.zip
           chmod +x Godot_v4.4-stable_linux.x86_64
           unzip -q templates.tpz -d tpl
