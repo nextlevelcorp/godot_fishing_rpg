@@ -1,0 +1,283 @@
+# Game Design — Shore Fishing Türkiye (working title)
+
+Status: living document. Owner: the user. Last updated 2026-11-04 (build 11).
+
+## Positioning (decided 2026-11-04)
+**Casual, realistic shore fishing at real Turkish spots.** Phone first (web, later iOS and
+Android). Sessions of 3-10 minutes. Collection and mastery, not hypercasual one-tap rounds.
+
+## Pillars
+1. **Real places, honestly sourced.** Every spot is a real place; species lists and tips cite
+   sources (`fishing_spots.gd`) and say when something is a game-design fill.
+2. **Realism you can read.** Depth, feeding time and line tension decide the outcome, and the
+   screen always shows enough to reason about them (float, rings, depth line, tension bar).
+3. **A living shore.** Everything that moves follows Nature of Code rules (`noc.gd`): forces,
+   springs, particles, steering agents, oscillation, Perlin noise.
+4. **Calm, then tense.** Walking and waiting are relaxed; the bite and the fight are short and
+   intense, with sound, vibration and a side view.
+
+## Core loop
+Map: pick a spot -> walk the shore or pier -> read the water (rings, shoals) -> set float depth
+-> cast (charge, aim, release) -> wait -> nibbles -> bite window -> strike -> fight (side view)
+-> catch card -> coins and journal -> tackle shop -> next spot or next hour of the day.
+
+## Systems (as built)
+| System | Where | Rule |
+|---|---|---|
+| Spots | `fishing_spots.gd` | 9 real Turkish spots, kind (bridge/harbor/rocky/beach), slope, max depth, species, sources, tips |
+| Walking | `shore_fishing.gd` `_walk` | analog stick, shore band plus a 42 m pier (not on the bridge spot) |
+| Depth | `_water_depth` | depth = distance out x spot slope, capped at max depth |
+| Bite odds | `_species_weight` | rarity x depth match (exp falloff, 2.5 m) x feeding time (`BiomeDB.activity_factor`) |
+| Wait | `_activity` | base wait / feeding activity, so a bad depth or hour means a long wait |
+| Nibble and bite | `BITE_PROFILES` | per species caution, nibble count, bite window, spook and self-hook chance |
+| Fight | `fishing_controller.gd` | spring-mass line, reel, clutch (drag), fatigue, snap, slack escape |
+| Side view | `fight_view.gd` | depth spring toward a Perlin target; runs dive, tired fish rise |
+| Progression | `game_session.gd`, `turkey_map.gd` | coins, 3 shore rigs, journal (best weight, count), saved |
+| Town and life | `shore_world.gd` | per-sea town, day-night, walkers, cats, gulls, clouds |
+| Sound | `ambience.gd` | procedural surf, gulls, splash, plop, click, snap |
+
+## Progression (build 15)
+- **XP per catch** = `sqrt(base_price) x kg^0.4 x 4`, +25 for a species logged for the first time, +10 for a new personal record. Knobs: `GameSession.XP_*`.
+- **Level n** needs `40 x (n-1)^1.7` XP in total, max level 30 (`LEVEL_K`, `LEVEL_POW`).
+- **Spot unlocks** by level, `unlock_level` in `fishing_spots.gd`: Dikili 1, Antalya 1, Teos 2, Çeşme 3, Galata 4, Sinop 5, Trabzon 6, Fethiye 8, Kaş 10. Locked pins are grey on the map and the button reads "LOCKED - LEVEL N". (Unlock levels are game-design fill.)
+- **Outing goals** (3 per visit, `ShoreFishing._make_goals`): catch 3 fish (40 coins); log a new species (60 coins + 15 XP) or catch 2 different species; land one fish of at least 0.45 x the heaviest weight a spot species can reach (80 coins).
+- **Outing summary** when leaving with progress: catches, coins, XP, new species, records, goals, unlocks.
+- **Test:** catch a fish, XP bar grows; reach level 2, Teos unlocks; leave the shore, summary shows; reload page, level and XP persist.
+
+## Weather (build 19)
+Each outing rolls one weather (`weather_fx.gd`, `KINDS`): clear 45%, overcast 25%, light rain 15%, windy 15%. It multiplies fish activity (overcast 1.15, light rain 1.25, windy 0.9) and the wind on the cast (windy x2.2). Rain is drawn as particles pushed by Perlin gusts, with a grey tint. The label sits next to the clock. Values are game-design fill, loosely based on common angling lore. Test: enter a spot several times; the label changes, rain falls in "Light rain", casts drift more in "Windy".
+
+## Night lamp (build 20)
+After dark the angler carries a lamp: a warm, flickering pool of light (two oscillators plus Perlin noise). Standing on the pier at night raises fish activity by 15% (`LAMP_PIER_BONUS`, game-design fill; real pier anglers use lights to draw baitfish). Test: set the clock to night with "+1 hour"; the glow appears, and the quiet-water hint is rarer on the pier than on the beach.
+
+## Fight styles (build 22)
+A hooked fish is no longer drawn during the fight. The angler sees the line, bubbles and the rod bend, and the fish only when it shows itself. `BiomeDB.FIGHT_STYLES` / `FISH_STYLE` give each species a family of behaviour: jumper (clears the water: garfish, seabass, mullet, mackerel), thrasher (bluefish), runner (long fast runs: bonito, amberjack, trevally, leerfish), diver (dives, no surface show: dentex, red seabream), bulldog (dogged heavy pull, never shows: groupers, turbot, halibut), puller (default), gentle (small, light), clinger (cephalopods, crab). Style scales run length, gap, strength and dive depth; bigger fish for their species jump less (surface chance x0.4 at max size) and run 1.5x longer. When a run ends the fish may break the surface (`fish_surfaced`): a jump is a projectile under gravity, a thrash or roll is an oscillation. The catch is still shown when landed. Style assignment is game-design fill from general angling knowledge. Test: hook a bluefish (thrash), a garfish (jump), a dusky grouper (never visible, long pulls); the side view shows no fish between events.
+
+## First-person view (build 23)
+From the moment the cast is released until the fish is landed or lost, the screen switches to a first-person view from the angler's eyes (`pov_view.gd`, replaces the side view). Pinhole projection at eye height (2.6 m on rocks or beach, 4.5 m on a pier, 8 m on a bridge): the float, the flying bait and the fish are placed in metres along the aim line, using the same simulation as the top-down scene. The rod is held in front (bottom right): a damped spring pulled by line tension, the reel handle turns while reeling. The fish is hidden; it shows only when it jumps, thrashes or rolls (fight styles), and is lifted into view when landed. Around it: sky by time of day (sun, moon, stars, clouds), the far shore with a small town, a mosque and lit windows at night, boats on the horizon, gulls (steering agents), sun or moon glitter on the water, wave rows, foam at the near edge, and other anglers' rods nodding beside you (one bends on a fish now and then). The top-down world is hidden while the view is open, so it costs no drawing.
+
+Sound (`ambience.gd`) was rebuilt: splash is band-passed noise with a falling pitch plus bubble drops; the float going under is a rising-pitch bubble bloop; cast and strike are a rod swish; a run plays the clutch ratchet; a snapped line cracks and twangs; output is soft-limited.
+
+## Bait and hook (build 27)
+The BAIT / HOOK button (shore HUD, only with the line in) chooses one of nine baits and six hook sizes (`tackle.gd`, saved in `GameSession`).
+- **Which fish come:** each species' bite weight is multiplied by its liking for the bait (`Tackle.PREF`; e.g. gilthead seabream 1.4 on mussel, grey mullet 1.5 on bread dough, bluefish 1.4 on live bait, horse mackerel 1.5 on a çapari string; unlisted baits 0.15) and by the hook fit: each size too big for the mouth (`Tackle.MOUTH`) multiplies by 0.35. A poor choice also lengthens the wait, since activity drops.
+- **Hook-up:** a strike sets the hook with chance 0.9, times 0.55 per size too big and 0.75 per size too small; a miss says why.
+- **Hook strength:** each size opens up above a pull (No. 12 14 N ... 3/0 170 N). Tension above it for 0.35 s loses the fish ("The hook opened up").
+- **Bait theft:** each nibble may strip a soft bait (bread 35 %, mussel 25 %, worm 22 %, squid 8 %, live bait 5 %). A bare hook gets no bites; reeling in shows the bait was gone and re-baits.
+- **Lures** (spoon, çapari) fish only while you reel: waiting time runs 1.6x while reeling and 0.08x when still; predators hit them without nibbling. The çapari carries its own No. 8 hooks.
+Bait choices follow common Turkish shore-angling practice; all numbers are game-design fill. Test: bread dough at a harbour catches mostly mullet; a 3/0 hook gets no horse mackerel; a No. 12 hook loses a big bluefish when the clutch is set high.
+
+## Live bait and journal (build 29)
+- **Live bait is a resource.** Live baitfish sit in a bucket (max 12, saved). Small istavrit, hamsi or uskumru (under 0.4 kg) caught go into the bucket, as Turkish shore anglers do before fishing for bluefish; the map's tackle shop sells 5 for 30 coins. A fish that takes it, or small fish stripping it, uses one; you cannot cast live bait with an empty bucket.
+- **Journal** shows each species with its picture (painted sprite or drawing; a dark silhouette until caught). Caught: best weight, count, depth range, feeding time, two best baits and the hook range. Not caught: "Locals say: try ..." with the best baits and feeding time, so the hidden rules are learnable.
+
+## Fight realism (build 30)
+- **Head shakes:** jumpers and thrashers (bluefish, seabass, garfish, mullet, mackerels) shake their heads between runs (about every 4-5 s while stamina > 0.2): for 0.5-1 s the pull pulses at 8 Hz (+-70 %), the rod tip knocks in the first-person view and the phone buzzes. If the line is slack for more than 0.15 s during a shake, 35 % chance the hook is thrown.
+- **Jumps:** a jumping fish pulls nothing for 0.9 s. If the line is slack for more than 0.3 s of that, 45 % chance it throws the hook. Keep reeling through the jump.
+- **Landing:** a fish over 1.5 kg with stamina above 30 % will not be landed: at the edge it runs 4 m out again at full strength. Tire it first.
+All numbers are game-design fill. Test: hook a bluefish, stop reeling during a jump; it often throws the hook. Reel a fresh 3 kg fish straight in; it runs at the edge.
+
+## Seasons (build 31)
+The game uses the real month from the device (`season.gd`). Each species has peak and low months from the common Turkish angling calendar: bluefish Sep-Dec, bonito Aug-Nov, anchovy Nov-Feb, mackerel Oct-Jan, red mullet Jul-Oct, seabass Oct-Feb, squid Nov-Mar, octopus May-Sep and others. Peak months multiply the bite weight by 1.7, low months by 0.35 (game-design fill). The month shows next to the clock, and the journal marks each species "in season" or "out of season". Test: in November, bluefish and bonito come far more often at Galata than in May.
+
+## Legal sizes and limits (build 32)
+Turkish amateur rules from Tebliğ 2024/21 (6/2, valid 2024-2028), via search results, the official PDF was not reachable from the build environment (`regulations.gd` has the citation): minimum sizes seabass 25 cm, gilthead seabream 20 cm, horse mackerel 13 cm, bluefish 18 cm, turbot 45 cm and one per day; a 5 kg daily total. Length comes from weight with W = a L^3, a set by body depth (game-design fill). A fish that breaks a rule is released at the catch: +3 XP, no coins, no journal entry, and the card says why. The journal shows the legal size. Other species have no size rule in the game until their values are confirmed.
+
+## Bottom rig (build 33)
+The BAIT / HOOK panel also chooses the rig: FLOAT (samandıra, bait at the float depth) or BOTTOM (dip takımı: a lead sinker holds the bait on the bottom). With a bottom rig the bait depth is the water depth at the landing point, DEEP/SHAL do nothing, the cast flies 15 % farther, there is no float: bites show as the rod tip nodding and a brass bell at the tip ringing (soft on nibbles, hard on the bite). Bottom feeders (bream, whiting, scorpionfish, turbot, weever) come through the existing depth match. Lures ignore the rig. Test: on a 10 m bottom at Çeşme, a bottom rig with sea worm brings bream; a float set at 2 m brings mostly mid-water fish.
+
+## Landing net (build 35)
+From a pier, harbour quay or bridge a landed fish must be lifted through the air. Without a landing net (kepçe), a fish whose weight times about twice g (the jerk of the lift) exceeds the line's breaking force is lost at the last moment (with the starter rig, 55 N: about 2.8 kg). The tackle shop sells a net for 250 coins (saved). Rocks and beaches need no net. Game-design fill for the factor 2. Test: on the Galata bridge with no net, a 3 kg bluefish is lost at the end; after buying the net it is landed.
+
+## Daily challenge (build 36)
+`daily.gd`: one challenge per calendar day, the same for every player on that date (seeded by the date): a species at one of your unlocked spots, weighted toward species in season, of at least the median weight that species bites at. Reward once per day: 120 coins plus the species' base price, and 40 XP. The map's TODAY button shows it with the locals' bait and hook advice and a button that selects the spot; the catch card says when it is done.
+
+## Boat fishing (build 37)
+From level 3 the map offers RENT A BOAT (60 coins per outing) beside FROM SHORE. In a boat outing you sit in a rowing kayık about 65 m out: the joystick rows (oar force, water drag, Nature of Code forces), and while not anchored the current and wind drift the boat, in every state, so the line and float move with you. ANCH drops or lifts the anchor; rowing lifts it. You can cast in any direction; the water is deeper, so deeper species come through the depth match. In the first-person view the eye is 1.4 m above the water, the bow of the kayık rocks in front of you, and fish can come right alongside (1.2 m). No lifting from height, so no net is needed. Game-design fill for the numbers. Test: rent a boat at Çeşme, row out, anchor, fish a bottom rig: dentex and scorpionfish show up more than from the shore.
+
+## Currents (build 39)
+Each spot has a surface current along the shore (`current_ms` in `fishing_spots.gd`): Galata 1.0 m/s (the Bosphorus surface current runs south at up to about 2 m/s, Livius; the Golden Horn mouth is calmer, the value is game-design fill), Black Sea coasts 0.3-0.35, Aegean and Mediterranean bays 0.08-0.2 (game-design fill), varied ±20 % per outing. A float rides 60 % of it, so at Galata it drifts fast and you recast or fish a bottom rig; a bottom lead holds (2 %) unless the current is over 0.7 m/s, then it rolls (15 %). A boat that is not anchored drifts with it. The HUD line shows the current. Test: at Galata a float drifts visibly within 20 s; a bottom rig stays put far longer.
+
+## Soundscape (build 40)
+Background life follows the real month, the hour and the place (`_update_soundscape`): cicadas on summer days (June-September, daylight), crickets on warm nights (May-October), the tak-tak of a fishing boat's single-cylinder diesel rising as a boat passes within about 90 m, waves lapping the rocks or pier posts every 2.5-6 s when you are at the edge, and a ferry horn every 70-150 s at Istanbul and the harbours. All rendered offline from models in `tools/audio/render_sfx.py` (no recordings).
+
+## Sound check (build 41)
+Measured, not listened to: spectrograms of every sound, loop-join click detector (linear-prediction residual), level step at the end of each one-shot. Fixed: a click at the engine loop join, a hard cut at the end of the ferry horn (8 dB step) and of the cast line hiss (16 dB), a small step at the end of the float nibble. More natural: gull call (quick rise and long fall, pitch wobble, rough grating, breath), clutch ratchet with uneven clicks (no steady buzz), engine with uneven firings, cicadas as two voices, line snap with almost no room tail. New: rain on water (the "Light rain" weather now sounds), wind that follows the weather's wind, footsteps by ground (pier planks, gravel on rocks, sand on beaches, stone on quays and bridges; walking is also slower, about 2.4 steps a second), oar strokes in the boat, a flop when a fish lands, distance for other anglers' splashes and the ferry horn (quieter, duller, and late at 343 m/s). Every sound has its own seed, so editing one never changes another. Not verified: how any of it sounds on the phone.
+
+## Bending sprites (build 43)
+A painted fish sprite is drawn as a strip of 24 quads whose corners follow the swim wave (`RealFish._bend`: small at the head, large at the tail, a wave running head to tail), so the picture swims, jumps and flaps instead of staying stiff. Neighbouring quads share corner points, so the outline bends smoothly with no steps or seams; icons (no flex) stay one plain picture. Checked offline by simulating the same shear on the real sprites at four phases (smooth outlines, tails swing). Not verified: frame time on the phone (24 small polygons per visible fish).
+
+## Test tools and every sprite (build 44)
+- Title Settings has TEST TOOLS (saved). When on, the shore HUD has a TEST button: pick any species and a size, and it is hooked at once 25 m out (no waiting, no hook-up roll). While a test fish is on, JUMP, THRASH and ROLL force a surfacing and LAND lands it. Test catches give no coins, XP or journal entry; the card says "TEST". Species with a painted picture are marked with a star in the list. Test: turn it on, hook a Whiting at LARGE, press JUMP, then LAND.
+- The squid, cuttlefish and blue crab pictures are used wherever a species is drawn (catch, other anglers' catches, journal); the squid and cuttlefish bend, the crab (seen from above) does not. Octopus has no picture yet and keeps its drawing.
+- **Sound trace (build 45):** title Settings has SOUND TEST: it plays a splash on a fresh player and prints whether the file is found, the setting and the master bus mute state, the bus count and the mix rate, so a missing sound can be traced on the phone without a console. The distance sound no longer uses a custom audio bus (a risk on the web export). CI now also runs `tests/smoke_features.gd`, which drives the real shore scene: sounds load and play, settings survive a save, a TEST fish is hooked, jumps and is landed with no rewards. It proves the code runs; it cannot hear.
+- `tools/art/import_sprites.py` is the one way a picture becomes a sprite (empty check, background cut, trim, scale, contact sheet).
+
+## The fish hangs from the hook (build 47)
+Device report on build 46: the landed fish was drawn level and the line met the middle of its body,
+so it did not look hooked, and its motion was jerky. Now the hook is in the mouth:
+- **Landed fish** (`pov_view.gd` `_animate_catch`, build 48): two pendulums. The line swings
+  slowly from the rod tip and is reeled up to `HANG_LINE` px; the body swings from the hook,
+  pushed by the hook's acceleration (radius half the fish length, gravity 9.8 m/s², 280 px per
+  metre). A line only pulls: when the hook decelerates faster than gravity the line goes slack
+  (effective gravity never below 0.3 g), so the fish cannot flip over. Flaps come every 0.6-1.4 s,
+  slower as it tires; each kicks the body one way and tugs the line the other. Softer damping
+  (0.9 body, 0.5 line) lets the swing die out over a few seconds instead of stopping dead.
+- **Jump and thrash** (`_jump_pose`): the line runs to the mouth, not to the body centre. The head
+  shake is smaller (0.12 rad) and the thrash eases in and out instead of snapping.
+- **Same side every time** (build 49, owner choice): the hanging fish always shows the same side,
+  snout up; it no longer picks left or right at random.
+Tuning knobs: `HANG_LINE`, `PX_PER_M`, flap interval and strength in `_animate_catch`.
+
+## Wide phones fill the screen (build 51)
+The window used to keep 16:9 with bars at the sides on 19.5:9 phones. It now stretches with
+aspect "expand": the screen is at least 1280x720 design units and wider phones see more.
+- Touch buttons and the joystick are pinned to the nearest screen corner (`TouchControls._pin`),
+  so they stay under the thumbs at the edges.
+- The first-person view keeps its 1280x720 design rect centred (`FightView.center_design_rect`);
+  sky, sea, waves, foam and the shore foreground are drawn out to the screen edges (`pad()`).
+- The shore camera, the map and the title screen already lay out from the screen size.
+- Safe areas: Safari keeps page content inside the notch insets on its own, so nothing is added.
+- Portrait still shows the "turn your phone" screen (`device_guard.gd`).
+
+## Pick the hour you go out (build 52)
+Every outing used to start at 07:12, so night species (squid, cuttlefish, scorpionfish) took
+minutes of waiting or "+1 hour" taps. The map now has a START button that cycles DAWN 05:45,
+MORNING 07:55, DUSK 17:16 and NIGHT 21:07 (`GameSession.START_TIMES`). Real anglers plan around
+first light and the evening bite; the choice makes the bite-time rules in BiomeDB a decision made
+before the trip. Default MORNING keeps the old feel. Kept for the session, not saved.
+
+## Locals on the shore (build 53)
+First slice of "angler life" (owner's pick from /brainstorm, 2026-11-07). Pillar: the shore is a
+place with people, not only water; a reason to come back to the same spot.
+- **Who:** one named local angler per spot (`locals.gd` `PEOPLE`), e.g. Hasan Amca on Galata
+  Bridge, Kemal Usta on the Çanakkale waterfront. They are one of the anglers already on the
+  shore, nearest the start, drawn in their own clothes with a name tag. All people and lines are
+  game-design fill; no real person is portrayed.
+- **Loop:** walk up (within 130 px) and TALK. They ask for 1-3 fish of one species from the spot's
+  list (weighted to in-season, common fish). Only kept fish count (legal size, daily limits), and
+  the catch card shows the progress. A yellow "!" over their head means the fish are ready: GIVE.
+- **Reward:** 20 + species base price x count coins, 20 XP per fish, friendship +1, and a new
+  request. Friendship tiers: Stranger 0, Known face 1, Friend 3, Old friend 6. The greeting
+  changes with the tier; from Friend on they share a secret each visit (when one of the spot's
+  species feeds and the best bait and hook size, from BiomeDB and `tackle.gd`).
+- **Saved:** friendship and the open request per spot (`GameSession.local_friend`, `local_req`).
+- **Calls out (build 56):** land a fish within 450 px of the local and their line goes on the
+  catch card: by the fish's size in its species' weight range (big, fair, small), or a nod when
+  you release one (`Locals.react`).
+- **Later slices:** a bait shop keeper.
+- **Test:** CI feature smoke checks the local exists, the TALK button exists and the panel opens.
+Tuning knobs: `COINS_BASE`, `XP_PER_FISH`, `TIERS`, `FRIEND_AT`, `TALK_RADIUS`.
+
+## Weekly shore tournament (build 54)
+Second slice of angler life. A reason to plan a trip and a short burst of pressure inside a
+casual session.
+- **Where and when:** one spot a week, picked from the spots you have unlocked (`tournament.gd`
+  `spot_this_week`, a new pick each Monday). The map note and a TOURNAMENT button on that shore
+  say so.
+- **Rules:** entry 30 coins, five minutes of real time, the heaviest single kept fish wins. Kept
+  means legal size and inside the daily limits, so a released fish does not count. A fish on the
+  line at the horn still counts: the end waits for the fight.
+- **Rivals:** the three anglers nearest you when you enter, the spot's local among them. They run
+  their usual wait-bite-land loop; each landed fish counts if it is of legal size (they release
+  under-size fish like you). The HUD shows time left, your best and place, and the leader.
+- **Prizes:** 300 / 150 / 60 coins and 80 / 40 / 20 XP, paid once a week; entering again that
+  week is for fun. No fish means last place.
+- **Saved:** the week whose prize was paid and the number of wins.
+- **Test:** CI feature smoke enters a tournament, ends it at the horn with no fish and checks that
+  the entry was paid and no prize given.
+Tuning knobs: `ENTRY`, `DURATION_S`, `PRIZES`, `PRIZE_XP`, `RIVALS`.
+
+## Special baits from the tackle shop (build 57)
+Owner's decision (2026-11-07): the ten everyday baits stay free; special, prized baits cost coins.
+- **Baits** (`tackle.gd`, `shop`): tube worm (boru kurdu, 5 for 40), peeler crab (soyulmuş yengeç,
+  3 for 60) and live shrimp (canlı karides, 5 for 50). Turkish shore anglers prize them for bream,
+  red mullet, seabass and dentex; pack sizes, prices and liking numbers are game-design fill. Each
+  is liked more (1.2-1.7) than any free bait by the species it suits, and is harder to steal.
+- **Use:** bought on the map's tackle shop (which lists the species that like each best), kept in
+  a box of up to 20 per bait (saved). One is used when a fish takes it or a nibble picks it off,
+  the same rule as the live-bait bucket. With none left you cannot cast it.
+- **Why:** a coin sink with a choice: pay for a better chance at the fish you want (a tournament,
+  a local's request, a new species), or fish free.
+- **Test:** CI feature smoke buys a pack, checks stock and coins, uses one.
+Tuning knobs: `pack`, `price`, `steal`, `PREF` entries, `BAIT_STOCK_MAX`.
+
+## The real moon (build 60)
+Invented in /brainstorm (owner: "invent"). Realism with no new UI to learn: the game already uses
+the device's real month for seasons, now it uses the real moon too.
+- **Phase** (`moon.gd`): from the device date, mean synodic month 29.530588853 days from the new
+  moon of 2000-01-06 18:14 UTC; right to about half a day. Shown in the shore HUD line (month, time,
+  weather, moon). The first-person sky draws the moon with its real phase (waxing lit on the right).
+- **Effect on night fishing** (only at night, fading with daylight): squid, cuttlefish and octopus
+  bite x1.15 at new moon down to x0.85 at full moon (they come to the lamp on dark nights); other
+  night feeders such as bass bite x0.90 at new moon up to x1.10 at full moon. The numbers are
+  game-design fill from common angling lore, not surveyed.
+- **Test:** CI checks the phase on two known dates (full 2024-01-25, new 2024-01-11), the effect
+  direction for both groups, no effect by day, and the phase names.
+Tuning knobs: `DARK_BONUS`, `LIGHT_BONUS`.
+
+## Named winds (build 61)
+Owner's pick ("Rüzgar"). Each outing has one of the winds of the Turkish compass rose (`winds.gd`):
+Yıldız (N), Poyraz (NE), Gündoğusu (E), Keşişleme (SE), Kıble (S), Lodos (SW), Günbatısı (W),
+Karayel (NW), or a calm (limanlık) day.
+- **Sources:** names, directions and lodos as the warm south-westerly that matters to seafarers:
+  the Turkish State Meteorological Service glossary (mgm.gov.tr). Poyraz keeping boats in harbour:
+  press reports from Tekirdağ. No source was found on how lodos changes shore bites.
+- **What it does:** sets the wind's direction on the shore (north up; it pushes the flying bait,
+  the line and the float) and its strength (rolled within each wind's range). Bites: calm x1.08,
+  poyraz x0.85, lodos x0.90, others x0.95-1.0, and x0.92 more above 8 m/s. These numbers, the
+  speed ranges and how often each wind blows are game-design fill. The weather's own wind
+  multiplier (WeatherFx "windy") still applies on top.
+- **Shown:** in the shore HUD line, e.g. "Poyraz (NE) 7 m/s".
+- **Test:** CI checks poyraz blows toward the south-west, calm has no wind, strong poyraz cuts
+  bites, and every rolled wind is known and inside its speed range.
+Tuning knobs: `KINDS` (bite, ms, weight), `PX_PER_MS`.
+
+## Review pass (build 62-63)
+A five-agent review on 2026-11-08 (QA, architecture, visual, benchmark against shipped fishing
+games, retention/economy), all from reading the code; nothing measured on a device.
+- **First minute:** a player who has never landed a fish gets the first visit within 2.5-4.5 s;
+  every wait is capped at 30 s (`MAX_WAIT_S`), after the review estimated up to ~67 s.
+- **Economy:** every kept fish is worth at least 3 coins (`MIN_FISH_COINS`); the outing weight goal
+  never asks, on a quay or bridge without a landing net, for more than you can lift on the line.
+- **Coming back:** the first fish kept on a new calendar day counts a day on the water and pays
+  20 coins, +10 a day up to 100 (`GameSession.mark_fishing_day`). The count only grows: a missed day
+  costs nothing. The outing summary lists today's challenge and this week's tournament spot.
+- **Turkish names:** catch card and journal show "Bluefish (lüfer)" (`BiomeDB.TR_NAMES`).
+- **Size medals (build 65):** the journal marks your best fish of each species BRONZE, SILVER or
+  GOLD by where it falls in the species' weight range (30% and 60%; with the game's weight roll
+  about 21% of fish reach gold). A reason to fish a logged species again.
+- **HUD, performance and bug fixes:** see the build 62 commit message.
+- **Not done, owner decisions:** Turkish UI (owner said not now), a shared theme for all panels,
+  painted ground tiles and character sprites (need art), splitting `shore_fishing.gd`.
+
+## Graphics pass (build 67)
+First pass made with real screenshots: Godot 4.4 runs in the cloud session under a virtual display
+(`tools/shots/shot.gd` saves the shore, the fight and the catch at any spot and hour).
+- **Water:** the top-down sea read as white static: per-pixel sun glints from a strong, fine normal
+  map. Now broad, soft highlights (`nightshoal_water.gdshader`: normal_strength 40 to 8, glint and
+  sky-reflection strength as uniforms, gentler caustics). The "+" sparkles were removed.
+- **Soft light and shade:** cloud shadows, street-lamp and window glows and the angler's night lamp
+  use one radial falloff texture (`assets/art/ui/soft_disc.png`) instead of stacked hard discs.
+- **Nights** follow the real moon: a full moon lifts the darkness, a new moon leaves it deep blue.
+- **Painted ground (build 70):** seamless 256 px tiles made by `tools/art/make_ground_textures.py`
+  (sand, pebbles, rock, cobble, planks, concrete, grass; no third-party art) replace the flat fills:
+  pebbles behind the rocks, sand on beaches, cobbles on quays, concrete on the bridge, planks on the
+  pier, grass and cobbles in the town. Tinted to each spot's palette (`ShoreWorld.tile_tint`, capped
+  so pale palettes do not wash out), drawn only where the camera looks.
+- **Rocky shore:** the surf line runs under the rocks, not across them; the swell wash is a short arc
+  on rocks that stand in the water.
+- **Catch card:** top left beside the hanging fish, clear of the coins, the status line and the
+  touch buttons; the goal list steps aside while it shows; long lines shrink to fit; species shows
+  as "Bluefish (lüfer)" (the old ASCII Turkish name is replaced).
+
+## Content
+42 species in BiomeDB; about 25 used by shore spots (fish, octopus, cuttlefish, squid, blue
+crab). Feeding times: twilight (default), day, night (game rule from general angling knowledge).
+
+## Known design gaps (see MVP_ROADMAP.md)
+No onboarding; no main menu or settings; no goals beyond coins and the journal; no session
+summary; English-only text for a Turkish audience; portrait phones letterboxed.
+
+## Out of scope for the MVP
+Monetization, accounts, backend, multiplayer, the legacy boat game.
